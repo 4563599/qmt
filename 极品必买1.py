@@ -1,35 +1,39 @@
 # -*- coding: gbk -*-
 """
-QMT极品必买策略 - 对应通达信公式
+QMT极品必买策略 - 优化版
+优化点：
+1. 全量行情获取：subscribe_whole_quote + get_full_tick(全部股票) 一次性获取
+2. 增量更新：历史数据只加载一次，扫描时只用实时数据
+3. 极速过滤：按淘汰率排序条件判断，90%股票在前两步被淘汰
+
 条件：
-1. ZF45: 今日最高 > 昨收*1.045 (涨幅4.5%)
-2. NIB1: 10天内 最高>昨收*1.065 的次数>=5 (涨幅6.5%)
-3. NIB2: 排除8和4开头
+1. NIB2: 排除8和4开头（最快，字符串判断，初始化时过滤）
+2. ZF45: 今日最高 > 昨收*1.045（极快，只需tick数据）
+3. NIB1: 10天内 最高>昨收*1.065 的次数>=5
 4. 10天内阴线数量<=3
 5. 10天内不存在"阴线且最低价<=MA5"的情况
 """
 
 import numpy as np
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
 # 全局变量
-g_stock_pool = []
-g_qualified_stocks = {}  # 当前符合条件的股票 {stock: info}
-g_all_found_stocks = {}  # 累计发现的所有股票 {stock: first_found_time}
-g_history_cache = {}
-g_prev_close_cache = {}
+g_stock_pool = []  # 预过滤后的股票池（已排除8/4开头）
+g_qualified_stocks = {}
+g_all_found_stocks = {}
 g_scan_count = 0
 g_initialized = False
 g_context = None
 g_lock = threading.Lock()
 
+# ========== 优化2: 历史数据缓存（只加载一次） ==========
+g_history_data = {}  # {stock: {'closes': array, 'opens': array, 'highs': array, 'lows': array}}
+g_prev_close_cache = {}  # {stock: prev_close}
+
 # 配置参数
 DEBUG_MODE = True
 CHECK_TRADING_TIME = False
-BATCH_SIZE = 800
-MAX_WORKERS = 12
 PRINT_PROGRESS = True
 
 
@@ -39,21 +43,31 @@ def log(msg, level="INFO"):
 
 
 def init(ContextInfo):
-    global g_stock_pool, g_initialized, g_context, g_history_cache, g_prev_close_cache
+    global g_stock_pool, g_initialized, g_context
     
     g_context = ContextInfo
     log("=" * 60)
-    log("========== 策略初始化开始 ==========")
+    log("========== 策略初始化开始（优化版） ==========")
     log("=" * 60)
     
-    g_stock_pool = get_stock_pool(ContextInfo)
-    log(f"股票池加载完成，共 {len(g_stock_pool)} 只股票")
+    # ========== 优化1: 订阅全市场行情 ==========
+    log(">>> 订阅全市场行情...")
+    try:
+        ContextInfo.subscribe_whole_quote(["SH", "SZ"])
+        log(">>> 全市场行情订阅成功 (SH, SZ)")
+    except Exception as e:
+        log(f">>> 全市场行情订阅失败: {e}", "WARN")
     
+    # 获取股票池（预过滤8/4开头）
+    g_stock_pool = get_stock_pool(ContextInfo)
+    log(f"股票池加载完成，共 {len(g_stock_pool)} 只股票（已排除8/4开头）")
+    
+    # ========== 优化2: 只加载一次历史数据 ==========
     log("")
-    log(">>> 正在预加载历史数据，请稍候...")
-    preload_all_data(ContextInfo)
+    log(">>> 正在预加载历史数据（只加载一次）...")
+    preload_history_data(ContextInfo)
     log(f">>> 历史数据预加载完成")
-    log(f">>> 缓存股票数: {len(g_history_cache)}")
+    log(f">>> 缓存股票数: {len(g_history_data)}")
     log(f">>> 昨收价缓存: {len(g_prev_close_cache)}")
     
     ContextInfo.run_time("scan_stocks", "3nSecond", "2024-01-01 09:30:00", "SH")
@@ -70,6 +84,7 @@ def init(ContextInfo):
 
 
 def get_stock_pool(ContextInfo):
+    """获取股票池，预过滤8/4开头（NIB2条件前置）"""
     stock_list = []
     log("正在获取股票列表...")
     
@@ -99,7 +114,7 @@ def get_stock_pool(ContextInfo):
         if 'ST' in stock.upper():
             excluded_st += 1
             continue
-        # NIB2: 排除8和4开头（北交所）
+        # NIB2: 排除8和4开头（北交所）- 在初始化时就过滤掉
         if code.startswith('8') or code.startswith('4'):
             excluded_bse += 1
             continue
@@ -121,15 +136,19 @@ def get_stock_pool(ContextInfo):
     return stock_list
 
 
-def preload_all_data(ContextInfo):
-    global g_history_cache, g_prev_close_cache
+def preload_history_data(ContextInfo):
+    """
+    优化2: 只加载一次历史数据到内存
+    历史数据（前14天）在交易日内不变，无需重复获取
+    """
+    global g_history_data, g_prev_close_cache
     
     batch_size = 300
     total = len(g_stock_pool)
     success_count = 0
     fail_count = 0
     
-    log(f"开始批量加载，共 {total} 只股票，批次大小 {batch_size}")
+    log(f"开始批量加载历史数据，共 {total} 只股票")
     
     for i in range(0, total, batch_size):
         batch = g_stock_pool[i:i+batch_size]
@@ -137,6 +156,7 @@ def preload_all_data(ContextInfo):
         total_batches = (total + batch_size - 1) // batch_size
         
         try:
+            # 获取15天数据（含今天，用于计算MA5等）
             data = ContextInfo.get_market_data(
                 ['open', 'high', 'low', 'close'], 
                 batch, 
@@ -147,28 +167,17 @@ def preload_all_data(ContextInfo):
             if data is not None:
                 for stock in batch:
                     try:
-                        stock_data = None
+                        stock_data = extract_stock_data(data, stock)
                         
-                        if hasattr(data, 'minor_xs'):
-                            try:
-                                stock_data = data.minor_xs(stock)
-                            except:
-                                pass
-                        
-                        if stock_data is None and hasattr(data, 'loc'):
-                            try:
-                                stock_data = data.loc[:, :, stock]
-                            except:
-                                pass
-                        
-                        if stock_data is None:
-                            try:
-                                stock_data = data[stock]
-                            except:
-                                pass
-                        
-                        if stock_data is not None and len(stock_data) >= 2:
-                            g_history_cache[stock] = stock_data
+                        if stock_data is not None and len(stock_data) >= 11:
+                            # 存储为numpy数组，加速后续计算
+                            g_history_data[stock] = {
+                                'closes': stock_data['close'].values.astype(float),
+                                'opens': stock_data['open'].values.astype(float),
+                                'highs': stock_data['high'].values.astype(float),
+                                'lows': stock_data['low'].values.astype(float)
+                            }
+                            # 昨收价 = 倒数第二天的收盘价
                             g_prev_close_cache[stock] = float(stock_data['close'].iloc[-2])
                             success_count += 1
                         else:
@@ -176,38 +185,43 @@ def preload_all_data(ContextInfo):
                     except:
                         fail_count += 1
             else:
-                log(f"  批次{batch_num}批量获取失败，尝试逐个获取...", "WARN")
-                for stock in batch:
-                    try:
-                        d = ContextInfo.get_market_data(['open','high','low','close'], [stock], period='1d', count=15)
-                        if d is not None and len(d) >= 2:
-                            g_history_cache[stock] = d
-                            g_prev_close_cache[stock] = float(d['close'].iloc[-2])
-                            success_count += 1
-                        else:
-                            fail_count += 1
-                    except:
-                        fail_count += 1
+                fail_count += len(batch)
                         
         except Exception as e:
             log(f"  批次{batch_num}异常: {str(e)}", "ERROR")
-            for stock in batch:
-                try:
-                    d = ContextInfo.get_market_data(['open','high','low','close'], [stock], period='1d', count=15)
-                    if d is not None and len(d) >= 2:
-                        g_history_cache[stock] = d
-                        g_prev_close_cache[stock] = float(d['close'].iloc[-2])
-                        success_count += 1
-                    else:
-                        fail_count += 1
-                except:
-                    fail_count += 1
+            fail_count += len(batch)
         
-        progress = min(i + batch_size, total)
-        pct = progress * 100 // total
-        log(f"  [预加载] 批次 {batch_num}/{total_batches} | 进度: {progress}/{total} ({pct}%) | 成功: {success_count} | 失败: {fail_count}")
+        if PRINT_PROGRESS:
+            progress = min(i + batch_size, total)
+            pct = progress * 100 // total
+            log(f"  [预加载] 批次 {batch_num}/{total_batches} | 进度: {progress}/{total} ({pct}%) | 成功: {success_count}")
     
     log(f"预加载完成: 成功 {success_count} 只, 失败 {fail_count} 只")
+
+
+def extract_stock_data(data, stock):
+    """从批量数据中提取单只股票数据"""
+    stock_data = None
+    
+    if hasattr(data, 'minor_xs'):
+        try:
+            stock_data = data.minor_xs(stock)
+        except:
+            pass
+    
+    if stock_data is None and hasattr(data, 'loc'):
+        try:
+            stock_data = data.loc[:, :, stock]
+        except:
+            pass
+    
+    if stock_data is None:
+        try:
+            stock_data = data[stock]
+        except:
+            pass
+    
+    return stock_data
 
 
 def handlebar(ContextInfo):
@@ -215,6 +229,12 @@ def handlebar(ContextInfo):
 
 
 def scan_stocks(ContextInfo):
+    """
+    优化后的扫描逻辑：
+    1. 一次性获取全部股票行情（传入完整股票列表）
+    2. 极速过滤：按淘汰率排序条件
+    3. 只用内存中的历史数据 + 实时tick计算
+    """
     global g_qualified_stocks, g_scan_count
     
     current_time = datetime.now()
@@ -225,147 +245,192 @@ def scan_stocks(ContextInfo):
     g_scan_count += 1
     log("")
     log("#" * 70)
-    log(f"############## 第 {g_scan_count} 轮扫描开始 ##############")
+    log(f"############## 第 {g_scan_count} 轮扫描开始（优化版） ##############")
     log("#" * 70)
     
     start_time = datetime.now()
     
+    # ========== 优化1: 一次性获取全部股票行情 ==========
     log("")
-    log(">>> 步骤1: 获取实时行情")
-    all_ticks = {}
-    tick_success = 0
-    tick_fail = 0
+    log(">>> 步骤1: 获取实时行情（一次性传入全部股票）")
+    tick_start = datetime.now()
     
-    total_batches = (len(g_stock_pool) + BATCH_SIZE - 1) // BATCH_SIZE
+    try:
+        # 一次性传入全部股票列表获取行情
+        all_ticks = ContextInfo.get_full_tick(g_stock_pool)
+        tick_count = len(all_ticks) if all_ticks else 0
+        tick_elapsed = (datetime.now() - tick_start).total_seconds()
+        log(f">>> 行情获取完成: {tick_count} 只, 耗时 {tick_elapsed:.3f} 秒")
+    except Exception as e:
+        log(f">>> 行情获取失败: {e}", "ERROR")
+        all_ticks = {}
     
-    for i in range(0, len(g_stock_pool), BATCH_SIZE):
-        batch = g_stock_pool[i:i+BATCH_SIZE]
-        batch_num = i // BATCH_SIZE + 1
-        
-        try:
-            ticks = ContextInfo.get_full_tick(batch)
-            if ticks:
-                all_ticks.update(ticks)
-                tick_success += len(ticks)
-            else:
-                tick_fail += len(batch)
-        except Exception as e:
-            log(f"  批次{batch_num}获取行情异常: {str(e)}", "ERROR")
-            tick_fail += len(batch)
-        
-        log(f"  [行情] 批次 {batch_num}/{total_batches} | 本批: {len(batch)} 只 | 累计获取: {len(all_ticks)} 只")
+    if not all_ticks:
+        log(">>> 无行情数据，跳过本轮扫描", "WARN")
+        return
     
-    log(f">>> 行情获取完成: 成功 {tick_success} 只, 失败 {tick_fail} 只")
-    
+    # ========== 优化3: 极速过滤 ==========
     log("")
-    log(">>> 步骤2: 并行筛选股票（通达信公式逻辑）")
+    log(">>> 步骤2: 极速过滤（按淘汰率排序）")
+    filter_start = datetime.now()
+    
     qualified = []
-    stats = {'no_tick': 0, 'no_prev': 0, 'no_hist': 0, 'fail_zf45': 0, 'fail_nib1': 0, 'fail_yinxian': 0, 'fail_ma5': 0, 'pass': 0}
-    processed = [0]
+    stats = {
+        'total': len(g_stock_pool),
+        'no_tick': 0,
+        'no_prev': 0,
+        'no_hist': 0,
+        'fail_zf45': 0,  # 第1道过滤（最快）
+        'fail_nib1': 0,  # 第2道过滤
+        'fail_yinxian': 0,  # 第3道过滤
+        'fail_ma5': 0,  # 第4道过滤（最慢）
+        'pass': 0
+    }
     
-    def check_stock(stock):
-        """检查单只股票 - 对应通达信公式"""
-        if stock not in all_ticks:
-            return None, 'no_tick'
-        
-        tick = all_ticks[stock]
-        prev_close = g_prev_close_cache.get(stock)
-        
-        if not prev_close or prev_close <= 0:
-            return None, 'no_prev'
-        
-        today_high = tick.get('high', 0)
-        if not today_high or today_high <= 0:
-            return None, 'no_tick'
-        
-        # 条件1: ZF45 - 今日最高 > 昨收*1.045 (涨幅4.5%)
-        if today_high <= prev_close * 1.045:
-            return None, 'fail_zf45'
-        
-        # 获取历史数据
-        hist = g_history_cache.get(stock)
-        if hist is None or len(hist) < 11:
-            return None, 'no_hist'
-        
-        # 条件2: COUNT(NIB1,10)>=5 - 10天内涨幅达6.5%的次数>=5
-        count_65 = check_nib1_count(hist)
-        if count_65 < 5:
-            return None, 'fail_nib1'
-        
-        # 条件3: COUNT(C<O,10)<=3 - 10天内阴线数量<=3
-        yinxian_count = check_yinxian_count(hist)
-        if yinxian_count > 3:
-            return None, 'fail_yinxian'
-        
-        # 条件4: COUNT(C<O AND L<=MA5, 10)=0 - 10天内不存在"阴线且最低价<=MA5"
-        if not check_ma5_condition(hist):
-            return None, 'fail_ma5'
-        
-        # 通过所有条件
-        current_price = tick.get('lastPrice', 0)
-        if not current_price:
-            current_price = tick.get('price', tick.get('last', 0))
-        
-        max_gain = (today_high - prev_close) / prev_close * 100
-        
-        return {
-            'stock': stock,
-            'today_max_gain': round(max_gain, 2),
-            'gain_65_count': count_65,
-            'yinxian_count': yinxian_count,
-            'current_price': current_price,
-            'prev_close': round(prev_close, 2),
-            'today_high': round(today_high, 2),
-            'time': current_time.strftime('%H:%M:%S')
-        }, 'pass'
+    # 遍历预过滤后的股票池（已排除8/4开头）
+    for stock in g_stock_pool:
+        result = check_stock_fast(stock, all_ticks, stats)
+        if result:
+            qualified.append(result)
+            log(f"  ★ 命中: {stock} | 涨幅:{result['today_max_gain']}% | 6.5%次数:{result['gain_65_count']} | 阴线:{result['yinxian_count']}天", "SUCCESS")
     
-    log(f"  启动 {MAX_WORKERS} 个线程并行处理...")
+    filter_elapsed = (datetime.now() - filter_start).total_seconds()
+    total_elapsed = (datetime.now() - start_time).total_seconds()
     
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = {executor.submit(check_stock, stock): stock for stock in g_stock_pool}
-        
-        for future in as_completed(futures):
-            try:
-                result, stat_key = future.result()
-                with g_lock:
-                    processed[0] += 1
-                    stats[stat_key] = stats.get(stat_key, 0) + 1
-                    
-                    if result:
-                        qualified.append(result)
-                        stock = result['stock']
-                        log(f"  ★ 命中: {stock} | 涨幅:{result['today_max_gain']}% | 6.5%次数:{result['gain_65_count']} | 阴线:{result['yinxian_count']}天", "SUCCESS")
-                    
-                    if processed[0] % 1000 == 0:
-                        log(f"  [筛选进度] {processed[0]}/{len(g_stock_pool)} | 当前命中: {len(qualified)} 只")
-            except Exception as e:
-                pass
-    
-    end_time = datetime.now()
-    elapsed = (end_time - start_time).total_seconds()
-    
+    # 打印统计
     log("")
     log("=" * 60)
-    log("扫描统计汇总（对应通达信公式条件）")
+    log("扫描统计汇总（极速过滤版）")
     log("=" * 60)
-    log(f"总股票数: {len(g_stock_pool)}")
-    log(f"扫描耗时: {elapsed:.2f} 秒")
-    log(f"扫描速度: {len(g_stock_pool)/elapsed:.0f} 只/秒")
+    log(f"总股票数: {stats['total']} (已预排除8/4开头)")
+    log(f"行情获取耗时: {tick_elapsed:.3f} 秒")
+    log(f"过滤计算耗时: {filter_elapsed:.3f} 秒")
+    log(f"总扫描耗时: {total_elapsed:.2f} 秒")
+    log(f"扫描速度: {stats['total']/total_elapsed:.0f} 只/秒")
     log("-" * 40)
     log(f"无行情数据: {stats['no_tick']}")
     log(f"无昨收价: {stats['no_prev']}")
     log(f"无历史数据: {stats['no_hist']}")
-    log(f"条件1淘汰(ZF45: 今日涨幅<4.5%): {stats['fail_zf45']}")
-    log(f"条件2淘汰(NIB1: 6.5%次数<5): {stats['fail_nib1']}")
-    log(f"条件3淘汰(阴线数量>3): {stats['fail_yinxian']}")
-    log(f"条件4淘汰(阴线跌破MA5): {stats['fail_ma5']}")
+    log(f"第1道淘汰(ZF45: 今日涨幅<4.5%): {stats['fail_zf45']}")
+    log(f"第2道淘汰(NIB1: 6.5%次数<5): {stats['fail_nib1']}")
+    log(f"第3道淘汰(阴线数量>3): {stats['fail_yinxian']}")
+    log(f"第4道淘汰(阴线跌破MA5): {stats['fail_ma5']}")
     log(f"全部通过: {stats['pass']}")
     log("=" * 60)
     
-    # 检查新增股票
-    new_stocks = []
+    # 处理结果
+    process_results(qualified, current_time)
+    
+    log("")
+    log("#" * 70)
+    log(f"############## 第 {g_scan_count} 轮扫描结束 ##############")
+    log("#" * 70)
+    log("")
+
+
+def check_stock_fast(stock, all_ticks, stats):
+    """
+    优化3: 极速过滤 - 按淘汰率排序条件判断
+    顺序：ZF45(最快) → NIB1 → 阴线数量 → MA5(最慢)
+    """
+    # 获取tick数据
+    tick = all_ticks.get(stock)
+    if not tick:
+        stats['no_tick'] += 1
+        return None
+    
+    # 获取昨收价
+    prev_close = g_prev_close_cache.get(stock)
+    if not prev_close or prev_close <= 0:
+        stats['no_prev'] += 1
+        return None
+    
+    today_high = tick.get('high', 0)
+    if not today_high or today_high <= 0:
+        stats['no_tick'] += 1
+        return None
+    
+    # ========== 第1道过滤: ZF45（最快，只需tick数据） ==========
+    # 今日最高 > 昨收*1.045 (涨幅4.5%)
+    if today_high <= prev_close * 1.045:
+        stats['fail_zf45'] += 1
+        return None
+    
+    # 获取历史数据（从内存缓存）
+    hist = g_history_data.get(stock)
+    if not hist:
+        stats['no_hist'] += 1
+        return None
+    
+    closes = hist['closes']
+    opens = hist['opens']
+    highs = hist['highs']
+    lows = hist['lows']
+    
+    if len(closes) < 11:
+        stats['no_hist'] += 1
+        return None
+    
+    # ========== 第2道过滤: NIB1 ==========
+    # COUNT(H > REF(C,1)*1.065, 10) >= 5
+    count_65 = 0
+    for i in range(len(closes) - 10, len(closes)):
+        if i >= 1 and closes[i-1] > 0 and highs[i] > closes[i-1] * 1.065:
+            count_65 += 1
+    
+    if count_65 < 5:
+        stats['fail_nib1'] += 1
+        return None
+    
+    # ========== 第3道过滤: 阴线数量 ==========
+    # COUNT(C<O, 10) <= 3
+    yinxian_count = 0
+    for i in range(len(closes) - 10, len(closes)):
+        if closes[i] < opens[i]:
+            yinxian_count += 1
+    
+    if yinxian_count > 3:
+        stats['fail_yinxian'] += 1
+        return None
+    
+    # ========== 第4道过滤: MA5条件（最慢） ==========
+    # COUNT(C<O AND L<=MA5, 10) = 0
+    for i in range(len(closes) - 10, len(closes)):
+        if i >= 4:
+            ma5 = np.mean(closes[i-4:i+1])
+            if closes[i] < opens[i] and lows[i] <= ma5:
+                stats['fail_ma5'] += 1
+                return None
+    
+    # ========== 通过所有条件 ==========
+    stats['pass'] += 1
+    
+    current_price = tick.get('lastPrice', 0)
+    if not current_price:
+        current_price = tick.get('price', tick.get('last', 0))
+    
+    max_gain = (today_high - prev_close) / prev_close * 100
+    
+    return {
+        'stock': stock,
+        'today_max_gain': round(max_gain, 2),
+        'gain_65_count': count_65,
+        'yinxian_count': yinxian_count,
+        'current_price': current_price,
+        'prev_close': round(prev_close, 2),
+        'today_high': round(today_high, 2),
+        'time': datetime.now().strftime('%H:%M:%S')
+    }
+
+
+def process_results(qualified, current_time):
+    """处理扫描结果"""
+    global g_qualified_stocks, g_all_found_stocks
+    
     current_time_str = current_time.strftime('%H:%M:%S')
     
+    # 检查新增股票
+    new_stocks = []
     for item in qualified:
         stock = item['stock']
         if stock not in g_all_found_stocks:
@@ -416,75 +481,12 @@ def scan_stocks(ContextInfo):
     log(f"【累计】今日共发现 {len(g_all_found_stocks)} 只符合条件的股票:")
     log("=" * 70)
     if g_all_found_stocks:
-        # 按首次发现时间排序
         sorted_stocks = sorted(g_all_found_stocks.items(), key=lambda x: x[1])
         for stock, first_time in sorted_stocks:
             code = stock.split('.')[0]
             board = "科创" if code.startswith('688') else "主板"
             log(f"  {stock} ({board}) - 首次发现: {first_time}")
     log("=" * 70)
-    
-    log("")
-    log("#" * 70)
-    log(f"############## 第 {g_scan_count} 轮扫描结束 ##############")
-    log("#" * 70)
-    log("")
-
-
-def check_nib1_count(hist_data):
-    """
-    COUNT(NIB1,10)>=5
-    NIB1 = H > REF(C,1)*1.065
-    10天内最高价>昨收*1.065的次数
-    """
-    closes = hist_data['close'].values
-    highs = hist_data['high'].values
-    count = 0
-    
-    # 取最近10天（不含今天）
-    for i in range(len(closes) - 10, len(closes)):
-        if i >= 1:
-            prev_close = closes[i-1]
-            if prev_close > 0 and highs[i] > prev_close * 1.065:
-                count += 1
-    
-    return count
-
-
-def check_yinxian_count(hist_data):
-    """
-    COUNT(C<O,10)<=3
-    10天内阴线数量
-    """
-    opens = hist_data['open'].values[-10:]
-    closes = hist_data['close'].values[-10:]
-    count = 0
-    
-    for i in range(len(opens)):
-        if closes[i] < opens[i]:
-            count += 1
-    
-    return count
-
-
-def check_ma5_condition(hist_data):
-    """
-    COUNT(C<O AND L<=MA5, 10)=0
-    10天内不存在"阴线且最低价<=MA5"的情况
-    """
-    opens = hist_data['open'].values
-    closes = hist_data['close'].values
-    lows = hist_data['low'].values
-    
-    # 计算每天的MA5
-    for i in range(len(closes) - 10, len(closes)):
-        if i >= 4:
-            ma5 = np.mean(closes[i-4:i+1])
-            # 检查是否是阴线且最低价<=MA5
-            if closes[i] < opens[i] and lows[i] <= ma5:
-                return False
-    
-    return True
 
 
 def is_trading_time(dt):
@@ -494,8 +496,8 @@ def is_trading_time(dt):
 
 
 def clear_cache(ContextInfo):
-    global g_history_cache, g_prev_close_cache, g_qualified_stocks, g_scan_count, g_all_found_stocks
-    g_history_cache = {}
+    global g_history_data, g_prev_close_cache, g_qualified_stocks, g_scan_count, g_all_found_stocks
+    g_history_data = {}
     g_prev_close_cache = {}
     g_qualified_stocks = {}
     g_all_found_stocks = {}
