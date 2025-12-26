@@ -30,11 +30,16 @@ g_lock = threading.Lock()
 # ========== 优化2: 历史数据缓存（只加载一次） ==========
 g_history_data = {}  # {stock: {'closes': array, 'opens': array, 'highs': array, 'lows': array}}
 g_prev_close_cache = {}  # {stock: prev_close}
+g_stock_names = {}  # {stock: name} 股票名称缓存
 
 # 配置参数
 DEBUG_MODE = True
 CHECK_TRADING_TIME = False
 PRINT_PROGRESS = True
+
+# 输出文件路径
+OUTPUT_FILE = r"C:\Users\lyy\Desktop\股票\预警\5拉升阴少_qmt.txt"
+STRATEGY_NAME = "极品必买1"  # 策略名称，写入文件时使用
 
 
 def log(msg, level="INFO"):
@@ -61,6 +66,12 @@ def init(ContextInfo):
     # 获取股票池（预过滤8/4开头）
     g_stock_pool = get_stock_pool(ContextInfo)
     log(f"股票池加载完成，共 {len(g_stock_pool)} 只股票（已排除8/4开头）")
+    
+    # 预加载股票名称
+    log("")
+    log(">>> 正在预加载股票名称...")
+    preload_stock_names(ContextInfo)
+    log(f">>> 股票名称加载完成: {len(g_stock_names)} 只")
     
     # ========== 优化2: 只加载一次历史数据 ==========
     log("")
@@ -222,6 +233,46 @@ def extract_stock_data(data, stock):
             pass
     
     return stock_data
+
+
+def preload_stock_names(ContextInfo):
+    """预加载股票名称"""
+    global g_stock_names
+    
+    for stock in g_stock_pool:
+        try:
+            name = ContextInfo.get_stock_name(stock)
+            if name:
+                g_stock_names[stock] = name
+            else:
+                g_stock_names[stock] = stock.split('.')[0]
+        except:
+            g_stock_names[stock] = stock.split('.')[0]
+
+
+def write_stocks_to_file(stocks, date_str, time_str):
+    """
+    将新增股票写入文件
+    格式：代码\t名称\t日期 时间\t价格\t涨幅%\t成交量\t策略名称
+    示例：001331	胜通能源	2025-12-26 09:29	42.10	10.01%	77994	极品必买1
+    """
+    try:
+        with open(OUTPUT_FILE, 'a', encoding='gbk') as f:
+            for item in stocks:
+                code = item['stock'].split('.')[0]
+                # 从缓存获取股票名称
+                stock_name = g_stock_names.get(item['stock'], code)
+                price = item['current_price']
+                gain = item['today_max_gain']
+                volume = item.get('volume', 0)
+                
+                # 单行格式：代码\t名称\t日期 时间\t价格\t涨幅%\t成交量\t策略名称
+                line = f"{code}\t{stock_name}\t{date_str} {time_str}\t{price:.2f}\t{gain:.2f}%\t{volume}\t{STRATEGY_NAME}\n"
+                f.write(line)
+        
+        log(f">>> 已写入 {len(stocks)} 只新增股票到文件: {OUTPUT_FILE}")
+    except Exception as e:
+        log(f">>> 写入文件失败: {e}", "ERROR")
 
 
 def handlebar(ContextInfo):
@@ -409,6 +460,11 @@ def check_stock_fast(stock, all_ticks, stats):
     if not current_price:
         current_price = tick.get('price', tick.get('last', 0))
     
+    # 获取成交量
+    volume = tick.get('volume', 0)
+    if not volume:
+        volume = tick.get('vol', 0)
+    
     max_gain = (today_high - prev_close) / prev_close * 100
     
     return {
@@ -419,6 +475,7 @@ def check_stock_fast(stock, all_ticks, stats):
         'current_price': current_price,
         'prev_close': round(prev_close, 2),
         'today_high': round(today_high, 2),
+        'volume': volume,
         'time': datetime.now().strftime('%H:%M:%S')
     }
 
@@ -428,6 +485,8 @@ def process_results(qualified, current_time):
     global g_qualified_stocks, g_all_found_stocks
     
     current_time_str = current_time.strftime('%H:%M:%S')
+    date_str = current_time.strftime('%Y-%m-%d')
+    time_str = current_time.strftime('%H:%M')
     
     # 检查新增股票
     new_stocks = []
@@ -436,6 +495,10 @@ def process_results(qualified, current_time):
         if stock not in g_all_found_stocks:
             g_all_found_stocks[stock] = current_time_str
             new_stocks.append(item)
+    
+    # 新增股票写入文件
+    if new_stocks:
+        write_stocks_to_file(new_stocks, date_str, time_str)
     
     # 打印本轮结果
     if qualified:
@@ -496,11 +559,12 @@ def is_trading_time(dt):
 
 
 def clear_cache(ContextInfo):
-    global g_history_data, g_prev_close_cache, g_qualified_stocks, g_scan_count, g_all_found_stocks
+    global g_history_data, g_prev_close_cache, g_qualified_stocks, g_scan_count, g_all_found_stocks, g_stock_names
     g_history_data = {}
     g_prev_close_cache = {}
     g_qualified_stocks = {}
     g_all_found_stocks = {}
+    g_stock_names = {}
     g_scan_count = 0
     log("缓存已清理，扫描计数已重置，累计股票已清空")
 
