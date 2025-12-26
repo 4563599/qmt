@@ -1,0 +1,152 @@
+# -*- coding: gbk -*-
+import pandas as pd
+import numpy as np
+import math
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def init(ContextInfo):
+    # 每3秒运行一次盘中实时监控
+    ContextInfo.run_time("realtime_scan", "3s", "2023-01-01 00:00:00")
+    
+    # 设定股票范围
+    ContextInfo.stock_universe = ContextInfo.get_stock_list_in_sector('沪深A股')
+    
+    # 这里的 print 只在启动时显示一次
+    print(">>> 策略启动，监控股票池: " + str(len(ContextInfo.stock_universe)) + "只")
+    print(">>> 正在启动多线程急速筛选，请稍候...")
+    
+    # 存储符合条件的股票
+    ContextInfo.candidates = []
+    
+    # 执行历史筛选（多线程版）
+    calculate_historical_candidates_fast(ContextInfo)
+
+def process_batch_stocks(stock_list, ContextInfo):
+    """
+    线程工作函数：处理一小批股票
+    返回：符合条件的股票列表
+    """
+    valid_batch = []
+    try:
+        # 批量获取数据（20天数据用于计算MA5和10天形态）
+        df_dict = ContextInfo.get_market_data_ex(
+            ['close', 'open', 'high', 'low', 'preClose'], 
+            stock_list, 
+            period='1d', 
+            count=20, 
+            dividend_type='follow'
+        )
+    except:
+        return []
+
+    for stock in stock_list:
+        if stock not in df_dict:
+            continue
+            
+        data = df_dict[stock]
+        # 数据长度校验，防止新股报错
+        if data.empty or len(data) < 15: 
+            continue
+        
+        # --- 极速计算逻辑 ---
+        
+        # 1. 计算涨幅 (High - PreClose) / PreClose
+        # 为了速度，直接使用向量化计算
+        data['max_pct'] = (data['high'] - data['preClose']) / data['preClose']
+        
+        # 2. 截取最后10天（注意：包含今天。如需排除今天请用 iloc[-11:-1]）
+        last_10 = data.iloc[-10:]
+        
+        # 3. 条件A：10天内涨幅>=6.85%的次数 >= 5
+        # 0.06849 是为了防止浮点数精度问题丢失0.0685
+        if (last_10['max_pct'] >= 0.06849).sum() < 5:
+            continue
+            
+        # 4. 条件B：阴线逻辑
+        # 筛选出阴线 (Close < Open)
+        yin_k = last_10[last_10['close'] < last_10['open']]
+        
+        if len(yin_k) == 0:
+            # 全是阳线 -> 符合
+            valid_batch.append(stock)
+        else:
+            # 存在阴线 -> 检查所有阴线的 Low 是否都 > 当日的 MA5
+            # 先计算MA5 (只计算最后几天的MA5即可，减少计算量)
+            # 为了对齐，我们直接用整列计算，pandas底层很快
+            data['ma5'] = data['close'].rolling(window=5).mean()
+            
+            # 重新定位阴线对应的ma5
+            # 利用索引自动对齐
+            yin_with_ma = data.loc[yin_k.index]
+            
+            if (yin_with_ma['low'] > yin_with_ma['ma5']).all():
+                valid_batch.append(stock)
+                
+    return valid_batch
+
+def calculate_historical_candidates_fast(ContextInfo):
+    stock_list = ContextInfo.stock_universe
+    
+    # 线程数：建议 4-10 之间，取决于电脑性能
+    max_workers = 8 
+    # 每批次处理数量
+    batch_size = 300 
+    
+    # 切分任务包
+    batches = []
+    for i in range(0, len(stock_list), batch_size):
+        batches.append(stock_list[i : i + batch_size])
+    
+    total_valid = []
+    
+    # 开始多线程处理
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # 提交所有任务
+        # 注意：这里需要把 ContextInfo 传进去，QMT中通常没问题，部分版本可能敏感
+        futures = [executor.submit(process_batch_stocks, batch, ContextInfo) for batch in batches]
+        
+        # 等待结果聚合
+        for future in as_completed(futures):
+            try:
+                res = future.result()
+                if res:
+                    total_valid.extend(res)
+            except Exception as e:
+                # 线程内部报错不打印，以免刷屏
+                pass
+
+    ContextInfo.candidates = total_valid
+    
+    print("-" * 30)
+    print("【极速筛选完成】")
+    print("符合条件股票数: " + str(len(total_valid)))
+    print("监控列表: " + str(total_valid))
+    print("-" * 30)
+
+def realtime_scan(ContextInfo):
+    """
+    盘中实时监控（保持不变）
+    """
+    target_list = ContextInfo.candidates
+    if not target_list:
+        return
+    
+    # 获取快照数据
+    snapshots = ContextInfo.get_full_tick(target_list)
+    
+    for stock in target_list:
+        tick = snapshots.get(stock)
+        if not tick:
+            continue
+            
+        current_high = tick['high']
+        last_close = tick['lastClose']
+        
+        if last_close <= 0: continue
+            
+        max_increase = (current_high - last_close) / last_close
+        
+        if max_increase >= 0.045:
+            name = tick.get('name', '')
+            # 打印触发信息
+            print("★触发: " + str(stock) + " " + str(name) + " 涨幅:" + str(round(max_increase*100, 2)) + "%")
