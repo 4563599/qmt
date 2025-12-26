@@ -17,6 +17,9 @@ QMT极品必买策略 - 优化版
 import numpy as np
 from datetime import datetime
 import threading
+import smtplib
+from email.mime.text import MIMEText
+from email.header import Header
 
 # 全局变量
 g_stock_pool = []  # 预过滤后的股票池（已排除8/4开头）
@@ -39,7 +42,19 @@ PRINT_PROGRESS = True
 
 # 输出文件路径
 OUTPUT_FILE = r"C:\Users\lyy\Desktop\股票\预警\5拉升阴少_qmt.txt"
+OUTPUT_FILE_2 = r"C:\Users\lyy\Desktop\股票\预警\5拉升阴少.txt"  # 第二个输出文件
 STRATEGY_NAME = "极品必买1"  # 策略名称，写入文件时使用
+
+# ========== QQ邮箱配置 ==========
+EMAIL_ENABLED = True  # 是否启用邮件发送，True=发送，False=不发送
+EMAIL_RECEIVERS = ["4563599@qq.com"]  # 接收邮件的邮箱列表，可添加多个
+EMAIL_SENDER = "4563599@qq.com"  # 发送邮件的QQ邮箱
+EMAIL_AUTH_CODE = "iruvzesxztercaic"  # QQ邮箱授权码
+EMAIL_SMTP_SERVER = "smtp.qq.com"
+EMAIL_SMTP_PORT = 465
+
+# 已发送邮件的股票记录（程序运行期间）
+g_email_sent_stocks = set()
 
 
 def log(msg, level="INFO"):
@@ -250,29 +265,90 @@ def preload_stock_names(ContextInfo):
             g_stock_names[stock] = stock.split('.')[0]
 
 
+def send_sms_tencent(stocks):
+    """
+    通过QQ邮箱发送邮件通知
+    stocks: 新增股票列表
+    格式：股票名称 股票代码 涨幅 极品必买1
+    """
+    global g_email_sent_stocks
+    
+    if not EMAIL_ENABLED:
+        return
+    
+    # 过滤出未发送过邮件的股票
+    new_stocks_to_send = []
+    for item in stocks:
+        stock = item['stock']
+        if stock not in g_email_sent_stocks:
+            new_stocks_to_send.append(item)
+            g_email_sent_stocks.add(stock)
+    
+    if not new_stocks_to_send:
+        log(">>> 所有股票已发送过邮件，跳过")
+        return
+    
+    # 构建邮件内容
+    email_lines = []
+    for item in new_stocks_to_send:
+        code = item['stock'].split('.')[0]
+        name = g_stock_names.get(item['stock'], code)
+        gain = f"{item['today_max_gain']:.2f}%"
+        # 格式：股票名称 股票代码 涨幅 极品必买1
+        email_lines.append(f"{name} {code} {gain} {STRATEGY_NAME}")
+    
+    email_content = "\n".join(email_lines)
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    try:
+        # 创建邮件
+        subject = f"【{STRATEGY_NAME}】发现 {len(new_stocks_to_send)} 只股票"
+        body = f"发现时间：{current_time}\n\n{email_content}"
+        
+        msg = MIMEText(body, 'plain', 'utf-8')
+        msg['From'] = Header(EMAIL_SENDER)
+        msg['To'] = Header(','.join(EMAIL_RECEIVERS))
+        msg['Subject'] = Header(subject, 'utf-8')
+        
+        # 发送邮件
+        server = smtplib.SMTP_SSL(EMAIL_SMTP_SERVER, EMAIL_SMTP_PORT)
+        server.login(EMAIL_SENDER, EMAIL_AUTH_CODE)
+        server.sendmail(EMAIL_SENDER, EMAIL_RECEIVERS, msg.as_string())
+        server.quit()
+        
+        log(f">>> 邮件发送成功: {len(new_stocks_to_send)} 只股票")
+        for line in email_lines:
+            log(f"    {line}")
+            
+    except Exception as e:
+        log(f">>> 邮件发送失败: {e}", "ERROR")
+
+
 def write_stocks_to_file(stocks, date_str, time_str):
     """
     将新增股票写入文件
     格式：代码\t名称\t日期 时间\t价格\t涨幅%\t成交量\t策略名称
     示例：001331	胜通能源	2025-12-26 09:29	42.10	10.01%	77994	极品必买1
     """
-    try:
-        with open(OUTPUT_FILE, 'a', encoding='gbk') as f:
-            for item in stocks:
-                code = item['stock'].split('.')[0]
-                # 从缓存获取股票名称
-                stock_name = g_stock_names.get(item['stock'], code)
-                price = item['current_price']
-                gain = item['today_max_gain']
-                volume = item.get('volume', 0)
-                
-                # 单行格式：代码\t名称\t日期 时间\t价格\t涨幅%\t成交量\t策略名称
-                line = f"{code}\t{stock_name}\t{date_str} {time_str}\t{price:.2f}\t{gain:.2f}%\t{volume}\t{STRATEGY_NAME}\n"
-                f.write(line)
-        
-        log(f">>> 已写入 {len(stocks)} 只新增股票到文件: {OUTPUT_FILE}")
-    except Exception as e:
-        log(f">>> 写入文件失败: {e}", "ERROR")
+    # 写入两个文件
+    for output_file in [OUTPUT_FILE, OUTPUT_FILE_2]:
+        try:
+            with open(output_file, 'a', encoding='gbk') as f:
+                for item in stocks:
+                    code = item['stock'].split('.')[0]
+                    # 从缓存获取股票名称
+                    stock_name = g_stock_names.get(item['stock'], code)
+                    price = item['current_price']
+                    gain = item['today_max_gain']
+                    volume = item.get('volume', 0)
+                    
+                    # 单行格式：代码\t名称\t日期 时间\t价格\t涨幅%\t成交量\t策略名称
+                    line = f"{code}\t{stock_name}\t{date_str} {time_str}\t{price:.2f}\t{gain:.2f}%\t{volume}\t{STRATEGY_NAME}\n"
+                    f.write(line)
+            
+            log(f">>> 已写入 {len(stocks)} 只新增股票到文件: {output_file}")
+        except Exception as e:
+            log(f">>> 写入文件失败 [{output_file}]: {e}", "ERROR")
 
 
 def handlebar(ContextInfo):
@@ -496,9 +572,10 @@ def process_results(qualified, current_time):
             g_all_found_stocks[stock] = current_time_str
             new_stocks.append(item)
     
-    # 新增股票写入文件
+    # 新增股票发送短信并写入文件
     if new_stocks:
-        write_stocks_to_file(new_stocks, date_str, time_str)
+        send_sms_tencent(new_stocks)  # 先发短信
+        write_stocks_to_file(new_stocks, date_str, time_str)  # 再写文件
     
     # 打印本轮结果
     if qualified:
@@ -559,14 +636,15 @@ def is_trading_time(dt):
 
 
 def clear_cache(ContextInfo):
-    global g_history_data, g_prev_close_cache, g_qualified_stocks, g_scan_count, g_all_found_stocks, g_stock_names
+    global g_history_data, g_prev_close_cache, g_qualified_stocks, g_scan_count, g_all_found_stocks, g_stock_names, g_email_sent_stocks
     g_history_data = {}
     g_prev_close_cache = {}
     g_qualified_stocks = {}
     g_all_found_stocks = {}
     g_stock_names = {}
+    g_email_sent_stocks = set()
     g_scan_count = 0
-    log("缓存已清理，扫描计数已重置，累计股票已清空")
+    log("缓存已清理，扫描计数已重置，累计股票已清空，邮件记录已重置")
 
 
 def manual_scan(ContextInfo):
