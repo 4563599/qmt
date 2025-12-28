@@ -20,6 +20,10 @@ import threading
 import smtplib
 from email.mime.text import MIMEText
 from email.header import Header
+try:
+    import requests
+except:
+    requests = None
 
 # 全局变量
 g_stock_pool = []  # 预过滤后的股票池（已排除8/4开头）
@@ -52,6 +56,12 @@ EMAIL_SENDER = "4563599@qq.com"  # 发送邮件的QQ邮箱
 EMAIL_AUTH_CODE = "iruvzesxztercaic"  # QQ邮箱授权码
 EMAIL_SMTP_SERVER = "smtp.qq.com"
 EMAIL_SMTP_PORT = 465
+
+# ========== WxPusher微信推送配置 ==========
+WXPUSHER_ENABLED = True  # 是否启用微信推送
+WXP_TOKEN = "AT_mUKiCaJyUxhf0V1K9X3MuhqDaLmguFY4"
+WXP_UID = "UID_d5iiHewR5VxqIWV3t2vkumOkykre"
+WXP_SUMMARY = "【极品必买1，阴线都不碰】"
 
 # 已发送邮件的股票记录（程序运行期间）
 g_email_sent_stocks = set()
@@ -265,11 +275,71 @@ def preload_stock_names(ContextInfo):
             g_stock_names[stock] = stock.split('.')[0]
 
 
+def get_date_with_weekday():
+    """获取星期，格式：星期日"""
+    weekdays = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日']
+    now = datetime.now()
+    return weekdays[now.weekday()]
+
+
+def push_to_wechat(stocks):
+    """通过 WxPusher 推送微信消息"""
+    log(f">>> 准备微信推送，共 {len(stocks)} 只股票")
+    log(f">>> WXPUSHER_ENABLED: {WXPUSHER_ENABLED}")
+    log(f">>> requests模块: {'已加载' if requests else '未加载'}")
+    
+    if not WXPUSHER_ENABLED:
+        log(">>> 微信推送已关闭，跳过")
+        return
+    
+    if requests is None:
+        log(">>> requests模块未安装，无法推送微信", "ERROR")
+        return
+    
+    date_weekday = get_date_with_weekday()
+    
+    for item in stocks:
+        code = item['stock'].split('.')[0]
+        name = g_stock_names.get(item['stock'], code)
+        gain = f"{item['current_gain']:.2f}%"
+        time_str = item['time']
+        
+        # 格式：【极品必买1，阴线都不碰】\n股票：万集科技 (300552)\n涨幅：2.38%\n时间：10:30:00 星期日 12月28日
+        msg_content = f"{WXP_SUMMARY}\n股票：{name} ({code})\n涨幅：{gain}\n时间：{time_str} {date_weekday}"
+        
+        log(f">>> 推送内容: {msg_content}")
+        log(f">>> WXP_TOKEN: {WXP_TOKEN[:20]}...")
+        log(f">>> WXP_UID: {WXP_UID}")
+        
+        url = "https://wxpusher.zjiecode.com/api/send/message"
+        payload = {
+            "appToken": WXP_TOKEN,
+            "content": msg_content,
+            "summary": f"阴线都不碰 {name} {time_str} {date_weekday}",
+            "contentType": 1,
+            "uids": [WXP_UID]
+        }
+        
+        try:
+            log(f">>> 正在发送请求到: {url}")
+            response = requests.post(url, json=payload, timeout=10)
+            log(f">>> HTTP状态码: {response.status_code}")
+            log(f">>> 响应内容: {response.text}")
+            
+            res = response.json()
+            if res.get('code') == 1000:
+                log(f">>> 微信推送成功: {name} {code}")
+            else:
+                log(f">>> 微信推送失败: code={res.get('code')}, msg={res.get('msg')}", "WARN")
+        except Exception as e:
+            log(f">>> 微信推送异常: {type(e).__name__}: {e}", "ERROR")
+
+
 def send_sms_tencent(stocks):
     """
     通过QQ邮箱发送邮件通知
     stocks: 新增股票列表
-    格式：股票名称 股票代码 涨幅 极品必买1
+    每只股票单独发送一封邮件
     """
     global g_email_sent_stocks
     
@@ -288,40 +358,35 @@ def send_sms_tencent(stocks):
         log(">>> 所有股票已发送过邮件，跳过")
         return
     
-    # 构建邮件内容
-    email_lines = []
+    date_weekday = get_date_with_weekday()
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    # 每只股票单独发送一封邮件
     for item in new_stocks_to_send:
         code = item['stock'].split('.')[0]
         name = g_stock_names.get(item['stock'], code)
-        gain = f"{item['today_max_gain']:.2f}%"
-        # 格式：股票名称 股票代码 涨幅 极品必买1
-        email_lines.append(f"{name} {code} {gain} {STRATEGY_NAME}")
-    
-    email_content = "\n".join(email_lines)
-    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
-    try:
-        # 创建邮件
-        subject = f"【{STRATEGY_NAME}】发现 {len(new_stocks_to_send)} 只股票"
-        body = f"发现时间：{current_time}\n\n{email_content}"
+        gain = f"{item['current_gain']:.2f}%"
+        time_str = item['time']
         
-        msg = MIMEText(body, 'plain', 'utf-8')
-        msg['From'] = Header(EMAIL_SENDER)
-        msg['To'] = Header(','.join(EMAIL_RECEIVERS))
-        msg['Subject'] = Header(subject, 'utf-8')
+        # 邮件标题：阴线都不碰 万集科技 10:30:00 星期日
+        subject = f"阴线都不碰 {name} {time_str} {date_weekday}"
+        # 邮件内容
+        body = f"发现时间：{current_time}\n\n【{STRATEGY_NAME}，阴线都不碰】\n股票：{name} ({code})\n涨幅：{gain}\n时间：{time_str} {date_weekday}"
         
-        # 发送邮件
-        server = smtplib.SMTP_SSL(EMAIL_SMTP_SERVER, EMAIL_SMTP_PORT)
-        server.login(EMAIL_SENDER, EMAIL_AUTH_CODE)
-        server.sendmail(EMAIL_SENDER, EMAIL_RECEIVERS, msg.as_string())
-        server.quit()
-        
-        log(f">>> 邮件发送成功: {len(new_stocks_to_send)} 只股票")
-        for line in email_lines:
-            log(f"    {line}")
+        try:
+            msg = MIMEText(body, 'plain', 'utf-8')
+            msg['From'] = Header(EMAIL_SENDER)
+            msg['To'] = Header(','.join(EMAIL_RECEIVERS))
+            msg['Subject'] = Header(subject, 'utf-8')
             
-    except Exception as e:
-        log(f">>> 邮件发送失败: {e}", "ERROR")
+            server = smtplib.SMTP_SSL(EMAIL_SMTP_SERVER, EMAIL_SMTP_PORT)
+            server.login(EMAIL_SENDER, EMAIL_AUTH_CODE)
+            server.sendmail(EMAIL_SENDER, EMAIL_RECEIVERS, msg.as_string())
+            server.quit()
+            
+            log(f">>> 邮件发送成功: {name} {code}")
+        except Exception as e:
+            log(f">>> 邮件发送失败 [{name} {code}]: {e}", "ERROR")
 
 
 def write_stocks_to_file(stocks, date_str, time_str):
@@ -339,7 +404,7 @@ def write_stocks_to_file(stocks, date_str, time_str):
                     # 从缓存获取股票名称
                     stock_name = g_stock_names.get(item['stock'], code)
                     price = item['current_price']
-                    gain = item['today_max_gain']
+                    gain = item['current_gain']  # 使用当前价格涨幅
                     volume = item.get('volume', 0)
                     
                     # 单行格式：代码\t名称\t日期 时间\t价格\t涨幅%\t成交量\t策略名称
@@ -541,11 +606,15 @@ def check_stock_fast(stock, all_ticks, stats):
     if not volume:
         volume = tick.get('vol', 0)
     
+    # 最高价涨幅（用于条件判断）
     max_gain = (today_high - prev_close) / prev_close * 100
+    # 当前价格涨幅（用于显示和写入文件）
+    current_gain = (current_price - prev_close) / prev_close * 100 if current_price > 0 else max_gain
     
     return {
         'stock': stock,
         'today_max_gain': round(max_gain, 2),
+        'current_gain': round(current_gain, 2),
         'gain_65_count': count_65,
         'yinxian_count': yinxian_count,
         'current_price': current_price,
@@ -572,10 +641,11 @@ def process_results(qualified, current_time):
             g_all_found_stocks[stock] = current_time_str
             new_stocks.append(item)
     
-    # 新增股票发送短信并写入文件
+    # 新增股票发送微信、邮件并写入文件
     if new_stocks:
-        send_sms_tencent(new_stocks)  # 先发短信
-        write_stocks_to_file(new_stocks, date_str, time_str)  # 再写文件
+        push_to_wechat(new_stocks)  # 先推送微信
+        send_sms_tencent(new_stocks)  # 再发邮件
+        write_stocks_to_file(new_stocks, date_str, time_str)  # 最后写文件
     
     # 打印本轮结果
     if qualified:
