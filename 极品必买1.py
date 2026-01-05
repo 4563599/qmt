@@ -41,8 +41,9 @@ g_stock_names = {}  # {stock: name} 股票名称缓存
 
 # 配置参数
 DEBUG_MODE = True
-CHECK_TRADING_TIME = False
+CHECK_TRADING_TIME = True  # 开启交易时间检查，收盘后停止执行
 PRINT_PROGRESS = True
+LOG_ENABLED = False  # 日志开关，False=关闭日志打印
 
 # 输出文件路径
 OUTPUT_FILE = r"C:\Users\lyy\Desktop\股票\预警\5拉升阴少_qmt.txt"
@@ -68,6 +69,8 @@ g_email_sent_stocks = set()
 
 
 def log(msg, level="INFO"):
+    if not LOG_ENABLED:
+        return
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     print(f"[{timestamp}] [{level}] {msg}")
 

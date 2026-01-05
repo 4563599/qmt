@@ -42,8 +42,9 @@ g_stock_names = {}
 
 # 配置参数
 DEBUG_MODE = True
-CHECK_TRADING_TIME = False
+CHECK_TRADING_TIME = True  # 开启交易时间检查，收盘后停止执行
 PRINT_PROGRESS = True
+LOG_ENABLED = False  # 日志开关，False=关闭日志打印
 
 # ========== 写入文件开关 ==========
 WRITE_FILE_ENABLED = True  # True=写入文件，False=不写入（测试模式）
@@ -71,6 +72,8 @@ g_email_sent_stocks = set()
 
 
 def log(msg, level="INFO"):
+    if not LOG_ENABLED:
+        return
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     print(f"[{timestamp}] [{level}] {msg}")
 
