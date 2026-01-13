@@ -250,23 +250,24 @@ def get_prev_close(ContextInfo, stock):
 
 
 def get_current_price(ContextInfo, stock):
-    """获取当前价格"""
+    """获取当前价格和买一价"""
     try:
         tick = ContextInfo.get_full_tick([stock])
         if tick and stock in tick:
             price = tick[stock].get('lastPrice', 0) or tick[stock].get('price', 0)
+            bid1 = tick[stock].get('bidPrice', [0])[0] if isinstance(tick[stock].get('bidPrice', [0]), list) else tick[stock].get('bid1', 0)
             if price and price > 0:
-                return price
+                return price, bid1
     except Exception as e:
         log(f"获取当前价格失败 [{stock}]: {e}", "WARN")
     
-    return 0
+    return 0, 0
 
 
 def sell_stock_market_order(ContextInfo, stock, volume):
     """
     市价卖出股票
-    使用"五档即成剩撤"提高成交概率
+    使用买一价*0.98作为委托价，确保快速成交且符合价格笼子规则
     """
     if DEBUG_MODE:
         log(f"[调试模式] 模拟卖出: {stock} 数量: {volume}", "DEBUG")
@@ -282,74 +283,99 @@ def sell_stock_market_order(ContextInfo, stock, volume):
         
         log(f"[DEBUG] 准备卖出: stock={stock}, volume={volume}, account={account_id}")
         
-        # 方法1: passorder 市价委托 (prType=11, 价格填-1)
+        # 获取买一价
+        current_price, bid1_price = get_current_price(ContextInfo, stock)
+        
+        if bid1_price <= 0:
+            log(f"无法获取 {stock} 买一价，使用当前价", "WARN")
+            bid1_price = current_price
+        
+        if bid1_price <= 0:
+            log(f"无法获取 {stock} 价格数据，卖出失败", "ERROR")
+            return False
+        
+        # 计算卖出价：买一价 * 0.98 + 0.01（稍微高一点点，避免卡在边缘）
+        sell_price = round(bid1_price * 0.98 + 0.01, 2)
+        
+        log(f"[DEBUG] 当前价: {current_price}, 买一价: {bid1_price}, 卖出价: {sell_price} (买一*0.98+0.01)")
+        
+        # 使用限价委托，价格=买一价*0.98+0.01
         try:
             result = passorder(
                 24,           # 卖出
                 1101,         # 股票
                 account_id,
                 stock,
-                11,           # 五档即成剩撤（市价委托）
-                -1,           # 市价委托价格填-1
+                4,            # 限价委托
+                sell_price,   # 买一价*0.98+0.01
                 volume,
                 "止损策略",
                 2,            # quickTrade: 2=普通
                 "",
                 ContextInfo
             )
-            log(f">>> 市价卖出委托已提交: {stock} 数量: {volume} 结果: {result}")
+            log(f">>> 限价卖出委托已提交: {stock} 数量: {volume} 价格: {sell_price} 结果: {result}")
             return True
         except Exception as e:
-            log(f"passorder市价(prType=11)失败: {e}", "WARN")
-        
-        # 方法2: passorder 卖五价 (prType=5)
-        try:
-            result = passorder(
-                24,           # 卖出
-                1101,         # 股票
-                account_id,
-                stock,
-                5,            # 卖五价
-                -1,           # 价格填-1
-                volume,
-                "止损策略",
-                2,
-                "",
-                ContextInfo
-            )
-            log(f">>> 卖五价委托已提交: {stock} 数量: {volume} 结果: {result}")
-            return True
-        except Exception as e:
-            log(f"passorder卖五价(prType=5)失败: {e}", "WARN")
-        
-        # 方法3: 获取当前价格，用限价委托
-        try:
-            current_price = get_current_price(ContextInfo, stock)
-            if current_price > 0:
-                # 用跌停价卖出，确保成交
-                limit_price = round(current_price * 0.9, 2)
-                result = passorder(
-                    24,           # 卖出
-                    1101,         # 股票
-                    account_id,
-                    stock,
-                    4,            # 限价委托
-                    limit_price,  # 跌停价
-                    volume,
-                    "止损策略",
-                    2,
-                    "",
-                    ContextInfo
-                )
-                log(f">>> 限价卖出委托已提交: {stock} 数量: {volume} 价格: {limit_price} 结果: {result}")
-                return True
-        except Exception as e:
-            log(f"passorder限价失败: {e}", "WARN")
+            log(f"限价委托失败: {e}", "ERROR")
+            return False
+            
+    except Exception as e:
+        log(f"卖出股票异常 [{stock}]: {e}", "ERROR")
             
     except Exception as e:
         log(f"卖出股票异常 [{stock}]: {e}", "ERROR")
     
     return False
+
+
+def cancel_target_orders(ContextInfo, stock):
+    """
+    撤销指定股票的所有卖出委托
+    返回: 撤单数量
+    """
+    if DEBUG_MODE:
+        log(f"[调试模式] 模拟撤单: {stock}", "DEBUG")
+        return 0
+    
+    cancel_count = 0
+    
+    try:
+        account_id = get_account_id(ContextInfo)
+        
+        # 获取所有委托
+        try:
+            orders = get_trade_detail_data(account_id, ACCOUNT_TYPE, "order")
+            if not orders:
+                return 0
+            
+            for order in orders:
+                # 获取委托信息
+                order_stock = getattr(order, 'm_strInstrumentID', '') or getattr(order, 'stock_code', '')
+                status = getattr(order, 'm_nOrderStatus', -1) or getattr(order, 'order_status', -1)
+                direction = getattr(order, 'm_nOffsetFlag', 0) or getattr(order, 'direction', 0)
+                order_id = getattr(order, 'm_strOrderSysID', '') or getattr(order, 'order_id', '')
+                
+                # 只撤销目标股票的未成交卖单
+                # 未成交状态：0=未报, 1=待报, 2=已报, 3=已报待撤, 5=部成
+                if order_stock == stock and status in [0, 1, 2, 3, 5]:
+                    # 卖出方向：24=卖出
+                    if direction == 24 or direction == 2 or str(direction).lower() == 'sell':
+                        try:
+                            # 调用撤单函数
+                            cancel_result = ContextInfo.cancel(order_id)
+                            log(f">>> 撤单: {stock} 委托ID: {order_id} 结果: {cancel_result}")
+                            cancel_count += 1
+                        except Exception as e:
+                            log(f"撤单失败 [{stock}] 委托ID: {order_id}: {e}", "WARN")
+        
+        except Exception as e:
+            log(f"获取委托列表失败: {e}", "WARN")
+    
+    except Exception as e:
+        log(f"撤单异常 [{stock}]: {e}", "ERROR")
+    
+    return cancel_count
 
 
 def check_stop_loss(ContextInfo):
@@ -393,6 +419,43 @@ def check_stop_loss(ContextInfo):
         for stock, vol in pending_orders.items():
             log(f"  挂单中: {stock} 待成交: {vol}")
     
+    # ========== 第一步：检查已触发止损的股票是否有卡单，如有则撤单 ==========
+    stocks_need_cancel = []
+    for stock in g_triggered_stocks.keys():
+        if stock not in positions:
+            continue
+        
+        pos = positions[stock]
+        volume = pos['volume']
+        available = pos['available_volume']
+        
+        # 判断是否有卡单：总持仓 > 可用持仓
+        if volume > available:
+            frozen = volume - available
+            log(f"  ⚠️ 检测到卡单: {stock} 总持仓={volume} 可用={available} 冻结={frozen}", "WARN")
+            stocks_need_cancel.append(stock)
+    
+    # 如果有卡单，先撤单，本次循环结束
+    if stocks_need_cancel:
+        log("")
+        log("=" * 60)
+        log(f"检测到 {len(stocks_need_cancel)} 只股票有卡单，执行撤单")
+        log("=" * 60)
+        
+        for stock in stocks_need_cancel:
+            log(f">>> 撤单: {stock}")
+            cancel_count = cancel_target_orders(ContextInfo, stock)
+            if cancel_count > 0:
+                log(f">>> {stock} 成功撤销 {cancel_count} 笔委托")
+            else:
+                log(f">>> {stock} 无委托可撤或撤单失败", "WARN")
+        
+        log("=" * 60)
+        log("撤单完成，等待下次循环重新下单")
+        log("-" * 60)
+        return
+    
+    # ========== 第二步：正常的止损检查和下单逻辑 ==========
     # 需要卖出的股票列表
     stocks_to_sell = []
     
@@ -405,7 +468,7 @@ def check_stop_loss(ContextInfo):
         
         # 获取价格
         prev_close = get_prev_close(ContextInfo, stock)
-        current_price = get_current_price(ContextInfo, stock)
+        current_price, _ = get_current_price(ContextInfo, stock)  # 只取当前价，忽略买一价
         
         if prev_close <= 0 or current_price <= 0:
             log(f"  {stock}: 无法获取价格数据", "WARN")
@@ -591,7 +654,7 @@ def test_buy_order(ContextInfo, stock=None, volume=None, price_offset=None):
     log(f"价格偏移: {price_offset:+.2f}%")
     
     # 获取当前价格
-    current_price = get_current_price(ContextInfo, stock)
+    current_price, _ = get_current_price(ContextInfo, stock)  # 只取当前价
     if current_price <= 0:
         log(f"无法获取 {stock} 当前价格", "ERROR")
         return False
@@ -646,7 +709,7 @@ def test_sell_order(ContextInfo, stock=None, volume=None, price_offset=None):
     log(f"价格偏移: {price_offset:+.2f}%")
     
     # 获取当前价格
-    current_price = get_current_price(ContextInfo, stock)
+    current_price, _ = get_current_price(ContextInfo, stock)  # 只取当前价
     if current_price <= 0:
         log(f"无法获取 {stock} 当前价格", "ERROR")
         return False
@@ -765,7 +828,7 @@ def test_market_sell(ContextInfo, stock=None, volume=None):
     log(f"数量: {volume}")
     log(f"委托类型: 五档即成剩撤（市价）")
     
-    current_price = get_current_price(ContextInfo, stock)
+    current_price, _ = get_current_price(ContextInfo, stock)  # 只取当前价
     if current_price > 0:
         log(f"当前价格: {current_price:.2f}")
     

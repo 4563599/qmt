@@ -9,10 +9,16 @@ QMT极品必买策略4 - 涨停板选股
     条件2：阳线且下引线<实体
     条件3：涨停板
 
-涨停板判断：
-  ST股票：5%
-  科创板(688)、创业板注册制(300且上市>=20200824)、北交所(8/43/83开头)：20%
-  其他：10%
+今日涨停判断：
+  1. 收盘价达到涨停价的99.8%以上
+  2. 收盘价达到最高价的99.8%以上（封板）
+  3. 有成交量
+  4. 今日最低价 > 昨日MA5（基础条件）
+
+涨停价计算：
+  - 主板：标准四舍五入（允许微幅超标，如10.016%）
+  - 北交所/科创板/创业板：严格限价（Hard Cap），超标则向下取整
+  - 北交所：30%，科创板/创业板：20%（ST也是20%），主板：10%（ST为5%）
 """
 
 import numpy as np
@@ -269,54 +275,82 @@ def extract_stock_data(data, stock):
 
 
 
-def get_limit_pct(stock, stock_name):
+def get_limit_ratio(stock_code, stock_name):
     """
-    计算涨停幅度
-    ST股票：5%
-    科创板(688)、创业板注册制(300且上市>=20200824)、北交所(8/43/83开头)：20%
-    其他：10%
+    根据股票代码和名称获取涨跌幅限制比例（返回小数形式）
+    
+    北交所规则：
+    - 8开头：北交所主板
+    - 4开头：北交所创新层
+    - 9开头：北交所
     """
-    code = stock.split('.')[0]
+    # 1. 北交所 (30%) - 8开头, 4开头, 9开头
+    if stock_code.startswith('8') or stock_code.startswith('4') or stock_code.startswith('9'):
+        return 0.30
     
-    # ST股票
-    if 'ST' in stock_name.upper() or '*ST' in stock_name.upper():
-        return 5.0
+    # 2. 科创板 (20%) - 688开头
+    # 注意：科创板即使ST也是20%
+    if stock_code.startswith('688'):
+        return 0.20
     
-    # 科创板
-    if code.startswith('688'):
-        return 20.0
+    # 3. 创业板注册制 (20%) - 30开头
+    # 注意：创业板即使ST也是20%
+    if stock_code.startswith('30'):
+        return 0.20
     
-    # 创业板注册制（简化判断：300开头默认20%）
-    if code.startswith('300'):
-        return 20.0
-    
-    # 北交所
-    if code.startswith('8') or code.startswith('43') or code.startswith('83'):
-        return 20.0
-    
-    # 其他
-    return 10.0
+    # 4. 主板 (通常10%，ST为5%)
+    is_st = 'ST' in stock_name.upper()
+    if is_st:
+        return 0.05
+    else:
+        return 0.10
 
 
-def check_limit_board(prev_close, current_close, current_high, volume, limit_pct):
+def calculate_limit_price(prev_close, ratio, stock_code):
     """
-    判断是否涨停
-    1. 涨幅 >= 涨停幅度*0.99
-    2. 封板：收盘价 >= 最高价*0.998
-    3. 有成交量
-    4. 非停牌（昨收价>0）
+    精准计算涨停价（兼容北交所严格限价规则）
+    
+    规则差异：
+    - 主板：允许四舍五入后微幅超标（如10.016%）
+    - 北交所/科创板/创业板：严格限价（Hard Cap），不得超过限制比例
+    
+    示例：
+    - 主板：23.66 * 1.1 = 26.026 -> 26.03 (涨幅10.016%，允许)
+    - 北交所：44.96 * 1.3 = 58.448 -> 58.44 (不是58.45，因为58.45会超30%)
     """
-    if prev_close <= 0 or volume <= 0:
-        return False
+    from decimal import Decimal, ROUND_HALF_UP, ROUND_DOWN
     
-    # 涨幅
-    pct = (current_close - prev_close) / prev_close * 100
-    pct_ok = pct >= (limit_pct * 0.99)
+    # 使用 Decimal 保证浮点数运算精度
+    p = Decimal(str(prev_close))
+    r = Decimal(str(ratio))
     
-    # 封板
-    sealed = current_close >= current_high * 0.998
+    # 计算目标价
+    target = p * (1 + r)
     
-    return pct_ok and sealed
+    # 判断是否为北交所/科创板/创业板（需要严格限价）
+    is_strict_limit = (stock_code.startswith('8') or 
+                      stock_code.startswith('4') or 
+                      stock_code.startswith('9') or 
+                      stock_code.startswith('688') or 
+                      stock_code.startswith('30'))
+    
+    if is_strict_limit:
+        # 严格限价：先四舍五入，然后检查是否超标
+        limit_price_round = target.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        
+        # 检查是否超过限制比例
+        actual_ratio = (limit_price_round - p) / p
+        
+        if actual_ratio > r:
+            # 超标了，向下取整
+            limit_price = target.quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+        else:
+            limit_price = limit_price_round
+    else:
+        # 主板：标准四舍五入（允许微幅超标）
+        limit_price = target.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    
+    return float(limit_price)
 
 
 def check_condition1(o, c, l):
@@ -398,12 +432,35 @@ def check_stock(stock, all_ticks, stats):
         stats['no_tick'] += 1
         return None
     
-    # 获取股票名称和涨停幅度
+    stock_code = stock.split('.')[0]
     stock_name = g_stock_names.get(stock, '')
-    limit_pct = get_limit_pct(stock, stock_name)
     
-    # 判断今日是否涨停（条件3）
-    today_is_limit = check_limit_board(prev_close, current_price, current_high, current_volume, limit_pct)
+    # ========== 今日涨停判断（TODAY_LIMIT） ==========
+    # 1. 获取涨停比例
+    limit_ratio = get_limit_ratio(stock_code, stock_name)
+    
+    # 2. 计算精确的涨停价
+    limit_price = calculate_limit_price(prev_close, limit_ratio, stock_code)
+    
+    # 3. 判断收盘价是否达到涨停价（允许0.2%误差）
+    price_ok = current_price >= limit_price * 0.998
+    
+    # 4. 判断是否封板（收盘价达到最高价的99.8%）
+    sealed = current_price >= current_high * 0.998
+    
+    # 5. 有成交量
+    has_volume = current_volume > 0
+    
+    # 6. 今日最低价大于5日均价（BASE_COND: L > MA5）
+    if len(closes) >= 5:
+        # 计算昨日的MA5（使用最近5天的收盘价，不包括今天）
+        ma5_yesterday = np.mean(closes[-5:])
+        today_low_above_ma5 = current_low > ma5_yesterday
+    else:
+        today_low_above_ma5 = False
+    
+    # TODAY_LIMIT：今日涨停
+    today_is_limit = price_ok and sealed and has_volume and today_low_above_ma5
     
     if not today_is_limit:
         stats['fail_not_limit'] += 1
@@ -441,8 +498,12 @@ def check_stock(stock, all_ticks, stats):
         # 条件2：阳线且下引线<实体
         cond2 = check_condition2(o, c, l)
         
-        # 条件3：涨停
-        cond3 = check_limit_board(prev_c, c, h, v, limit_pct)
+        # 条件3：涨停（使用精确的涨停价计算）
+        if prev_c > 0 and v > 0:
+            hist_limit_price = calculate_limit_price(prev_c, limit_ratio, stock_code)
+            cond3 = (c >= hist_limit_price * 0.998) and (c >= h * 0.998)
+        else:
+            cond3 = False
         
         # 满足任一条件
         any_cond = cond1 or cond2 or cond3
@@ -465,7 +526,7 @@ def check_stock(stock, all_ticks, stats):
     return {
         'stock': stock,
         'current_gain': round(gain, 2),
-        'limit_pct': limit_pct,
+        'limit_price': round(limit_price, 2),
         'current_price': current_price,
         'prev_close': round(prev_close, 2),
         'volume': current_volume,
@@ -662,7 +723,7 @@ def scan_stocks(ContextInfo):
             qualified.append(result)
             code = stock.split('.')[0]
             name = g_stock_names.get(stock, code)
-            log(f"  ★ 命中: {stock} {name} | 涨幅:{result['current_gain']}% | 涨停幅度:{result['limit_pct']}%", "SUCCESS")
+            log(f"  ★ 命中: {stock} {name} | 涨幅:{result['current_gain']}% | 涨停价:{result['limit_price']}", "SUCCESS")
     
     total_elapsed = (datetime.now() - start_time).total_seconds()
     
@@ -677,7 +738,7 @@ def scan_stocks(ContextInfo):
     log(f"无行情数据: {stats['no_tick']}")
     log(f"无昨收价: {stats['no_prev']}")
     log(f"无历史数据: {stats['no_hist']}")
-    log(f"第1道淘汰(今日未涨停): {stats['fail_not_limit']}")
+    log(f"第1道淘汰(今日未涨停或L<=MA5): {stats['fail_not_limit']}")
     log(f"第2道淘汰(连续3天条件不满足): {stats['fail_3days']}")
     log(f"全部通过: {stats['pass']}")
     log("=" * 60)
@@ -725,7 +786,7 @@ def process_results(qualified, current_time):
             code = item['stock'].split('.')[0]
             name = g_stock_names.get(item['stock'], code)
             log(f"【{idx}】{code} {name}")
-            log(f"    涨幅: {item['current_gain']}% | 涨停幅度: {item['limit_pct']}%")
+            log(f"    涨幅: {item['current_gain']}% | 涨停价: {item['limit_price']}")
         
         g_qualified_stocks = {item['stock']: item for item in qualified}
     else:
