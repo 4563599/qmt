@@ -89,8 +89,7 @@ REDIS_DB = 0
 g_email_sent_stocks = set()
 g_redis_client = None
 
-# 3个独立的消息队列（并行处理）
-g_redis_queue = queue.Queue()  # Redis存储队列
+# 2个独立的消息队列（并行处理）
 g_wechat_queue = queue.Queue()  # 微信推送队列
 g_email_queue = queue.Queue()  # 邮件发送队列
 
@@ -270,24 +269,6 @@ def get_market_cap(tick, stock):
 
 
 
-def redis_worker():
-    """Redis存储工作线程"""
-    while True:
-        try:
-            message = g_redis_queue.get(timeout=1)
-            if message is None:  # 退出信号
-                break
-            
-            # 存储到Redis
-            save_to_redis(message)
-            
-            g_redis_queue.task_done()
-        except queue.Empty:
-            continue
-        except Exception as e:
-            log_redis(f">>> Redis存储线程异常: {e}", "ERROR")
-
-
 def wechat_worker():
     """微信推送工作线程"""
     while True:
@@ -398,79 +379,6 @@ def send_email_message(data):
         log(f">>> 邮件发送失败: {e}", "ERROR")
 
 
-def save_to_redis(data):
-    """保存数据到Redis（使用Base64编码避免敏感词检测）"""
-    if not REDIS_ENABLED:
-        log_redis("Redis存储已关闭，跳过", "WARN")
-        return
-    
-    if g_redis_client is None:
-        log_redis("Redis客户端未初始化，跳过存储", "ERROR")
-        return
-    
-    try:
-        date_str = data['date_str']
-        stock_data = data['stock_data']
-        
-        # 键名格式：stocks_yxdxs:YYYY-MM-DD
-        key = f"stocks_yxdxs:{date_str}"
-        timestamp_key = f"{key}:timestamp"
-        
-        # 字段名：股票代码
-        field = stock_data['code']
-        
-        # 值：JSON字符串
-        json_str = json.dumps(stock_data, ensure_ascii=False)
-        
-        # Base64编码（避免敏感词检测）
-        value = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
-        
-        log_redis(f"准备存储到Redis: {key}")
-        log_redis(f"  股票: {stock_data['code']} {stock_data['name']}")
-        log_redis(f"  涨跌幅: {stock_data['today_change']:.2f}%")
-        log_redis(f"  拉升次数: {stock_data['ls_num']}")
-        log_redis(f"  不下杀次数: {stock_data['no_xs_num']}")
-        log_redis(f"  市值: {stock_data['market_cap']}亿")
-        log_redis(f"  数据已Base64编码")
-        
-        # 设置hash字段
-        result = g_redis_client.hset(key, field, value)
-        log_redis(f"  HSET结果: {'新增' if result == 1 else '更新'}")
-        
-        # 设置过期时间（30天）
-        ttl = 30 * 24 * 60 * 60
-        g_redis_client.expire(key, ttl)
-        log_redis(f"  过期时间: 30天")
-        
-        # 更新时间戳（毫秒级）
-        import time
-        timestamp = int(time.time() * 1000)  # 毫秒时间戳
-        g_redis_client.set(timestamp_key, timestamp)
-        g_redis_client.expire(timestamp_key, ttl)  # 时间戳也设置过期时间
-        log_redis(f"  ✓ 更新时间戳: {timestamp}")
-        
-        # 验证存储
-        stored_value = g_redis_client.hget(key, field)
-        if stored_value:
-            # 解码验证
-            try:
-                decoded_json = base64.b64decode(stored_value.encode('utf-8')).decode('utf-8')
-                decoded_data = json.loads(decoded_json)
-                log_redis(f"✅ Redis存储成功: {stock_data['code']} {stock_data['name']}")
-                log_redis(f"  验证解码: {decoded_data['name']}")
-            except Exception as e:
-                log_redis(f"⚠️  Redis存储成功但解码验证失败: {e}", "WARN")
-        else:
-            log_redis(f"⚠️  Redis存储验证失败: {stock_data['code']} {stock_data['name']}", "WARN")
-    
-    except redis.RedisError as e:
-        log_redis(f"❌ Redis存储失败（Redis错误）: {e}", "ERROR")
-        log_redis(f"   股票: {stock_data.get('code', 'N/A')} {stock_data.get('name', 'N/A')}", "ERROR")
-    except Exception as e:
-        log_redis(f"❌ Redis存储失败（未知错误）: {e}", "ERROR")
-        log_redis(f"   股票: {stock_data.get('code', 'N/A')} {stock_data.get('name', 'N/A')}", "ERROR")
-
-
 def clear_today_files():
     """清除今天的输出文件和日志文件"""
     import os
@@ -557,16 +465,13 @@ def init(ContextInfo):
     ContextInfo.run_time("scan_stocks", "3nSecond", "2024-01-01 09:30:00", "SH")
     log("定时器设置完成，每3秒扫描一次")
     
-    # 启动3个独立的工作线程（并行处理）
-    redis_thread = threading.Thread(target=redis_worker, daemon=True)
+    # 启动2个独立的工作线程（微信和邮件并行处理）
     wechat_thread = threading.Thread(target=wechat_worker, daemon=True)
     email_thread = threading.Thread(target=email_worker, daemon=True)
     
-    redis_thread.start()
     wechat_thread.start()
     email_thread.start()
     
-    log(">>> Redis存储线程已启动")
     log(">>> 微信推送线程已启动")
     log(">>> 邮件发送线程已启动")
     
@@ -1038,8 +943,70 @@ def write_stocks_to_file(stocks, date_str, time_str):
         log(f">>> 写入文件失败 [{output_file}]: {e}", "ERROR")
 
 
+def save_single_stock_to_redis(stock_item, date_str, is_last=False):
+    """单只股票存储到Redis（独立线程执行）"""
+    if not REDIS_ENABLED or g_redis_client is None:
+        return
+    
+    try:
+        code = stock_item['stock'].split('.')[0]
+        name = g_stock_names.get(stock_item['stock'], code)
+        
+        stock_data = {
+            "code": code,
+            "name": name,
+            "strategies": [STRATEGY_NAME],
+            "today_change": stock_item['current_gain'],
+            "ls_num": stock_item.get('ls_num', 0),
+            "no_xs_num": stock_item.get('no_xs_num', 0),
+            "market_cap": stock_item.get('market_cap', 0),
+            "warning_time": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
+        key = f"stocks_yxdxs:{date_str}"
+        timestamp_key = f"{key}:timestamp"
+        ttl = 30 * 24 * 60 * 60
+        
+        # JSON序列化 + Base64编码
+        json_str = json.dumps(stock_data, ensure_ascii=False)
+        value = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
+        
+        log_redis(f"[并发存储] 开始: {name} ({code})")
+        
+        # 存储到Redis
+        result = g_redis_client.hset(key, code, value)
+        g_redis_client.expire(key, ttl)
+        
+        log_redis(f"[并发存储] HSET结果: {name} ({code}) - {'新增' if result == 1 else '更新'}")
+        
+        # 验证存储
+        stored_value = g_redis_client.hget(key, code)
+        if stored_value:
+            try:
+                decoded_json = base64.b64decode(stored_value.encode('utf-8')).decode('utf-8')
+                decoded_data = json.loads(decoded_json)
+                log_redis(f"✅ [并发存储] 成功: {name} ({code}) - {decoded_data['today_change']}%")
+            except Exception as e:
+                log_redis(f"⚠️  [并发存储] 解码失败: {name} ({code}) - {e}", "WARN")
+        else:
+            log_redis(f"⚠️  [并发存储] 验证失败: {name} ({code})", "WARN")
+        
+        # 如果是最后一只股票，更新时间戳
+        if is_last:
+            import time
+            timestamp = int(time.time() * 1000)
+            g_redis_client.set(timestamp_key, timestamp)
+            g_redis_client.expire(timestamp_key, ttl)
+            log_redis(f"✓✓✓ [并发存储] 更新时间戳: {timestamp} ✓✓✓")
+        
+    except redis.RedisError as e:
+        log_redis(f"❌ [并发存储] Redis错误: {name} ({code}) - {e}", "ERROR")
+    except Exception as e:
+        log_redis(f"❌ [并发存储] 未知错误: {name} ({code}) - {e}", "ERROR")
+
+
 def save_stocks_to_redis(stocks, date_str):
-    """保存股票数据到Redis"""
+    """并发保存股票数据到Redis（每只股票独立线程，立即执行）"""
     if not REDIS_ENABLED:
         log_redis("Redis存储已关闭，跳过", "WARN")
         return
@@ -1049,47 +1016,37 @@ def save_stocks_to_redis(stocks, date_str):
         return
     
     log_redis("\n" + "=" * 60)
-    log_redis(f"开始保存股票到Redis: {date_str}")
-    log_redis(f"共 {len(stocks)} 只股票")
+    log_redis(f"开始并发保存股票到Redis: {date_str}")
+    log_redis(f"共 {len(stocks)} 只股票（每只独立线程，立即执行）")
     log_redis("=" * 60)
     
+    threads = []
+    total = len(stocks)
+    
+    # 为每只股票创建独立线程，立即启动
     for idx, item in enumerate(stocks, 1):
+        is_last = (idx == total)
+        
+        # 创建并启动线程（不等待）
+        thread = threading.Thread(
+            target=save_single_stock_to_redis,
+            args=(item, date_str, is_last),
+            daemon=True
+        )
+        thread.start()
+        threads.append(thread)
+        
         code = item['stock'].split('.')[0]
         name = g_stock_names.get(item['stock'], code)
-        
-        stock_data = {
-            "code": code,
-            "name": name,
-            "strategies": [STRATEGY_NAME],
-            "today_change": item['current_gain'],
-            "ls_num": item.get('ls_num', 0),
-            "no_xs_num": item.get('no_xs_num', 0),
-            "market_cap": item.get('market_cap', 0),
-            "warning_time": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        }
-        
-        log_redis(f"\n[{idx}/{len(stocks)}] 准备存储: {name} ({code})")
-        
-        # 判断是否是最后一只股票
-        is_last = (idx == len(stocks))
-        
-        # 将消息放入Redis队列
-        message = {
-            'date_str': date_str,
-            'stock_data': stock_data,
-            'update_timestamp': is_last  # 只在最后一只股票时更新时间戳
-        }
-        g_redis_queue.put(message)
-        
-        if is_last:
-            log_redis(f"  ✓ Redis消息已加入队列（最后一只，将更新时间戳）")
-        else:
-            log_redis(f"  ✓ Redis消息已加入队列")
+        log_redis(f"[{idx}/{total}] 启动存储线程: {name} ({code})")
     
     log_redis("\n" + "=" * 60)
-    log_redis(f"所有股票已加入Redis存储队列")
-    log_redis(f"时间戳将在最后一只股票存储完成后更新")
+    log_redis(f"✅ 所有 {total} 只股票的存储线程已启动（并发执行）")
     log_redis("=" * 60 + "\n")
+    
+    # 可选：等待所有线程完成（用于验证）
+    # for thread in threads:
+    #     thread.join(timeout=5)  # 最多等待5秒
 
 
 def process_results(qualified, current_time, ContextInfo):
