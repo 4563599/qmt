@@ -89,8 +89,10 @@ REDIS_DB = 0
 g_email_sent_stocks = set()
 g_redis_client = None
 
-# 消息队列
-g_message_queue = queue.Queue()
+# 3个独立的消息队列（并行处理）
+g_redis_queue = queue.Queue()  # Redis存储队列
+g_wechat_queue = queue.Queue()  # 微信推送队列
+g_email_queue = queue.Queue()  # 邮件发送队列
 
 
 def log(msg, level="INFO"):
@@ -268,39 +270,60 @@ def get_market_cap(tick, stock):
 
 
 
-def message_sender_worker():
-    """消息发送工作线程，从队列中取出消息并发送"""
+def redis_worker():
+    """Redis存储工作线程"""
     while True:
         try:
-            # 从队列中获取消息
-            message = g_message_queue.get(timeout=1)
-            
+            message = g_redis_queue.get(timeout=1)
             if message is None:  # 退出信号
                 break
             
-            msg_type = message.get('type')
-            data = message.get('data')
+            # 存储到Redis
+            save_to_redis(message)
             
-            if msg_type == 'wechat':
-                # 发送微信消息
-                send_wechat_message(data)
-                time.sleep(0.6)  # 限制QPS
-            
-            elif msg_type == 'email':
-                # 发送邮件
-                send_email_message(data)
-                time.sleep(0.5)  # 邮件发送间隔
-            
-            elif msg_type == 'redis':
-                # 存储到Redis
-                save_to_redis(data)
-            
-            g_message_queue.task_done()
-            
+            g_redis_queue.task_done()
         except queue.Empty:
             continue
         except Exception as e:
-            log(f">>> 消息发送线程异常: {e}", "ERROR")
+            log_redis(f">>> Redis存储线程异常: {e}", "ERROR")
+
+
+def wechat_worker():
+    """微信推送工作线程"""
+    while True:
+        try:
+            message = g_wechat_queue.get(timeout=1)
+            if message is None:  # 退出信号
+                break
+            
+            # 发送微信消息
+            send_wechat_message(message)
+            time.sleep(0.6)  # 限制QPS
+            
+            g_wechat_queue.task_done()
+        except queue.Empty:
+            continue
+        except Exception as e:
+            log(f">>> 微信推送线程异常: {e}", "ERROR")
+
+
+def email_worker():
+    """邮件发送工作线程"""
+    while True:
+        try:
+            message = g_email_queue.get(timeout=1)
+            if message is None:  # 退出信号
+                break
+            
+            # 发送邮件
+            send_email_message(message)
+            time.sleep(0.5)  # 邮件发送间隔
+            
+            g_email_queue.task_done()
+        except queue.Empty:
+            continue
+        except Exception as e:
+            log(f">>> 邮件发送线程异常: {e}", "ERROR")
 
 
 def send_wechat_message(data):
@@ -391,6 +414,7 @@ def save_to_redis(data):
         
         # 键名格式：stocks_yxdxs:YYYY-MM-DD
         key = f"stocks_yxdxs:{date_str}"
+        timestamp_key = f"{key}:timestamp"
         
         # 字段名：股票代码
         field = stock_data['code']
@@ -417,6 +441,13 @@ def save_to_redis(data):
         ttl = 30 * 24 * 60 * 60
         g_redis_client.expire(key, ttl)
         log_redis(f"  过期时间: 30天")
+        
+        # 更新时间戳（毫秒级）
+        import time
+        timestamp = int(time.time() * 1000)  # 毫秒时间戳
+        g_redis_client.set(timestamp_key, timestamp)
+        g_redis_client.expire(timestamp_key, ttl)  # 时间戳也设置过期时间
+        log_redis(f"  ✓ 更新时间戳: {timestamp}")
         
         # 验证存储
         stored_value = g_redis_client.hget(key, field)
@@ -526,10 +557,18 @@ def init(ContextInfo):
     ContextInfo.run_time("scan_stocks", "3nSecond", "2024-01-01 09:30:00", "SH")
     log("定时器设置完成，每3秒扫描一次")
     
-    # 启动消息发送线程
-    sender_thread = threading.Thread(target=message_sender_worker, daemon=True)
-    sender_thread.start()
-    log(">>> 消息发送线程已启动")
+    # 启动3个独立的工作线程（并行处理）
+    redis_thread = threading.Thread(target=redis_worker, daemon=True)
+    wechat_thread = threading.Thread(target=wechat_worker, daemon=True)
+    email_thread = threading.Thread(target=email_worker, daemon=True)
+    
+    redis_thread.start()
+    wechat_thread.start()
+    email_thread.start()
+    
+    log(">>> Redis存储线程已启动")
+    log(">>> 微信推送线程已启动")
+    log(">>> 邮件发送线程已启动")
     
     # 显示开关状态
     log("")
@@ -899,20 +938,17 @@ def push_to_wechat(stocks):
         ls_num = item.get('ls_num', 0)
         no_xs_num = item.get('no_xs_num', 0)
         
-        # 将消息放入队列
+        # 将消息放入微信队列
         message = {
-            'type': 'wechat',
-            'data': {
-                'code': code,
-                'name': name,
-                'gain': gain,
-                'time': time_str,
-                'date_weekday': date_weekday,
-                'ls_num': ls_num,
-                'no_xs_num': no_xs_num
-            }
+            'code': code,
+            'name': name,
+            'gain': gain,
+            'time': time_str,
+            'date_weekday': date_weekday,
+            'ls_num': ls_num,
+            'no_xs_num': no_xs_num
         }
-        g_message_queue.put(message)
+        g_wechat_queue.put(message)
         log(f">>> 微信消息已加入队列: {name} {code}")
 
 
@@ -945,21 +981,18 @@ def send_email(stocks):
         ls_num = item.get('ls_num', 0)
         no_xs_num = item.get('no_xs_num', 0)
         
-        # 将消息放入队列
+        # 将消息放入邮件队列
         message = {
-            'type': 'email',
-            'data': {
-                'code': code,
-                'name': name,
-                'gain': gain,
-                'time': time_str,
-                'date_weekday': date_weekday,
-                'current_time': current_time,
-                'ls_num': ls_num,
-                'no_xs_num': no_xs_num
-            }
+            'code': code,
+            'name': name,
+            'gain': gain,
+            'time': time_str,
+            'date_weekday': date_weekday,
+            'current_time': current_time,
+            'ls_num': ls_num,
+            'no_xs_num': no_xs_num
         }
-        g_message_queue.put(message)
+        g_email_queue.put(message)
         log(f">>> 邮件消息已加入队列: {name} {code}")
 
 
@@ -1037,19 +1070,25 @@ def save_stocks_to_redis(stocks, date_str):
         
         log_redis(f"\n[{idx}/{len(stocks)}] 准备存储: {name} ({code})")
         
-        # 将消息放入队列
+        # 判断是否是最后一只股票
+        is_last = (idx == len(stocks))
+        
+        # 将消息放入Redis队列
         message = {
-            'type': 'redis',
-            'data': {
-                'date_str': date_str,
-                'stock_data': stock_data
-            }
+            'date_str': date_str,
+            'stock_data': stock_data,
+            'update_timestamp': is_last  # 只在最后一只股票时更新时间戳
         }
-        g_message_queue.put(message)
-        log_redis(f"  ✓ Redis消息已加入队列")
+        g_redis_queue.put(message)
+        
+        if is_last:
+            log_redis(f"  ✓ Redis消息已加入队列（最后一只，将更新时间戳）")
+        else:
+            log_redis(f"  ✓ Redis消息已加入队列")
     
     log_redis("\n" + "=" * 60)
     log_redis(f"所有股票已加入Redis存储队列")
+    log_redis(f"时间戳将在最后一只股票存储完成后更新")
     log_redis("=" * 60 + "\n")
 
 
@@ -1068,12 +1107,12 @@ def process_results(qualified, current_time, ContextInfo):
             g_all_found_stocks[stock] = current_time_str
             new_stocks.append(item)
     
-    # 新增股票处理
+    # 新增股票处理：先存储Redis，再并行推送微信和邮件
     if new_stocks:
-        push_to_wechat(new_stocks)  # 推送微信（队列）
-        send_email(new_stocks)  # 发邮件（队列）
-        write_stocks_to_file(new_stocks, date_str, time_str)  # 写文件
-        save_stocks_to_redis(new_stocks, date_str)  # 存Redis（队列）
+        write_stocks_to_file(new_stocks, date_str, time_str)  # 写文件（同步）
+        save_stocks_to_redis(new_stocks, date_str)  # 存Redis（队列，优先）
+        push_to_wechat(new_stocks)  # 推送微信（队列，并行）
+        send_email(new_stocks)  # 发邮件（队列，并行）
     
     # 打印结果
     if qualified:
