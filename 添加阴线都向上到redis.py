@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-添加阴线都向上策略数据到Redis
+添加阴线都向上策略数据到Redis（支持Base64编码）
 """
 import redis
 import json
+import base64
 from datetime import datetime, timedelta
 
 # Redis连接配置
@@ -34,7 +35,7 @@ def connect_redis():
 
 def add_stock_to_redis(r, date_str, stock_data):
     """
-    添加股票数据到Redis
+    添加股票数据到Redis（使用Base64编码）
     
     参数:
         r: Redis连接对象
@@ -58,8 +59,9 @@ def add_stock_to_redis(r, date_str, stock_data):
         # 字段名：股票代码
         field = stock_data['code']
         
-        # 值：JSON字符串
-        value = json.dumps(stock_data, ensure_ascii=False)
+        # 值：JSON字符串 -> Base64编码
+        json_str = json.dumps(stock_data, ensure_ascii=False)
+        value = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
         
         # 设置hash字段
         r.hset(key, field, value)
@@ -68,7 +70,7 @@ def add_stock_to_redis(r, date_str, stock_data):
         ttl = 30 * 24 * 60 * 60  # 30天
         r.expire(key, ttl)
         
-        print(f"✅ 添加成功: {stock_data['code']} {stock_data['name']}")
+        print(f"✅ 添加成功: {stock_data['code']} {stock_data['name']} (Base64编码)")
         return True
     except Exception as e:
         print(f"❌ 添加失败: {e}")
@@ -111,7 +113,7 @@ def add_multiple_stocks(r, date_str, stocks_list):
 
 def get_stocks_by_date(r, date_str):
     """
-    获取指定日期的股票数据
+    获取指定日期的股票数据（支持Base64解码）
     
     参数:
         r: Redis连接对象
@@ -133,8 +135,18 @@ def get_stocks_by_date(r, date_str):
         
         stocks = []
         for code, value in hash_data.items():
-            stock_data = json.loads(value)
-            stocks.append(stock_data)
+            try:
+                # 尝试Base64解码
+                try:
+                    decoded_json = base64.b64decode(value.encode('utf-8')).decode('utf-8')
+                    stock_data = json.loads(decoded_json)
+                except:
+                    # 如果不是Base64编码，直接解析JSON
+                    stock_data = json.loads(value)
+                
+                stocks.append(stock_data)
+            except Exception as e:
+                print(f"⚠️  解析失败: {code} - {e}")
         
         # 按涨跌幅排序
         stocks.sort(key=lambda x: x.get('today_change', 0), reverse=True)

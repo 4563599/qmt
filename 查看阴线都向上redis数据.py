@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-查看Redis中阴线都向上策略的数据
+查看Redis中阴线都向上策略的数据（支持Base64解码）
 """
 import redis
 import json
+import base64
 
 # Redis连接配置
 REDIS_HOST = "175.24.178.113"
@@ -66,7 +67,7 @@ def list_yxdxs_keys(r):
 
 
 def show_key_detail(r, key):
-    """显示键的详细数据"""
+    """显示键的详细数据（支持Base64解码）"""
     try:
         print("\n" + "=" * 80)
         print(f"键详情: {key}")
@@ -88,10 +89,17 @@ def show_key_detail(r, key):
         stocks = []
         for code, value in hash_data.items():
             try:
-                stock_data = json.loads(value)
+                # 尝试Base64解码
+                try:
+                    decoded_json = base64.b64decode(value.encode('utf-8')).decode('utf-8')
+                    stock_data = json.loads(decoded_json)
+                except:
+                    # 如果不是Base64编码，直接解析JSON
+                    stock_data = json.loads(value)
+                
                 stocks.append(stock_data)
-            except:
-                print(f"⚠️  解析失败: {code}")
+            except Exception as e:
+                print(f"⚠️  解析失败: {code} - {e}")
         
         # 按涨跌幅排序
         stocks.sort(key=lambda x: x.get('today_change', 0), reverse=True)
