@@ -462,8 +462,8 @@ def init(ContextInfo):
     preload_history_data(ContextInfo)
     log(f">>> 历史数据预加载完成: {len(g_history_data)} 只")
     
-    ContextInfo.run_time("scan_stocks", "3nSecond", "2024-01-01 09:30:00", "SH")
-    log("定时器设置完成，每3秒扫描一次")
+    ContextInfo.run_time("scan_stocks", "3nSecond", "2024-01-01 09:25:15", "SH")
+    log("定时器设置完成，每3秒扫描一次（从9:25:15开始）")
     
     # 启动2个独立的工作线程（微信和邮件并行处理）
     wechat_thread = threading.Thread(target=wechat_worker, daemon=True)
@@ -1102,9 +1102,18 @@ def process_results(qualified, current_time, ContextInfo):
 
 
 def is_trading_time(dt):
+    """
+    判断是否在交易时间内
+    9:25:15-11:30 (集合竞价结束后15秒开始)
+    13:00-15:00 (下午交易时间)
+    """
     t = dt.time()
-    return (datetime.strptime("09:30", "%H:%M").time() <= t <= datetime.strptime("11:30", "%H:%M").time()) or \
-           (datetime.strptime("13:00", "%H:%M").time() <= t <= datetime.strptime("15:00", "%H:%M").time())
+    morning_start = datetime.strptime("09:25:15", "%H:%M:%S").time()
+    morning_end = datetime.strptime("11:30:00", "%H:%M:%S").time()
+    afternoon_start = datetime.strptime("13:00:00", "%H:%M:%S").time()
+    afternoon_end = datetime.strptime("15:00:00", "%H:%M:%S").time()
+    
+    return (morning_start <= t <= morning_end) or (afternoon_start <= t <= afternoon_end)
 
 
 def clear_cache(ContextInfo):
