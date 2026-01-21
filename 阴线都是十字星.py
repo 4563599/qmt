@@ -11,6 +11,7 @@ QMT阴线都是十字星策略
 分组1（优先级高）：
 - 满足基础条件
 - 如果出现阴线，所有阴线的最低价大于等于5日均价
+- 参考日期（今日）最高涨幅≥5%
 - 策略名称：十字并不碰（有阴线）或 全阳（无阴线）
 
 分组2（优先级低）：
@@ -764,6 +765,7 @@ def check_stock_yxdszx(stock, all_ticks, stats, ContextInfo):
     分组1（优先）：
     - 满足基础条件
     - 如果出现阴线，所有阴线的最低价>=5日均价
+    - 今日最高涨幅≥5%
     - 策略：十字并不碰（有阴线）或 全阳（无阴线）
     
     分组2：
@@ -862,11 +864,12 @@ def check_stock_yxdszx(stock, all_ticks, stats, ContextInfo):
     # 判断分组
     strategy = None
     
-    # 分组1：如果出现阴线，所有阴线的最低价>=5日均价
+    # 分组1：如果出现阴线，所有阴线的最低价>=5日均价，且今日最高涨幅≥5%
     if yinxian_count == 0:
-        # 全阳
-        strategy = "全阳"
-        stats['pass_group1'] += 1
+        # 全阳，需要今日最高涨幅≥5%
+        if today_max_gain >= 5.0:
+            strategy = "全阳"
+            stats['pass_group1'] += 1
     elif yinxian_count > 0:
         # 检查所有阴线的最低价是否>=5日均价
         all_above_ma5 = True
@@ -876,18 +879,20 @@ def check_stock_yxdszx(stock, all_ticks, stats, ContextInfo):
                 all_above_ma5 = False
                 break
         
-        if all_above_ma5:
-            # 十字并不碰
+        if all_above_ma5 and today_max_gain >= 5.0:
+            # 十字并不碰，且今日最高涨幅≥5%
             strategy = "十字并不碰"
             stats['pass_group1'] += 1
+    
+    # 如果不满足分组1，检查分组2
+    if strategy is None:
+        # 分组2：今日最高涨幅≥6.85%
+        if today_max_gain >= 6.85:
+            strategy = "阴线都是十字星"
+            stats['pass_group2'] += 1
         else:
-            # 分组2：今日最高涨幅≥6.85%
-            if today_max_gain >= 6.85:
-                strategy = "阴线都是十字星"
-                stats['pass_group2'] += 1
-            else:
-                # 不满足任何分组
-                return None
+            # 不满足任何分组
+            return None
     
     if strategy is None:
         return None
