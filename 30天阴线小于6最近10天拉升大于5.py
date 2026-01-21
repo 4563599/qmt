@@ -42,6 +42,7 @@ g_lock = threading.Lock()
 g_history_data = {}
 g_prev_close_cache = {}
 g_stock_names = {}
+g_market_cap_cache = {}  # 市值缓存
 
 # Redis连接
 g_redis_client = None
@@ -69,7 +70,7 @@ OUTPUT_DIR = r"C:\Users\lyy\Desktop\股票\预警"
 STRATEGY_NAME = "10天阴线≤3+5次拉升+20天阴线≤5或=6"
 
 # ========== QQ邮箱配置 ==========
-EMAIL_ENABLED = True
+EMAIL_ENABLED = False  # 已关闭邮件发送
 EMAIL_RECEIVERS = ["4563599@qq.com"]
 EMAIL_SENDER = "4563599@qq.com"
 EMAIL_AUTH_CODE = "iruvzesxztercaic"
@@ -101,25 +102,37 @@ def init_redis():
         return False
     
     try:
+        # 增加超时设置，避免网络延迟导致的超时问题
         if REDIS_PASSWORD:
             g_redis_client = redis.Redis(
                 host=REDIS_HOST,
                 port=REDIS_PORT,
                 db=REDIS_DB,
                 password=REDIS_PASSWORD,
-                decode_responses=True
+                decode_responses=True,
+                socket_timeout=30,  # Socket超时30秒
+                socket_connect_timeout=10,  # 连接超时10秒
+                socket_keepalive=True,  # 保持连接
+                retry_on_timeout=True,  # 超时重试
+                health_check_interval=30  # 健康检查间隔
             )
         else:
             g_redis_client = redis.Redis(
                 host=REDIS_HOST,
                 port=REDIS_PORT,
                 db=REDIS_DB,
-                decode_responses=True
+                decode_responses=True,
+                socket_timeout=30,
+                socket_connect_timeout=10,
+                socket_keepalive=True,
+                retry_on_timeout=True,
+                health_check_interval=30
             )
         
         # 测试连接
         g_redis_client.ping()
         log(f">>> Redis连接成功: {REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}")
+        log(f"  连接配置: 超时30s, 自动重试, 保持连接")
         return True
     except Exception as e:
         log(f">>> Redis连接失败: {e}", "ERROR")
@@ -127,54 +140,146 @@ def init_redis():
         return False
 
 
+def save_single_stock_to_redis(stock_data, redis_key, max_retries=3):
+    """保存单只股票到Redis（带重试机制）
+    Args:
+        stock_data: 股票数据字典
+        redis_key: Redis键名
+        max_retries: 最大重试次数
+    Returns:
+        bool: 是否成功保存
+    """
+    if not g_redis_client:
+        return False
+    
+    stock_code = stock_data['code']
+    stock_name = stock_data['name']
+    
+    for retry in range(max_retries):
+        try:
+            # 使用 Hash 结构存储单只股票，field 为股票代码
+            # Redis Key: 5ls20:20260121  Field: 600001  Value: JSON数据
+            json_data = json.dumps(stock_data, ensure_ascii=False)
+            
+            # 使用 HSET 存储单只股票
+            g_redis_client.hset(redis_key, stock_code, json_data)
+            
+            # 设置过期时间（只需要设置一次）
+            g_redis_client.expire(redis_key, 30 * 24 * 60 * 60)
+            
+            # 成功则返回
+            if retry > 0:
+                log(f"  ✓ Redis保存成功(重试{retry}次): {stock_name}({stock_code})")
+            return True
+            
+        except Exception as e:
+            if retry < max_retries - 1:
+                log(f"  ✗ Redis保存失败(第{retry+1}次尝试): {stock_name}({stock_code}) - {str(e)}", "WARN")
+                # 尝试重新连接
+                try:
+                    g_redis_client.ping()
+                except:
+                    log(f"  尝试重新连接Redis...", "WARN")
+            else:
+                log(f"  ✗ Redis保存失败(已重试{max_retries}次): {stock_name}({stock_code}) - {str(e)}", "ERROR")
+                return False
+    
+    return False
+
+
 def save_to_redis(stocks, date_str):
-    """保存数据到Redis，按日期存储
-    Redis Key格式: 5ls20:YYYYMMDD
+    """逐只股票实时保存到Redis
+    Redis Key格式: 5ls20:YYYYMMDD (Hash结构)
+    每个Field为股票代码，Value为该股票的JSON数据
     """
     if not g_redis_client:
         log(">>> Redis未连接，跳过保存", "WARN")
         return
     
-    try:
-        # 生成Redis key
-        file_date = date_str.replace('-', '')  # 20260121
-        redis_key = f"{REDIS_KEY_PREFIX}:{file_date}"
+    # 生成Redis key
+    file_date = date_str.replace('-', '')  # 20260121
+    redis_key = f"{REDIS_KEY_PREFIX}:{file_date}"
+    
+    log(f">>> 开始逐只保存到Redis: {redis_key}")
+    log(f"  待保存股票数量: {len(stocks)}")
+    
+    success_count = 0
+    failed_stocks = []
+    
+    for idx, item in enumerate(stocks, 1):
+        code = item['stock'].split('.')[0]
+        stock_name = g_stock_names.get(item['stock'], code)
         
-        # 准备数据
-        stock_data_list = []
+        # 准备单只股票数据
+        stock_info = {
+            'code': code,
+            'name': stock_name,
+            'stock': item['stock'],
+            'current_gain': round(item['current_gain'], 2),
+            'today_max_gain': round(item['today_max_gain'], 2),
+            'current_price': round(item['current_price'], 2),
+            'prev_close': round(item['prev_close'], 2),
+            'volume': item.get('volume', 0),
+            'yin_count_10': item['yin_count_10'],
+            'pull_count_10': item['pull_count_10'],
+            'yin_count_20': item['yin_count_20'],
+            'limit_down_count_10': item.get('limit_down_count_10', 0),
+            'limit_down_count_20': item.get('limit_down_count_20', 0),
+            'bare_foot_yang_count_10': item.get('bare_foot_yang_count_10', 0),
+            'total_market_cap': item.get('total_market_cap', 0),
+            'circulating_market_cap': item.get('circulating_market_cap', 0),
+            'group': item['group'],
+            'time': item['time'],
+            'date': date_str
+        }
+        
+        # 立即保存到Redis（带重试）
+        if save_single_stock_to_redis(stock_info, redis_key, max_retries=3):
+            success_count += 1
+            log(f"  [{idx}/{len(stocks)}] ✓ {stock_name}({code}) 已保存到Redis")
+        else:
+            failed_stocks.append(f"{stock_name}({code})")
+            log(f"  [{idx}/{len(stocks)}] ✗ {stock_name}({code}) 保存失败", "ERROR")
+    
+    # 汇总结果
+    log(f">>> Redis保存完成: 成功 {success_count}/{len(stocks)} 只")
+    if failed_stocks:
+        log(f"  失败股票: {', '.join(failed_stocks)}", "ERROR")
+    
+    # 尝试补救失败的股票（再试一次）
+    if failed_stocks and success_count > 0:
+        log(f"  正在尝试补救失败的 {len(failed_stocks)} 只股票...")
+        retry_success = 0
         for item in stocks:
             code = item['stock'].split('.')[0]
             stock_name = g_stock_names.get(item['stock'], code)
-            
-            stock_info = {
-                'code': code,
-                'name': stock_name,
-                'stock': item['stock'],
-                'current_gain': round(item['current_gain'], 2),
-                'today_max_gain': round(item['today_max_gain'], 2),
-                'current_price': round(item['current_price'], 2),
-                'prev_close': round(item['prev_close'], 2),
-                'volume': item.get('volume', 0),
-                'yin_count_10': item['yin_count_10'],
-                'pull_count_10': item['pull_count_10'],
-                'yin_count_20': item['yin_count_20'],
-                'group': item['group'],
-                'time': item['time'],
-                'date': date_str
-            }
-            stock_data_list.append(stock_info)
-        
-        # 将数据转为JSON字符串存入Redis
-        json_data = json.dumps(stock_data_list, ensure_ascii=False)
-        g_redis_client.set(redis_key, json_data)
-        
-        # 设置过期时间（30天）
-        g_redis_client.expire(redis_key, 30 * 24 * 60 * 60)
-        
-        log(f">>> 已保存到Redis: {redis_key} ({len(stock_data_list)}只股票)")
-        
-    except Exception as e:
-        log(f">>> 保存到Redis失败: {e}", "ERROR")
+            if f"{stock_name}({code})" in failed_stocks:
+                stock_info = {
+                    'code': code,
+                    'name': stock_name,
+                    'stock': item['stock'],
+                    'current_gain': round(item['current_gain'], 2),
+                    'today_max_gain': round(item['today_max_gain'], 2),
+                    'current_price': round(item['current_price'], 2),
+                    'prev_close': round(item['prev_close'], 2),
+                    'volume': item.get('volume', 0),
+                    'yin_count_10': item['yin_count_10'],
+                    'pull_count_10': item['pull_count_10'],
+                    'yin_count_20': item['yin_count_20'],
+                    'limit_down_count_10': item.get('limit_down_count_10', 0),
+                    'limit_down_count_20': item.get('limit_down_count_20', 0),
+                    'bare_foot_yang_count_10': item.get('bare_foot_yang_count_10', 0),
+                    'total_market_cap': item.get('total_market_cap', 0),
+                    'circulating_market_cap': item.get('circulating_market_cap', 0),
+                    'group': item['group'],
+                    'time': item['time'],
+                    'date': date_str
+                }
+                if save_single_stock_to_redis(stock_info, redis_key, max_retries=2):
+                    retry_success += 1
+        if retry_success > 0:
+            log(f"  补救成功: {retry_success} 只")
+            success_count += retry_success
 
 
 def get_from_redis(date_str):
@@ -231,6 +336,10 @@ def init(ContextInfo):
     log(">>> 正在预加载股票名称...")
     preload_stock_names(ContextInfo)
     log(f">>> 股票名称加载完成: {len(g_stock_names)} 只")
+    
+    # 预加载市值数据
+    log("")
+    preload_market_cap(ContextInfo)
     
     # 预加载历史数据（需要至少30天数据，考虑停牌情况多取几天）
     log("")
@@ -300,6 +409,85 @@ def get_date_with_weekday():
     return weekdays[now.weekday()]
 
 
+def preload_market_cap(ContextInfo):
+    """预加载市值数据"""
+    global g_market_cap_cache
+    
+    log(">>> 正在预加载市值数据...")
+    
+    batch_size = 100  # 市值数据批量获取，每批100只
+    total = len(g_stock_pool)
+    success_count = 0
+    
+    for i in range(0, total, batch_size):
+        batch = g_stock_pool[i:i+batch_size]
+        batch_num = i // batch_size + 1
+        total_batches = (total + batch_size - 1) // batch_size
+        
+        try:
+            # 使用 get_market_data_ex 获取市值数据
+            # total_market_cap: 总市值（单位：元）
+            # circulating_market_cap: 流通市值（单位：元）
+            cap_data = ContextInfo.get_market_data_ex(
+                ['total_market_cap', 'circulating_market_cap'], 
+                batch
+            )
+            
+            if cap_data:
+                for stock in batch:
+                    try:
+                        if stock in cap_data:
+                            stock_cap_data = cap_data[stock]
+                            
+                            # QMT返回的是字典，每个字段值是pandas Series
+                            # 需要取最后一个有效值（最新数据）
+                            total_cap = 0
+                            circ_cap = 0
+                            
+                            if isinstance(stock_cap_data, dict):
+                                # 字典格式：{'total_market_cap': Series, 'circulating_market_cap': Series}
+                                if 'total_market_cap' in stock_cap_data:
+                                    cap_series = stock_cap_data['total_market_cap']
+                                    # 如果是pandas Series，取最后一个有效值
+                                    if hasattr(cap_series, 'iloc'):
+                                        total_cap = float(cap_series.iloc[-1]) if len(cap_series) > 0 else 0
+                                    else:
+                                        total_cap = float(cap_series) if cap_series else 0
+                                
+                                if 'circulating_market_cap' in stock_cap_data:
+                                    cap_series = stock_cap_data['circulating_market_cap']
+                                    if hasattr(cap_series, 'iloc'):
+                                        circ_cap = float(cap_series.iloc[-1]) if len(cap_series) > 0 else 0
+                                    else:
+                                        circ_cap = float(cap_series) if cap_series else 0
+                            
+                            # 将市值从元转换为亿元，处理可能的NaN
+                            if total_cap > 0 or circ_cap > 0:
+                                # 确保不是NaN
+                                import math
+                                if math.isnan(total_cap):
+                                    total_cap = 0
+                                if math.isnan(circ_cap):
+                                    circ_cap = 0
+                                
+                                g_market_cap_cache[stock] = {
+                                    'total_market_cap': round(total_cap / 100000000, 2) if total_cap > 0 else 0,
+                                    'circulating_market_cap': round(circ_cap / 100000000, 2) if circ_cap > 0 else 0
+                                }
+                                success_count += 1
+                    except Exception as e:
+                        if batch_num <= 2:  # 前两批显示详细错误
+                            log(f"  {stock} 市值解析失败: {str(e)}", "DEBUG")
+        except Exception as e:
+            log(f"  批次{batch_num}获取市值数据异常: {str(e)}", "ERROR")
+        
+        if PRINT_PROGRESS and batch_num % 5 == 0:  # 每5批打印一次
+            progress = min(i + batch_size, total)
+            log(f"  [市值预加载] 批次 {batch_num}/{total_batches} | 进度: {progress}/{total} | 成功: {success_count}")
+    
+    log(f">>> 市值数据预加载完成: 成功 {success_count} 只")
+
+
 def preload_history_data(ContextInfo):
     """预加载历史数据（需要至少30天数据，考虑停牌多取40天）"""
     global g_history_data, g_prev_close_cache
@@ -322,9 +510,10 @@ def preload_history_data(ContextInfo):
         total_batches = (total + batch_size - 1) // batch_size
         
         try:
+            # 使用 get_market_data_ex 替代 get_market_data（推荐接口）
             # 获取40天数据，以应对停牌情况
             if end_date:
-                data = ContextInfo.get_market_data(
+                data = ContextInfo.get_market_data_ex(
                     ['open', 'high', 'low', 'close', 'volume'], 
                     batch, 
                     period='1d', 
@@ -332,7 +521,7 @@ def preload_history_data(ContextInfo):
                     end_time=end_date
                 )
             else:
-                data = ContextInfo.get_market_data(
+                data = ContextInfo.get_market_data_ex(
                     ['open', 'high', 'low', 'close', 'volume'], 
                     batch, 
                     period='1d', 
@@ -391,7 +580,55 @@ def is_suspended(volume):
     return volume == 0
 
 
-def get_valid_trading_days(closes, opens, highs, lows, volumes, need_days):
+def calc_limit_down_price(prev_close, stock_code):
+    """
+    计算跌停价
+    根据不同板块计算跌停价：
+    - 科创板/创业板(注册制)：20%
+    - 北交所：30%
+    - ST股票：5%
+    - 主板：10%
+    """
+    if prev_close <= 0:
+        return 0
+    
+    # 判断股票类型
+    if stock_code.startswith('688') or stock_code.startswith('689'):  # 科创板
+        limit_ratio = 0.20
+    elif stock_code.startswith('300'):  # 创业板(注册制)
+        limit_ratio = 0.20
+    elif stock_code.startswith('8') or stock_code.startswith('4'):  # 北交所
+        limit_ratio = 0.30
+    elif 'ST' in stock_code.upper():  # ST股票
+        limit_ratio = 0.05
+    else:  # 主板
+        limit_ratio = 0.10
+    
+    limit_down = prev_close * (1 - limit_ratio)
+    return round(limit_down, 2)
+
+
+def is_limit_down(close_price, open_price, prev_close, stock_code, tolerance=0.01):
+    """
+    判断是否跌停（包括一字跌停）
+    tolerance: 容差，默认1%，考虑到价格精度问题
+    """
+    if prev_close <= 0:
+        return False
+    
+    limit_down = calc_limit_down_price(prev_close, stock_code)
+    
+    # 判断收盘价是否接近跌停价（考虑价格精度）
+    price_diff_ratio = abs(close_price - limit_down) / prev_close
+    
+    # 如果收盘价在跌停价附近（容差范围内），认为是跌停
+    if price_diff_ratio <= tolerance:
+        return True
+    
+    return False
+
+
+def get_valid_trading_days(closes, opens, highs, lows, volumes, need_days, stock_code=""):
     """
     获取有效交易日数据（排除停牌日）
     返回：有效交易日的数据列表
@@ -404,6 +641,14 @@ def get_valid_trading_days(closes, opens, highs, lows, volumes, need_days):
         if is_suspended(volumes[i]):
             continue
         
+        prev_close_price = closes[i-1] if i > 0 else 0
+        
+        # 判断是否跌停
+        is_ld = is_limit_down(closes[i], opens[i], prev_close_price, stock_code)
+        
+        # 判断是否光脚阳线
+        is_bfy = is_bare_foot_yang(opens[i], closes[i], lows[i])
+        
         valid_days.append({
             'idx': i,
             'open': opens[i],
@@ -411,13 +656,42 @@ def get_valid_trading_days(closes, opens, highs, lows, volumes, need_days):
             'low': lows[i],
             'close': closes[i],
             'volume': volumes[i],
-            'prev_close': closes[i-1] if i > 0 else 0
+            'prev_close': prev_close_price,
+            'is_limit_down': is_ld,
+            'is_bare_foot_yang': is_bfy
         })
         
         if len(valid_days) >= need_days:
             break
     
     return valid_days
+
+
+def is_bare_foot_yang(open_price, close_price, low_price, tolerance=0.001):
+    """
+    判断是否为光脚阳线
+    光脚阳线：阳线且没有下影线（或下影线极短）
+    条件：
+    1. 收盘价 > 开盘价（阳线）
+    2. 最低价 = 开盘价（或非常接近，考虑价格精度）
+    
+    tolerance: 容差，默认0.1%，用于判断是否"接近"
+    """
+    # 必须是阳线
+    if close_price <= open_price:
+        return False
+    
+    # 计算下影线长度相对于K线实体的比例
+    body = close_price - open_price
+    lower_shadow = open_price - low_price
+    
+    if body <= 0:
+        return False
+    
+    # 下影线长度相对于实体的比例小于容差，认为是光脚
+    shadow_ratio = lower_shadow / body
+    
+    return shadow_ratio <= tolerance
 
 
 def calc_max_gain(h, prev_c):
@@ -474,8 +748,11 @@ def check_stock(stock, all_ticks, stats):
     # 参考日最高涨幅
     ref_max_gain = calc_max_gain(current_high, prev_close)
     
+    # 获取股票代码（用于判断跌停）
+    stock_code = stock.split('.')[0]
+    
     # ========== 获取有效的10个交易日（排除停牌） ==========
-    valid_days_10 = get_valid_trading_days(closes, opens, highs, lows, volumes, 10)
+    valid_days_10 = get_valid_trading_days(closes, opens, highs, lows, volumes, 10, stock_code)
     
     if len(valid_days_10) < 10:
         stats['no_enough_data'] += 1
@@ -483,9 +760,18 @@ def check_stock(stock, all_ticks, stats):
     
     # ========== 条件2：最近10个交易日的阴线次数 ≤ 3 ==========
     yin_count_10 = 0
+    limit_down_count_10 = 0  # 记录跌停次数
+    bare_foot_yang_count_10 = 0  # 记录光脚阳线次数
     for day in valid_days_10:
-        if day['close'] < day['open']:  # 阴线
+        # 阴线：收盘价 < 开盘价，或者跌停（包括一字跌停）
+        if day['close'] < day['open'] or day['is_limit_down']:
             yin_count_10 += 1
+            if day['is_limit_down']:
+                limit_down_count_10 += 1
+        
+        # 统计光脚阳线
+        if day['is_bare_foot_yang']:
+            bare_foot_yang_count_10 += 1
     
     if yin_count_10 > 3:
         stats['fail_yin_10'] += 1
@@ -503,7 +789,7 @@ def check_stock(stock, all_ticks, stats):
         return None
     
     # ========== 获取有效的20个交易日（排除停牌） ==========
-    valid_days_20 = get_valid_trading_days(closes, opens, highs, lows, volumes, 20)
+    valid_days_20 = get_valid_trading_days(closes, opens, highs, lows, volumes, 20, stock_code)
     
     if len(valid_days_20) < 20:
         stats['no_enough_data'] += 1
@@ -511,9 +797,13 @@ def check_stock(stock, all_ticks, stats):
     
     # ========== 条件4：20天阴线判断 ==========
     yin_count_20 = 0
+    limit_down_count_20 = 0  # 记录跌停次数
     for day in valid_days_20:
-        if day['close'] < day['open']:  # 阴线
+        # 阴线：收盘价 < 开盘价，或者跌停（包括一字跌停）
+        if day['close'] < day['open'] or day['is_limit_down']:
             yin_count_20 += 1
+            if day['is_limit_down']:
+                limit_down_count_20 += 1
     
     # 判断属于哪个组
     group = None
@@ -534,6 +824,16 @@ def check_stock(stock, all_ticks, stats):
     # 计算涨幅
     gain = (current_price - prev_close) / prev_close * 100
     
+    # 获取市值数据
+    market_cap_data = g_market_cap_cache.get(stock, {})
+    total_market_cap = market_cap_data.get('total_market_cap', 0)
+    circulating_market_cap = market_cap_data.get('circulating_market_cap', 0)
+    
+    # 通过条件的股票，打印详细日志
+    stock_name = g_stock_names.get(stock, stock.split('.')[0])
+    if PRINT_PROGRESS:
+        log(f"  ✓ {stock_name}({stock.split('.')[0]}) | 组{group} | 10天{yin_count_10}阴{pull_count_10}拉 | 20天{yin_count_20}阴 | 市值{total_market_cap:.2f}亿", "INFO")
+    
     return {
         'stock': stock,
         'current_gain': round(gain, 2),
@@ -544,6 +844,11 @@ def check_stock(stock, all_ticks, stats):
         'yin_count_10': yin_count_10,
         'pull_count_10': pull_count_10,
         'yin_count_20': yin_count_20,
+        'limit_down_count_10': limit_down_count_10,
+        'limit_down_count_20': limit_down_count_20,
+        'bare_foot_yang_count_10': bare_foot_yang_count_10,
+        'total_market_cap': total_market_cap,
+        'circulating_market_cap': circulating_market_cap,
         'group': group,
         'time': datetime.now().strftime('%H:%M:%S')
     }
@@ -572,7 +877,16 @@ def push_to_wechat(stocks):
         max_gain = f"{item['today_max_gain']:.2f}%"
         time_str = item['time']
         
-        msg_content = f"{WXP_SUMMARY}\n股票：{name} ({code})\n涨幅：{gain}\n最高涨幅：{max_gain}\n10天阴线：{item['yin_count_10']}\n10天拉升：{item['pull_count_10']}次\n20天阴线：{item['yin_count_20']}\n分组：{item['group']}\n时间：{time_str} {date_weekday}"
+        ld_10 = item.get('limit_down_count_10', 0)
+        ld_20 = item.get('limit_down_count_20', 0)
+        bfy_10 = item.get('bare_foot_yang_count_10', 0)
+        total_cap = item.get('total_market_cap', 0)
+        circ_cap = item.get('circulating_market_cap', 0)
+        ld_info_10 = f"(含{ld_10}跌停)" if ld_10 > 0 else ""
+        ld_info_20 = f"(含{ld_20}跌停)" if ld_20 > 0 else ""
+        cap_info = f"\n总市值：{total_cap}亿\n流通市值：{circ_cap}亿" if total_cap > 0 else ""
+        
+        msg_content = f"{WXP_SUMMARY}\n股票：{name} ({code})\n涨幅：{gain}\n最高涨幅：{max_gain}{cap_info}\n10天阴线：{item['yin_count_10']}{ld_info_10}\n10天拉升：{item['pull_count_10']}次\n10天光脚阳线：{bfy_10}次\n20天阴线：{item['yin_count_20']}{ld_info_20}\n分组：{item['group']}\n时间：{time_str} {date_weekday}"
         summary = f"{name} {gain}"
         
         log(f">>> 推送内容 [{idx}/{len(stocks)}]: {msg_content}")
@@ -630,8 +944,17 @@ def send_email(stocks):
         max_gain = f"{item['today_max_gain']:.2f}%"
         time_str = item['time']
         
+        ld_10 = item.get('limit_down_count_10', 0)
+        ld_20 = item.get('limit_down_count_20', 0)
+        bfy_10 = item.get('bare_foot_yang_count_10', 0)
+        total_cap = item.get('total_market_cap', 0)
+        circ_cap = item.get('circulating_market_cap', 0)
+        ld_info_10 = f"(含{ld_10}跌停)" if ld_10 > 0 else ""
+        ld_info_20 = f"(含{ld_20}跌停)" if ld_20 > 0 else ""
+        cap_info = f"\n总市值：{total_cap}亿\n流通市值：{circ_cap}亿" if total_cap > 0 else ""
+        
         subject = f"{name} {gain}"
-        body = f"发现时间：{current_time}\n\n{WXP_SUMMARY}\n股票：{name} ({code})\n涨幅：{gain}\n最高涨幅：{max_gain}\n10天阴线：{item['yin_count_10']}\n10天拉升：{item['pull_count_10']}次\n20天阴线：{item['yin_count_20']}\n分组：{item['group']}\n时间：{time_str} {date_weekday}"
+        body = f"发现时间：{current_time}\n\n{WXP_SUMMARY}\n股票：{name} ({code})\n涨幅：{gain}\n最高涨幅：{max_gain}{cap_info}\n10天阴线：{item['yin_count_10']}{ld_info_10}\n10天拉升：{item['pull_count_10']}次\n10天光脚阳线：{bfy_10}次\n20天阴线：{item['yin_count_20']}{ld_info_20}\n分组：{item['group']}\n时间：{time_str} {date_weekday}"
         
         try:
             msg = MIMEText(body, 'plain', 'utf-8')
@@ -677,8 +1000,16 @@ def write_stocks_to_file(stocks, date_str):
                 max_gain = item['today_max_gain']
                 volume = item.get('volume', 0)
                 
-                # 格式：代码\t名称\t日期 时间\t价格\t涨幅%\t最高涨幅%\t成交量\t10天阴线\t10天拉升\t20天阴线\t分组\t策略名称
-                line = f"{code}\t{stock_name}\t{date_str} {item['time']}\t{price:.2f}\t{gain:.2f}%\t{max_gain:.2f}%\t{volume}\t{item['yin_count_10']}阴\t{item['pull_count_10']}拉\t{item['yin_count_20']}阴\t{item['group']}\t{STRATEGY_NAME}\n"
+                ld_10 = item.get('limit_down_count_10', 0)
+                ld_20 = item.get('limit_down_count_20', 0)
+                bfy_10 = item.get('bare_foot_yang_count_10', 0)
+                total_cap = item.get('total_market_cap', 0)
+                circ_cap = item.get('circulating_market_cap', 0)
+                ld_info_10 = f"(含{ld_10}跌停)" if ld_10 > 0 else ""
+                ld_info_20 = f"(含{ld_20}跌停)" if ld_20 > 0 else ""
+                
+                # 格式：代码\t名称\t日期 时间\t价格\t涨幅%\t最高涨幅%\t成交量\t总市值\t流通市值\t10天阴线\t10天拉升\t10天光脚阳\t20天阴线\t分组\t策略名称
+                line = f"{code}\t{stock_name}\t{date_str} {item['time']}\t{price:.2f}\t{gain:.2f}%\t{max_gain:.2f}%\t{volume}\t{total_cap}亿\t{circ_cap}亿\t{item['yin_count_10']}阴{ld_info_10}\t{item['pull_count_10']}拉\t{bfy_10}光脚阳\t{item['yin_count_20']}阴{ld_info_20}\t{item['group']}\t{STRATEGY_NAME}\n"
                 f.write(line)
         log(f">>> 已写入文件: {output_file}")
     except Exception as e:
@@ -755,6 +1086,15 @@ def scan_stocks(ContextInfo):
             'pass': 0
         }
         
+        # 获取日期字符串（用于Redis保存）
+        if REFERENCE_DATE:
+            date_str = f"{REFERENCE_DATE[:4]}-{REFERENCE_DATE[4:6]}-{REFERENCE_DATE[6:8]}"
+        else:
+            date_str = current_time.strftime('%Y-%m-%d')
+        
+        file_date = date_str.replace('-', '')
+        redis_key = f"{REDIS_KEY_PREFIX}:{file_date}"
+        
         for stock in g_stock_pool:
             try:
                 result = check_stock(stock, all_ticks, stats)
@@ -762,7 +1102,43 @@ def scan_stocks(ContextInfo):
                     qualified.append(result)
                     code = stock.split('.')[0]
                     name = g_stock_names.get(stock, code)
-                    log(f"  ★ 命中: {stock} {name} | 涨幅:{result['current_gain']}% | 最高涨幅:{result['today_max_gain']}% | 10天{result['yin_count_10']}阴{result['pull_count_10']}拉 | 20天{result['yin_count_20']}阴 | {result['group']}", "SUCCESS")
+                    ld_10 = result.get('limit_down_count_10', 0)
+                    ld_20 = result.get('limit_down_count_20', 0)
+                    bfy_10 = result.get('bare_foot_yang_count_10', 0)
+                    total_cap = result.get('total_market_cap', 0)
+                    ld_info_10 = f"(含{ld_10}跌停)" if ld_10 > 0 else ""
+                    ld_info_20 = f"(含{ld_20}跌停)" if ld_20 > 0 else ""
+                    cap_info = f" | 总市值:{total_cap}亿" if total_cap > 0 else ""
+                    log(f"  ★ 命中: {stock} {name} | 涨幅:{result['current_gain']}% | 最高涨幅:{result['today_max_gain']}%{cap_info} | 10天{result['yin_count_10']}阴{ld_info_10}{result['pull_count_10']}拉{bfy_10}光脚阳 | 20天{result['yin_count_20']}阴{ld_info_20} | {result['group']}", "SUCCESS")
+                    
+                    # 立即保存到Redis（实时保存）
+                    stock_info = {
+                        'code': code,
+                        'name': name,
+                        'stock': result['stock'],
+                        'current_gain': round(result['current_gain'], 2),
+                        'today_max_gain': round(result['today_max_gain'], 2),
+                        'current_price': round(result['current_price'], 2),
+                        'prev_close': round(result['prev_close'], 2),
+                        'volume': result.get('volume', 0),
+                        'yin_count_10': result['yin_count_10'],
+                        'pull_count_10': result['pull_count_10'],
+                        'yin_count_20': result['yin_count_20'],
+                        'limit_down_count_10': result.get('limit_down_count_10', 0),
+                        'limit_down_count_20': result.get('limit_down_count_20', 0),
+                        'bare_foot_yang_count_10': result.get('bare_foot_yang_count_10', 0),
+                        'total_market_cap': result.get('total_market_cap', 0),
+                        'circulating_market_cap': result.get('circulating_market_cap', 0),
+                        'group': result['group'],
+                        'time': result['time'],
+                        'date': date_str
+                    }
+                    # 立即保存到Redis
+                    if save_single_stock_to_redis(stock_info, redis_key, max_retries=3):
+                        log(f"    → Redis已保存: {name}({code})")
+                    else:
+                        log(f"    → Redis保存失败: {name}({code})", "ERROR")
+                        
             except Exception as e:
                 log(f"  检查股票异常 [{stock}]: {e}", "ERROR")
         
@@ -817,12 +1193,16 @@ def process_results(qualified, current_time):
             g_all_found_stocks[stock] = current_time_str
             new_stocks.append(item)
     
-    # 新增股票处理
+    # 新增股票处理（Redis已在发现时实时保存）
     if new_stocks:
-        push_to_wechat(new_stocks)
-        send_email(new_stocks)
+        # 1. 写入文件
         write_stocks_to_file(new_stocks, date_str)
-        save_to_redis(new_stocks, date_str)  # 保存到Redis
+        
+        # 2. 微信推送
+        push_to_wechat(new_stocks)
+        
+        # 3. 邮件发送（已关闭）
+        send_email(new_stocks)
     
     # 打印结果
     if qualified:
@@ -836,8 +1216,15 @@ def process_results(qualified, current_time):
         for idx, item in enumerate(qualified, 1):
             code = item['stock'].split('.')[0]
             name = g_stock_names.get(item['stock'], code)
+            ld_10 = item.get('limit_down_count_10', 0)
+            ld_20 = item.get('limit_down_count_20', 0)
+            bfy_10 = item.get('bare_foot_yang_count_10', 0)
+            total_cap = item.get('total_market_cap', 0)
+            ld_info_10 = f"(含{ld_10}跌停)" if ld_10 > 0 else ""
+            ld_info_20 = f"(含{ld_20}跌停)" if ld_20 > 0 else ""
+            cap_info = f" | 总市值: {total_cap}亿" if total_cap > 0 else ""
             log(f"【{idx}】{code} {name}")
-            log(f"    涨幅: {item['current_gain']}% | 最高涨幅: {item['today_max_gain']}% | 10天{item['yin_count_10']}阴{item['pull_count_10']}拉 | 20天{item['yin_count_20']}阴 | {item['group']}")
+            log(f"    涨幅: {item['current_gain']}% | 最高涨幅: {item['today_max_gain']}%{cap_info} | 10天{item['yin_count_10']}阴{ld_info_10}{item['pull_count_10']}拉{bfy_10}光脚阳 | 20天{item['yin_count_20']}阴{ld_info_20} | {item['group']}")
         
         g_qualified_stocks = {item['stock']: item for item in qualified}
     else:
@@ -861,13 +1248,14 @@ def is_trading_time(dt):
 
 
 def clear_cache(ContextInfo):
-    global g_history_data, g_prev_close_cache, g_qualified_stocks, g_scan_count, g_all_found_stocks, g_stock_names, g_email_sent_stocks
+    global g_history_data, g_prev_close_cache, g_qualified_stocks, g_scan_count, g_all_found_stocks, g_stock_names, g_email_sent_stocks, g_market_cap_cache
     g_history_data = {}
     g_prev_close_cache = {}
     g_qualified_stocks = {}
     g_all_found_stocks = {}
     g_stock_names = {}
     g_email_sent_stocks = set()
+    g_market_cap_cache = {}
     g_scan_count = 0
     log("缓存已清理")
 
