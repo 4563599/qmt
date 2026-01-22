@@ -3,11 +3,13 @@
 QMT极品策略 - 10天阴线≤3 + 10天5次拉升 + 20天阴线≤5或=6
 策略逻辑：
 1. 参考日期：今天是交易日则为今天，否则为最近一个交易日
-2. 最近10个交易日的阴线次数 ≤ 3（必须满足）
-3. 10天内 最高>昨收*1.065 的次数>=5
-4. 第一组 最近20个交易日的阴线次数 ≤ 5（必须满足）+ 今日最高涨幅>4.5%
-   第二组 最近20个交易日的阴线次数=6，并且参考日期最高涨幅>6.5%
+2. 最近10个交易日（包括今日参考日）的阴线次数 ≤ 3（必须满足）
+3. 10天内（包括今日参考日） 最高>昨收*1.065 的次数>=5（盘中动态计算）
+4. 第一组 最近20个交易日（包括今日参考日）的阴线次数 ≤ 5（必须满足）+ 今日最高涨幅>4.5%
+   第二组 最近20个交易日（包括今日参考日）的阴线次数=6，并且参考日期最高涨幅>6.5%
 5. 如果最近20个交易日内有停牌日期，则停牌日期不算，要继续获取数据，保证要有20个交易日的数据
+
+注意：10天和20天计算包括今日，今日数据盘中实时变化，可能导致股票动态进出筛选池
 """
 
 import numpy as np
@@ -187,6 +189,48 @@ def save_single_stock_to_redis(stock_data, redis_key, max_retries=3):
     return False
 
 
+def delete_stock_from_redis(stock_code, stock_name, redis_key, max_retries=3):
+    """从Redis中删除单只股票（带重试机制）
+    Args:
+        stock_code: 股票代码（不含后缀）
+        stock_name: 股票名称
+        redis_key: Redis键名
+        max_retries: 最大重试次数
+    Returns:
+        bool: 是否成功删除
+    """
+    if not g_redis_client:
+        return False
+    
+    for retry in range(max_retries):
+        try:
+            # 使用 HDEL 从 Hash 中删除该股票
+            result = g_redis_client.hdel(redis_key, stock_code)
+            
+            if result > 0:
+                # 成功删除
+                if retry > 0:
+                    log(f"  ✓ Redis删除成功(重试{retry}次): {stock_name}({stock_code})")
+                return True
+            else:
+                # 字段不存在（可能已经被删除了）
+                return True
+            
+        except Exception as e:
+            if retry < max_retries - 1:
+                log(f"  ✗ Redis删除失败(第{retry+1}次尝试): {stock_name}({stock_code}) - {str(e)}", "WARN")
+                # 尝试重新连接
+                try:
+                    g_redis_client.ping()
+                except:
+                    log(f"  尝试重新连接Redis...", "WARN")
+            else:
+                log(f"  ✗ Redis删除失败(已重试{max_retries}次): {stock_name}({stock_code}) - {str(e)}", "ERROR")
+                return False
+    
+    return False
+
+
 def save_to_redis(stocks, date_str):
     """逐只股票实时保存到Redis
     Redis Key格式: 5ls20:YYYYMMDD (Hash结构)
@@ -333,7 +377,7 @@ def init(ContextInfo):
     preload_stock_names(ContextInfo)
     log(f">>> 股票名称加载完成: {len(g_stock_names)} 只")
     
-    # 预加载历史数据（需要至少30天数据，考虑停牌情况多取几天）
+    # 预加载历史数据（需要至少20天数据，考虑停牌情况多取30天）
     log("")
     log(">>> 正在预加载历史数据...")
     preload_history_data(ContextInfo)
@@ -402,7 +446,7 @@ def get_date_with_weekday():
 
 
 def preload_history_data(ContextInfo):
-    """预加载历史数据（需要至少30天数据，考虑停牌多取40天）"""
+    """预加载历史数据（需要至少20天数据，考虑停牌多取30天）"""
     global g_history_data, g_prev_close_cache
     
     batch_size = 300
@@ -424,13 +468,13 @@ def preload_history_data(ContextInfo):
         
         try:
             # 使用 get_market_data_ex 替代 get_market_data（推荐接口）
-            # 获取40天数据，以应对停牌情况
+            # 获取30天数据，以应对停牌情况
             if end_date:
                 data = ContextInfo.get_market_data_ex(
                     ['open', 'high', 'low', 'close', 'volume'], 
                     batch, 
                     period='1d', 
-                    count=40,
+                    count=30,
                     end_time=end_date
                 )
             else:
@@ -438,7 +482,7 @@ def preload_history_data(ContextInfo):
                     ['open', 'high', 'low', 'close', 'volume'], 
                     batch, 
                     period='1d', 
-                    count=40
+                    count=30
                 )
             
             if data is not None:
@@ -541,14 +585,17 @@ def is_limit_down(close_price, open_price, prev_close, stock_code, tolerance=0.0
     return False
 
 
-def get_valid_trading_days(closes, opens, highs, lows, volumes, need_days, stock_code=""):
+def get_valid_trading_days(closes, opens, highs, lows, volumes, need_days, stock_code="", skip_last=True):
     """
     获取有效交易日数据（排除停牌日）
     返回：有效交易日的数据列表
+    skip_last: 是否跳过最后一天(默认True,因为最后一天是今天,会用实时行情替代)
     """
     valid_days = []
     
-    # 从最新的一天开始往前查找（跳过索引-1，因为那是参考日）
+    # 从历史数据的倒数第2天开始往前查找（因为最后一天是今天，会用实时行情替代）
+    # 历史数据: [..., 前天, 昨天, 今天]，索引为 [..., -3, -2, -1]
+    # 我们需要从昨天(-2)开始往前取数据
     for i in range(len(closes) - 2, -1, -1):
         # 检查是否停牌
         if is_suspended(volumes[i]):
@@ -619,19 +666,33 @@ def calc_max_gain(h, prev_c):
 
 def check_stock(stock, all_ticks, stats):
     """检查单只股票"""
+    # 调试：重点关注的股票
+    stock_code = stock.split('.')[0]
+    stock_name = g_stock_names.get(stock, stock_code)
+    is_debug_stock = stock_name in ['锋龙股份', '五矿发展'] or stock_code in ['002931', '600058']
+    
+    if is_debug_stock:
+        log(f">>> [调试] 开始检查 {stock_name}({stock_code})", "DEBUG")
+    
     tick = all_ticks.get(stock)
     if not tick:
         stats['no_tick'] += 1
+        if is_debug_stock:
+            log(f">>> [调试] {stock_name}({stock_code}) 无行情数据", "DEBUG")
         return None
     
     prev_close = g_prev_close_cache.get(stock)
     if not prev_close or prev_close <= 0:
         stats['no_prev'] += 1
+        if is_debug_stock:
+            log(f">>> [调试] {stock_name}({stock_code}) 无昨收价", "DEBUG")
         return None
     
     hist = g_history_data.get(stock)
     if not hist:
         stats['no_hist'] += 1
+        if is_debug_stock:
+            log(f">>> [调试] {stock_name}({stock_code}) 无历史数据", "DEBUG")
         return None
     
     closes = hist['closes']
@@ -642,6 +703,8 @@ def check_stock(stock, all_ticks, stats):
     
     if len(closes) < 21:
         stats['no_hist'] += 1
+        if is_debug_stock:
+            log(f">>> [调试] {stock_name}({stock_code}) 历史数据不足: {len(closes)}天", "DEBUG")
         return None
     
     # 获取今日数据（参考日）
@@ -654,22 +717,52 @@ def check_stock(stock, all_ticks, stats):
     current_open = tick.get('open', 0)
     current_volume = tick.get('volume', tick.get('vol', 0))
     
+    if is_debug_stock:
+        log(f">>> [调试] {stock_name}({stock_code}) 今日行情: 开{current_open:.2f} 高{current_high:.2f} 低{current_low:.2f} 收{current_price:.2f} 昨收{prev_close:.2f}", "DEBUG")
+        log(f">>> [调试] {stock_name}({stock_code}) 历史数据最后一天: 开{opens[-1]:.2f} 收{closes[-1]:.2f}", "DEBUG")
+    
     if current_price <= 0 or current_high <= 0:
         stats['no_tick'] += 1
+        if is_debug_stock:
+            log(f">>> [调试] {stock_name}({stock_code}) 价格数据无效", "DEBUG")
         return None
     
     # 参考日最高涨幅
     ref_max_gain = calc_max_gain(current_high, prev_close)
     
-    # 获取股票代码（用于判断跌停）
-    stock_code = stock.split('.')[0]
+    if is_debug_stock:
+        log(f">>> [调试] {stock_name}({stock_code}) 今日最高涨幅: {ref_max_gain:.2f}%", "DEBUG")
     
-    # ========== 获取有效的10个交易日（排除停牌） ==========
-    valid_days_10 = get_valid_trading_days(closes, opens, highs, lows, volumes, 10, stock_code)
+    # ========== 获取有效的9个历史交易日（排除停牌） ==========
+    # 注意：这里获取9天，因为要加上今天（参考日）一起算10天
+    valid_days_9 = get_valid_trading_days(closes, opens, highs, lows, volumes, 9, stock_code)
     
-    if len(valid_days_10) < 10:
+    if len(valid_days_9) < 9:
         stats['no_enough_data'] += 1
+        if is_debug_stock:
+            log(f">>> [调试] {stock_name}({stock_code}) 有效交易日不足9天: {len(valid_days_9)}天", "DEBUG")
         return None
+    
+    # ========== 构建今日数据（参考日），使用实时行情 ==========
+    # 判断今天是否跌停
+    is_limit_down_today = is_limit_down(current_price, current_open, prev_close, stock_code)
+    
+    # 判断今天是否光脚阳线
+    is_bare_foot_yang_today = is_bare_foot_yang(current_open, current_price, current_low)
+    
+    today_data = {
+        'open': current_open,
+        'high': current_high,  # 盘中实时最高价
+        'close': current_price,  # 盘中实时价格
+        'low': current_low,
+        'volume': current_volume,
+        'prev_close': prev_close,
+        'is_limit_down': is_limit_down_today,
+        'is_bare_foot_yang': is_bare_foot_yang_today
+    }
+    
+    # 将今日数据插入到列表最前面，组成完整的10天（含今日）
+    valid_days_10 = [today_data] + valid_days_9
     
     # ========== 条件2：最近10个交易日的阴线次数 ≤ 3 ==========
     yin_count_10 = 0
@@ -686,8 +779,13 @@ def check_stock(stock, all_ticks, stats):
         if day['is_bare_foot_yang']:
             bare_foot_yang_count_10 += 1
     
+    if is_debug_stock:
+        log(f">>> [调试] {stock_name}({stock_code}) 10天阴线: {yin_count_10}次 (含{limit_down_count_10}跌停)", "DEBUG")
+    
     if yin_count_10 > 3:
         stats['fail_yin_10'] += 1
+        if is_debug_stock:
+            log(f">>> [调试] {stock_name}({stock_code}) ❌ 10天阴线>3,被淘汰", "DEBUG")
         return None
     
     # ========== 条件3：10天内 最高>昨收*1.065 的次数>=5 ==========
@@ -697,37 +795,73 @@ def check_stock(stock, all_ticks, stats):
             if day['high'] > day['prev_close'] * 1.065:
                 pull_count_10 += 1
     
+    if is_debug_stock:
+        log(f">>> [调试] {stock_name}({stock_code}) 10天拉升: {pull_count_10}次", "DEBUG")
+    
     if pull_count_10 < 5:
         stats['fail_pull_10'] += 1
+        if is_debug_stock:
+            log(f">>> [调试] {stock_name}({stock_code}) ❌ 10天拉升<5次,被淘汰", "DEBUG")
         return None
     
-    # ========== 获取有效的20个交易日（排除停牌） ==========
-    valid_days_20 = get_valid_trading_days(closes, opens, highs, lows, volumes, 20, stock_code)
+    # ========== 获取有效的19个历史交易日（排除停牌） ==========
+    # 注意：这里获取19天，因为要加上今天（参考日）一起算20天
+    valid_days_19 = get_valid_trading_days(closes, opens, highs, lows, volumes, 19, stock_code)
     
-    if len(valid_days_20) < 20:
+    if len(valid_days_19) < 19:
         stats['no_enough_data'] += 1
+        if is_debug_stock:
+            log(f">>> [调试] {stock_name}({stock_code}) 有效交易日不足19天: {len(valid_days_19)}天", "DEBUG")
         return None
     
-    # ========== 条件4：20天阴线判断 ==========
+    # 将今日数据插入到列表最前面，组成完整的20天（含今日）
+    valid_days_20 = [today_data] + valid_days_19
+    
+    # ========== 条件4：20天阴线判断（包括今日，盘中动态） ==========
     yin_count_20 = 0
     limit_down_count_20 = 0  # 记录跌停次数
-    for day in valid_days_20:
+    
+    if is_debug_stock:
+        log(f">>> [调试] {stock_name}({stock_code}) 20天K线明细:", "DEBUG")
+    
+    for idx, day in enumerate(valid_days_20):
         # 阴线：收盘价 < 开盘价，或者跌停（包括一字跌停）
-        if day['close'] < day['open'] or day['is_limit_down']:
+        is_yin = day['close'] < day['open'] or day['is_limit_down']
+        if is_yin:
             yin_count_20 += 1
             if day['is_limit_down']:
                 limit_down_count_20 += 1
+        
+        if is_debug_stock:
+            day_type = "阴线" if is_yin else "阳线"
+            day_label = "今日" if idx == 0 else f"T-{idx}"
+            log(f"  {day_label}: 开{day['open']:.2f} 收{day['close']:.2f} 高{day['high']:.2f} 低{day['low']:.2f} -> {day_type}", "DEBUG")
+    
+    if is_debug_stock:
+        log(f">>> [调试] {stock_name}({stock_code}) 20天阴线: {yin_count_20}次 (含{limit_down_count_20}跌停)", "DEBUG")
     
     # 判断属于哪个组
     group = None
     
-    # 第一组：最近20个交易日的阴线次数 ≤ 5 + 今日最高涨幅>4.5%
+    # 第一组：最近20个交易日的阴线次数 ≤ 5 + 今日最高涨幅>4.5%（盘中动态）
     if yin_count_20 <= 5 and ref_max_gain > 4.5:
         group = "第一组(20天阴线≤5且今日涨幅>4.5%)"
-    # 第二组：最近20个交易日的阴线次数=6，并且参考日期最高涨幅>6.5%
+        if is_debug_stock:
+            log(f">>> [调试] {stock_name}({stock_code}) ✅ 通过所有条件! 第一组", "DEBUG")
+    # 第二组：最近20个交易日的阴线次数=6，并且参考日期最高涨幅>6.5%（盘中动态）
     elif yin_count_20 == 6 and ref_max_gain > 6.5:
         group = "第二组(20天阴线=6且参考日涨幅>6.5%)"
+        if is_debug_stock:
+            log(f">>> [调试] {stock_name}({stock_code}) ✅ 通过所有条件! 第二组", "DEBUG")
     else:
+        # 调试信息：打印接近通过的股票
+        if is_debug_stock or yin_count_20 <= 6:
+            if yin_count_20 <= 5:
+                log(f"  ⊗ {stock_name}({stock_code}) ❌ 20天{yin_count_20}阴满足,但今日最高涨幅{ref_max_gain:.2f}%不够 (需>4.5%)", "DEBUG")
+            elif yin_count_20 == 6:
+                log(f"  ⊗ {stock_name}({stock_code}) ❌ 20天{yin_count_20}阴满足,但今日最高涨幅{ref_max_gain:.2f}%不够 (需>6.5%)", "DEBUG")
+            else:
+                log(f"  ⊗ {stock_name}({stock_code}) ❌ 20天阴线{yin_count_20}次,不满足条件", "DEBUG")
         stats['fail_yin_20'] += 1
         return None
     
@@ -981,7 +1115,8 @@ def scan_stocks(ContextInfo):
             'total': len(g_stock_pool),
             'no_tick': 0, 'no_prev': 0, 'no_hist': 0, 'no_enough_data': 0,
             'fail_yin_10': 0, 'fail_pull_10': 0, 'fail_yin_20': 0,
-            'pass': 0
+            'pass': 0,
+            'removed': 0  # 新增：记录从Redis删除的股票数量
         }
         
         # 获取日期字符串（用于Redis保存）
@@ -996,10 +1131,12 @@ def scan_stocks(ContextInfo):
         for stock in g_stock_pool:
             try:
                 result = check_stock(stock, all_ticks, stats)
+                code = stock.split('.')[0]
+                name = g_stock_names.get(stock, code)
+                
                 if result:
+                    # ✅ 满足条件
                     qualified.append(result)
-                    code = stock.split('.')[0]
-                    name = g_stock_names.get(stock, code)
                     ld_10 = result.get('limit_down_count_10', 0)
                     ld_20 = result.get('limit_down_count_20', 0)
                     bfy_10 = result.get('bare_foot_yang_count_10', 0)
@@ -1040,6 +1177,18 @@ def scan_stocks(ContextInfo):
                     else:
                         # 已存在的股票，只打印日志
                         log(f"  ● 已存在: {stock} {name} | 涨幅:{result['current_gain']}% | 最高涨幅:{result['today_max_gain']}% | 10天{result['yin_count_10']}阴{ld_info_10}{result['pull_count_10']}拉{bfy_10}光脚阳 | 20天{result['yin_count_20']}阴{ld_info_20} | {result['group']}")
+                else:
+                    # ❌ 不满足条件
+                    # 如果之前存在于 g_all_found_stocks，说明之前满足条件，现在不满足了，需要从Redis删除
+                    if stock in g_all_found_stocks:
+                        log(f"  ⚠ 不再满足条件，从Redis删除: {stock} {name}", "WARN")
+                        if delete_stock_from_redis(code, name, redis_key, max_retries=3):
+                            log(f"    → Redis已删除: {name}({code})")
+                            # 从内存中移除
+                            del g_all_found_stocks[stock]
+                            stats['removed'] += 1
+                        else:
+                            log(f"    → Redis删除失败: {name}({code})", "ERROR")
                         
             except Exception as e:
                 log(f"  检查股票异常 [{stock}]: {e}", "ERROR")
@@ -1062,6 +1211,7 @@ def scan_stocks(ContextInfo):
         log(f"第2道淘汰(10天拉升<5): {stats['fail_pull_10']}")
         log(f"第3道淘汰(20天阴线不满足): {stats['fail_yin_20']}")
         log(f"全部通过: {stats['pass']}")
+        log(f"动态剔除(不再满足条件): {stats['removed']}")
         log("=" * 60)
         
         # 处理结果

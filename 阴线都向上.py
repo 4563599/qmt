@@ -4,8 +4,8 @@ QMT阴线都向上策略
 策略逻辑：
 1. 今日最高涨幅>4.5%
    计算最高涨幅：（今日最高点价格 - 昨日收盘价）÷ 昨日收盘价 × 100%
-2. 最近10个交易日内最高涨幅≥6.85%次数大于等于5（拉升次数）
-3. 10天内阴线的次数<=3或者没有阴线
+2. 最近10个交易日（包括今天参考日）内最高涨幅≥6.85%次数大于等于5（拉升次数）
+3. 10天内（包括今天）阴线的次数<=3或者没有阴线
 4. 10天内如果出现阴线则满足阴线都向上
    - 阴线向上：阴线满足（上引线大于阴线实体并且上引线大于下引线）或者满足（最高涨幅≥6.85%）
    - 阴线都向上：最近10个交易日所有阴线满足阴线向上或者没有阴线
@@ -13,6 +13,8 @@ QMT阴线都向上策略
    - 不下杀条件1：满足十字星（收盘价和开盘价幅度 ≤ 1.68%）
    - 不下杀条件2：下引线 < K线实体或者没有下引线
    - 不下杀定义（满足不下杀条件1或者不下杀条件2）
+
+注意：10天计算包括今日，今日数据盘中实时变化，可能导致股票动态进出筛选池
 """
 
 import numpy as np
@@ -655,14 +657,41 @@ def scan_stocks(ContextInfo):
         'total': len(g_stock_pool),
         'no_tick': 0, 'no_prev': 0, 'no_hist': 0,
         'fail_zf45': 0, 'fail_ls_count': 0, 'fail_yinxian': 0, 'fail_yin_up': 0,
-        'pass': 0
+        'pass': 0,
+        'removed': 0  # 新增：记录从Redis删除的股票数量
     }
+    
+    # 获取日期字符串（用于Redis删除）
+    date_str = current_time.strftime('%Y-%m-%d')
     
     for stock in g_stock_pool:
         result = check_stock_yxdxs(stock, all_ticks, stats, ContextInfo)
+        code = stock.split('.')[0]
+        name = g_stock_names.get(stock, code)
+        
         if result:
+            # ✅ 满足条件
             qualified.append(result)
-            log(f"  ★ 命中: {stock} | 涨幅:{result['current_gain']}% | 拉升:{result['ls_num']}次 | 阴线:{result['yinxian_count']}天 | 不下杀:{result['no_xs_num']}次", "SUCCESS")
+            
+            # 检查是否为新股票
+            is_new_stock = stock not in g_all_found_stocks
+            
+            if is_new_stock:
+                log(f"  ★ 新发现: {stock} {name} | 涨幅:{result['current_gain']}% | 拉升:{result['ls_num']}次 | 阴线:{result['yinxian_count']}天 | 不下杀:{result['no_xs_num']}次", "SUCCESS")
+            else:
+                log(f"  ● 已存在: {stock} {name} | 涨幅:{result['current_gain']}% | 拉升:{result['ls_num']}次 | 阴线:{result['yinxian_count']}天 | 不下杀:{result['no_xs_num']}次")
+        else:
+            # ❌ 不满足条件
+            # 如果之前存在于 g_all_found_stocks，说明之前满足条件，现在不满足了，需要从Redis删除
+            if stock in g_all_found_stocks:
+                log(f"  ⚠ 不再满足条件，从Redis删除: {stock} {name}", "WARN")
+                if delete_stock_from_redis(code, name, date_str, max_retries=3):
+                    log(f"    → Redis已删除: {name}({code})")
+                    # 从内存中移除
+                    del g_all_found_stocks[stock]
+                    stats['removed'] += 1
+                else:
+                    log(f"    → Redis删除失败: {name}({code})", "ERROR")
     
     total_elapsed = (datetime.now() - start_time).total_seconds()
     
@@ -682,6 +711,7 @@ def scan_stocks(ContextInfo):
     log(f"第3道淘汰(阴线数量>3): {stats['fail_yinxian']}")
     log(f"第4道淘汰(阴线都向上不满足): {stats['fail_yin_up']}")
     log(f"全部通过: {stats['pass']}")
+    log(f"动态剔除(不再满足条件): {stats['removed']}")
     log("=" * 60)
     
     # 处理结果
@@ -698,8 +728,8 @@ def check_stock_yxdxs(stock, all_ticks, stats, ContextInfo):
     检查单只股票 - 阴线都向上版
     条件：
     1. 今日最高涨幅>4.5%
-    2. 最近10个交易日内最高涨幅≥6.85%次数大于等于5（拉升次数）
-    3. 10天内阴线的次数<=3或者没有阴线
+    2. 最近10个交易日（包括今天）内最高涨幅≥6.85%次数大于等于5（拉升次数）
+    3. 10天内（包括今天）阴线的次数<=3或者没有阴线
     4. 10天内如果出现阴线则满足阴线都向上
     """
     tick = all_ticks.get(stock)
@@ -712,7 +742,14 @@ def check_stock_yxdxs(stock, all_ticks, stats, ContextInfo):
         stats['no_prev'] += 1
         return None
     
+    # 获取今日实时数据
     today_high = tick.get('high', 0)
+    today_low = tick.get('low', 0)
+    today_open = tick.get('open', 0)
+    current_price = tick.get('lastPrice', 0)
+    if not current_price:
+        current_price = tick.get('price', tick.get('last', 0))
+    
     if not today_high or today_high <= 0:
         stats['no_tick'] += 1
         return None
@@ -733,37 +770,52 @@ def check_stock_yxdxs(stock, all_ticks, stats, ContextInfo):
     highs = hist['highs']
     lows = hist['lows']
     
-    if len(closes) < 11:
+    if len(closes) < 10:
         stats['no_hist'] += 1
         return None
     
-    # 第2道: 最近10个交易日内最高涨幅≥6.85%次数（拉升次数）
+    # ========== 第2道: 最近10个交易日（包括今天）内最高涨幅≥6.85%次数（拉升次数） ==========
+    # 历史9天 + 今天 = 10天
     ls_num = 0  # 拉升次数
-    for i in range(len(closes) - 10, len(closes)):
+    # 历史9天
+    for i in range(len(closes) - 9, len(closes)):
         if i >= 1 and closes[i-1] > 0:
             max_gain = calc_max_gain(highs[i], closes[i-1])
             if max_gain >= 6.85:
                 ls_num += 1
+    # 今天（盘中动态）
+    if today_max_gain >= 6.85:
+        ls_num += 1
     
     if ls_num < 5:
         stats['fail_ls_count'] += 1
         return None
     
-    # 第3道: 10天内阴线的次数<=3
+    # ========== 第3道: 10天内（包括今天）阴线的次数<=3 ==========
     yinxian_count = 0
-    yin_indices = []  # 记录阴线的索引
-    for i in range(len(closes) - 10, len(closes)):
+    yin_indices = []  # 历史阴线索引
+    is_today_yin = False  # 今天是否为阴线
+    
+    # 历史9天
+    for i in range(len(closes) - 9, len(closes)):
         if closes[i] < opens[i]:
             yinxian_count += 1
             yin_indices.append(i)
+    
+    # 今天（盘中动态判断）
+    if current_price < today_open:
+        yinxian_count += 1
+        is_today_yin = True
     
     if yinxian_count > 3:
         stats['fail_yinxian'] += 1
         return None
     
-    # 第4道: 10天内如果出现阴线则满足阴线都向上
+    # ========== 第4道: 10天内如果出现阴线则满足阴线都向上 ==========
     if yinxian_count > 0:
         all_yin_up = True
+        
+        # 检查历史阴线
         for i in yin_indices:
             o = opens[i]
             c = closes[i]
@@ -775,13 +827,19 @@ def check_stock_yxdxs(stock, all_ticks, stats, ContextInfo):
                 all_yin_up = False
                 break
         
+        # 检查今天如果是阴线
+        if all_yin_up and is_today_yin:
+            if not check_yin_up(today_open, current_price, today_high, today_low, prev_close):
+                all_yin_up = False
+        
         if not all_yin_up:
             stats['fail_yin_up'] += 1
             return None
     
-    # 计算不下杀次数（10天内）
+    # ========== 计算不下杀次数（10天内，包括今天） ==========
     no_xs_num = 0
-    for i in range(len(closes) - 10, len(closes)):
+    # 历史9天
+    for i in range(len(closes) - 9, len(closes)):
         o = opens[i]
         c = closes[i]
         l = lows[i]
@@ -789,12 +847,12 @@ def check_stock_yxdxs(stock, all_ticks, stats, ContextInfo):
         if check_no_kill(o, c, l):
             no_xs_num += 1
     
+    # 今天
+    if check_no_kill(today_open, current_price, today_low):
+        no_xs_num += 1
+    
     # 通过所有条件
     stats['pass'] += 1
-    
-    current_price = tick.get('lastPrice', 0)
-    if not current_price:
-        current_price = tick.get('price', tick.get('last', 0))
     
     volume = tick.get('volume', tick.get('vol', 0))
     
@@ -1043,6 +1101,42 @@ def save_stocks_to_redis(stocks, date_str):
     log_redis("\n" + "=" * 60)
     log_redis(f"✅ 所有 {total} 只股票的存储线程已启动（并发执行）")
     log_redis("=" * 60 + "\n")
+
+
+def delete_stock_from_redis(stock_code, stock_name, date_str, max_retries=3):
+    """从Redis中删除单只股票（带重试机制）"""
+    if not REDIS_ENABLED or g_redis_client is None:
+        return False
+    
+    file_date = date_str.replace('-', '')
+    key = f"yxdxs:{file_date}"
+    
+    for retry in range(max_retries):
+        try:
+            result = g_redis_client.hdel(key, stock_code)
+            
+            if result > 0:
+                if retry > 0:
+                    log_redis(f"  ✓ Redis删除成功(重试{retry}次): {stock_name}({stock_code})")
+                else:
+                    log_redis(f"  ✓ Redis删除: {stock_name}({stock_code})")
+                return True
+            else:
+                # 字段不存在（可能已经被删除了）
+                return True
+            
+        except Exception as e:
+            if retry < max_retries - 1:
+                log_redis(f"  ✗ Redis删除失败(第{retry+1}次尝试): {stock_name}({stock_code}) - {str(e)}", "WARN")
+                try:
+                    g_redis_client.ping()
+                except:
+                    log_redis(f"  尝试重新连接Redis...", "WARN")
+            else:
+                log_redis(f"  ✗ Redis删除失败(已重试{max_retries}次): {stock_name}({stock_code}) - {str(e)}", "ERROR")
+                return False
+    
+    return False
     
     # 可选：等待所有线程完成（用于验证）
     # for thread in threads:
