@@ -20,7 +20,9 @@ QMT阴线都是十字星策略
 - 参考日期（今日）最高涨幅≥6.85%
 - 策略名称：阴线都是十字星
 
-注意：10天计算包括今日，今日数据盘中实时变化，可能导致股票动态进出筛选池
+注意：
+- 10天计算包括参考日（默认今日），参考日数据盘中实时变化，可能导致股票动态进出筛选池
+- 可设置REFERENCE_DATE为历史日期（如"20260122"）进行历史选股
 """
 
 import numpy as np
@@ -94,6 +96,10 @@ REDIS_HOST = "175.24.178.113"
 REDIS_PORT = 5268
 REDIS_PASSWORD = "lyy654321@REDIS"
 REDIS_DB = 0
+
+# ========== 参考日期设置 ==========
+# 设置参考日期，格式：20260122，为空则使用今天
+REFERENCE_DATE = ""  # 留空使用今天，或设置如 "20260122"
 
 g_email_sent_stocks = set()
 g_redis_client = None
@@ -457,7 +463,7 @@ def delete_stock_from_redis(stock_code, stock_name, date_str, max_retries=3):
         return False
     
     file_date = date_str.replace('-', '')
-    key = f"yxdszx:{file_date}"
+    key = f"stocks_yxdszx:{file_date}"
     
     for retry in range(max_retries):
         try:
@@ -552,6 +558,20 @@ def init(ContextInfo):
     preload_stock_names(ContextInfo)
     log(f">>> 股票名称加载完成: {len(g_stock_names)} 只")
     
+    # 从Redis加载已有股票（必须在股票池加载之后）
+    if REDIS_ENABLED and g_redis_client:
+        log("")
+        log(">>> 正在从Redis加载已有股票...")
+        load_existing_stocks_from_redis()
+        log(f">>> Redis股票加载完成: {len(g_all_found_stocks)} 只")
+    
+    # 从Redis加载已有股票（必须在股票池加载之后）
+    if REDIS_ENABLED and g_redis_client:
+        log("")
+        log(">>> 正在从Redis加载已有股票...")
+        load_existing_stocks_from_redis()
+        log(f">>> Redis股票加载完成: {len(g_all_found_stocks)} 只")
+    
     log("")
     log(">>> 正在预加载历史数据...")
     preload_history_data(ContextInfo)
@@ -626,6 +646,51 @@ def preload_stock_names(ContextInfo):
             g_stock_names[stock] = stock.split('.')[0]
 
 
+def load_existing_stocks_from_redis():
+    """从Redis加载今天已有的股票到内存（用于动态删除）"""
+    global g_all_found_stocks
+    
+    if not REDIS_ENABLED or g_redis_client is None:
+        return
+    
+    try:
+        # 获取今天的日期
+        if REFERENCE_DATE:
+            date_str = REFERENCE_DATE
+        else:
+            date_str = datetime.now().strftime('%Y%m%d')
+        
+        key = f"stocks_yxdszx:{date_str}"
+        
+        # 获取Redis中所有股票代码
+        existing_codes = g_redis_client.hkeys(key)
+        
+        if existing_codes:
+            log_redis(f">>> 从Redis加载已有股票: {len(existing_codes)} 只")
+            
+            # 将股票代码转换为完整代码并加入内存
+            for code_bytes in existing_codes:
+                code = code_bytes.decode('utf-8') if isinstance(code_bytes, bytes) else code_bytes
+                
+                # 尝试匹配股票池中的完整代码
+                for stock in g_stock_pool:
+                    if stock.startswith(code + '.'):
+                        g_all_found_stocks[stock] = "from_redis"
+                        break
+            
+            log_redis(f">>> 已加载到内存: {len(g_all_found_stocks)} 只股票")
+            
+            # 打印部分股票用于验证
+            if g_all_found_stocks:
+                sample_stocks = list(g_all_found_stocks.keys())[:5]
+                log_redis(f">>> 示例: {', '.join([s.split('.')[0] for s in sample_stocks])}")
+        else:
+            log_redis(f">>> Redis中暂无今天的股票数据 (key: {key})")
+    
+    except Exception as e:
+        log_redis(f">>> 从Redis加载股票失败: {str(e)}", "ERROR")
+
+
 def get_date_with_weekday():
     """获取星期"""
     weekdays = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日']
@@ -641,18 +706,37 @@ def preload_history_data(ContextInfo):
     total = len(g_stock_pool)
     success_count = 0
     
+    # 如果设置了参考日期，使用指定日期；否则使用今天
+    if REFERENCE_DATE:
+        log(f">>> 使用参考日期: {REFERENCE_DATE}")
+        end_date = REFERENCE_DATE
+    else:
+        log(f">>> 使用今天作为参考日期")
+        end_date = ""
+    
     for i in range(0, total, batch_size):
         batch = g_stock_pool[i:i+batch_size]
         batch_num = i // batch_size + 1
         total_batches = (total + batch_size - 1) // batch_size
         
         try:
-            data = ContextInfo.get_market_data(
-                ['open', 'high', 'low', 'close'], 
-                batch, 
-                period='1d', 
-                count=15
-            )
+            if end_date:
+                # 使用参考日期获取历史数据
+                data = ContextInfo.get_market_data_ex(
+                    batch,
+                    period='1d',
+                    end_time=end_date,
+                    count=15,
+                    dividend_type='front'
+                )
+            else:
+                # 使用今天获取历史数据
+                data = ContextInfo.get_market_data(
+                    ['open', 'high', 'low', 'close'], 
+                    batch, 
+                    period='1d', 
+                    count=15
+                )
             
             if data is not None:
                 for stock in batch:
@@ -718,29 +802,51 @@ def scan_stocks(ContextInfo):
     global g_qualified_stocks, g_scan_count
     
     current_time = datetime.now()
-    if CHECK_TRADING_TIME and not is_trading_time(current_time):
+    
+    # 如果设置了参考日期，跳过交易时间检查
+    if not REFERENCE_DATE and CHECK_TRADING_TIME and not is_trading_time(current_time):
         return
     
     g_scan_count += 1
     log("")
     log("#" * 70)
-    log(f"############## 第 {g_scan_count} 轮扫描开始（阴线都是十字星） ##############")
+    if REFERENCE_DATE:
+        log(f"############## 历史选股 {REFERENCE_DATE} ##############")
+    else:
+        log(f"############## 第 {g_scan_count} 轮扫描开始（阴线都是十字星） ##############")
     log("#" * 70)
     
     start_time = datetime.now()
     
     log("")
-    log(">>> 步骤1: 获取实时行情")
-    tick_start = datetime.now()
-    
-    try:
-        all_ticks = ContextInfo.get_full_tick(g_stock_pool)
-        tick_count = len(all_ticks) if all_ticks else 0
-        tick_elapsed = (datetime.now() - tick_start).total_seconds()
-        log(f">>> 行情获取完成: {tick_count} 只, 耗时 {tick_elapsed:.3f} 秒")
-    except Exception as e:
-        log(f">>> 行情获取失败: {e}", "ERROR")
+    if REFERENCE_DATE:
+        log(">>> 步骤1: 使用历史数据作为参考日行情")
         all_ticks = {}
+        for stock, hist in g_history_data.items():
+            if len(hist['closes']) > 0:
+                all_ticks[stock] = {
+                    'high': hist['highs'][-1],
+                    'low': hist['lows'][-1],
+                    'open': hist['opens'][-1],
+                    'lastPrice': hist['closes'][-1],
+                    'price': hist['closes'][-1],
+                    'volume': 0,
+                    'circulatingMarketCap': 0
+                }
+        tick_count = len(all_ticks)
+        log(f">>> 历史行情加载完成: {tick_count} 只")
+    else:
+        log(">>> 步骤1: 获取实时行情")
+        tick_start = datetime.now()
+        
+        try:
+            all_ticks = ContextInfo.get_full_tick(g_stock_pool)
+            tick_count = len(all_ticks) if all_ticks else 0
+            tick_elapsed = (datetime.now() - tick_start).total_seconds()
+            log(f">>> 行情获取完成: {tick_count} 只, 耗时 {tick_elapsed:.3f} 秒")
+        except Exception as e:
+            log(f">>> 行情获取失败: {e}", "ERROR")
+            all_ticks = {}
     
     if not all_ticks:
         log(">>> 无行情数据，跳过本轮扫描", "WARN")
@@ -758,8 +864,11 @@ def scan_stocks(ContextInfo):
         'removed': 0  # 新增：记录从Redis删除的股票数量
     }
     
-    # 获取日期字符串（用于Redis删除）
-    date_str = current_time.strftime('%Y-%m-%d')
+    # 获取日期字符串（用于Redis保存/删除）
+    if REFERENCE_DATE:
+        date_str = f"{REFERENCE_DATE[:4]}-{REFERENCE_DATE[4:6]}-{REFERENCE_DATE[6:8]}"
+    else:
+        date_str = current_time.strftime('%Y-%m-%d')
     
     for stock in g_stock_pool:
         result = check_stock_yxdszx(stock, all_ticks, stats, ContextInfo)
@@ -1159,8 +1268,14 @@ def process_results(qualified, current_time, ContextInfo):
     global g_qualified_stocks, g_all_found_stocks
     
     current_time_str = current_time.strftime('%H:%M:%S')
-    date_str = current_time.strftime('%Y-%m-%d')
-    time_str = current_time.strftime('%H:%M')
+    
+    # 使用参考日期或当前日期
+    if REFERENCE_DATE:
+        date_str = f"{REFERENCE_DATE[:4]}-{REFERENCE_DATE[4:6]}-{REFERENCE_DATE[6:8]}"
+        time_str = "历史"
+    else:
+        date_str = current_time.strftime('%Y-%m-%d')
+        time_str = current_time.strftime('%H:%M')
     
     new_stocks = []
     for item in qualified:

@@ -5,7 +5,7 @@ QMT阴线都向上策略
 1. 今日最高涨幅>4.5%
    计算最高涨幅：（今日最高点价格 - 昨日收盘价）÷ 昨日收盘价 × 100%
 2. 最近10个交易日（包括今天参考日）内最高涨幅≥6.85%次数大于等于5（拉升次数）
-3. 10天内（包括今天）阴线的次数<=3或者没有阴线
+3. 10天内（包括今天）阴线的次数<=4或者没有阴线
 4. 10天内如果出现阴线则满足阴线都向上
    - 阴线向上：阴线满足（上引线大于阴线实体并且上引线大于下引线）或者满足（最高涨幅≥6.85%）
    - 阴线都向上：最近10个交易日所有阴线满足阴线向上或者没有阴线
@@ -14,7 +14,9 @@ QMT阴线都向上策略
    - 不下杀条件2：下引线 < K线实体或者没有下引线
    - 不下杀定义（满足不下杀条件1或者不下杀条件2）
 
-注意：10天计算包括今日，今日数据盘中实时变化，可能导致股票动态进出筛选池
+注意：
+- 10天计算包括参考日（默认今日），参考日数据盘中实时变化，可能导致股票动态进出筛选池
+- 可设置REFERENCE_DATE为历史日期（如"20260122"）进行历史选股
 """
 
 import numpy as np
@@ -60,6 +62,10 @@ LOG_ENABLED = False  # 日志开关，False=关闭日志打印
 REDIS_LOG_ENABLED = True  # Redis日志开关，True=打印Redis相关日志
 LOG_FILE = r"C:\Users\lyy\Desktop\股票\预警\阴线都向上.log"  # 日志文件路径
 
+# ========== 个股判断日志配置 ==========
+STOCK_CHECK_LOG_ENABLED = True  # 个股判断日志开关
+STOCK_CHECK_LOG_FILE = r"C:\Users\lyy\Desktop\股票\预警\阴线都向上个股判断.log"  # 个股判断日志文件
+
 # ========== 写入文件开关 ==========
 WRITE_FILE_ENABLED = True  # True=写入文件，False=不写入（测试模式）
 
@@ -87,6 +93,10 @@ REDIS_HOST = "175.24.178.113"
 REDIS_PORT = 5268
 REDIS_PASSWORD = "lyy654321@REDIS"
 REDIS_DB = 0
+
+# ========== 参考日期设置 ==========
+# 设置参考日期，格式：20260122，为空则使用今天
+REFERENCE_DATE = ""  # 留空使用今天，或设置如 "20260122"
 
 g_email_sent_stocks = set()
 g_redis_client = None
@@ -126,6 +136,28 @@ def log_redis(msg, level="INFO"):
             f.write(log_msg + '\n')
     except Exception as e:
         print(f"[ERROR] 写入日志文件失败: {e}")
+
+
+def log_stock_check(msg, level="INFO"):
+    """个股判断专用日志，只写入到个股判断日志文件"""
+    if not STOCK_CHECK_LOG_ENABLED:
+        return
+    
+    import os
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]  # 精确到毫秒
+    log_msg = f"[{timestamp}] [{level}] {msg}"
+    
+    # 写入个股判断日志文件
+    try:
+        # 确保日志目录存在
+        log_dir = os.path.dirname(STOCK_CHECK_LOG_FILE)
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        
+        with open(STOCK_CHECK_LOG_FILE, 'a', encoding='utf-8') as f:
+            f.write(log_msg + '\n')
+    except Exception as e:
+        print(f"[ERROR] 写入个股判断日志文件失败: {e}")
 
 
 def connect_redis():
@@ -458,6 +490,13 @@ def init(ContextInfo):
     preload_stock_names(ContextInfo)
     log(f">>> 股票名称加载完成: {len(g_stock_names)} 只")
     
+    # 从Redis加载已有股票（必须在股票池加载之后）
+    if REDIS_ENABLED and g_redis_client:
+        log("")
+        log(">>> 正在从Redis加载已有股票...")
+        load_existing_stocks_from_redis()
+        log(f">>> Redis股票加载完成: {len(g_all_found_stocks)} 只")
+    
     # 预加载历史数据
     log("")
     log(">>> 正在预加载历史数据...")
@@ -535,6 +574,51 @@ def preload_stock_names(ContextInfo):
             g_stock_names[stock] = stock.split('.')[0]
 
 
+def load_existing_stocks_from_redis():
+    """从Redis加载今天已有的股票到内存（用于动态删除）"""
+    global g_all_found_stocks
+    
+    if not REDIS_ENABLED or g_redis_client is None:
+        return
+    
+    try:
+        # 获取今天的日期
+        if REFERENCE_DATE:
+            date_str = REFERENCE_DATE
+        else:
+            date_str = datetime.now().strftime('%Y%m%d')
+        
+        key = f"stocks_yxdxs:{date_str}"
+        
+        # 获取Redis中所有股票代码
+        existing_codes = g_redis_client.hkeys(key)
+        
+        if existing_codes:
+            log_redis(f">>> 从Redis加载已有股票: {len(existing_codes)} 只")
+            
+            # 将股票代码转换为完整代码并加入内存
+            for code_bytes in existing_codes:
+                code = code_bytes.decode('utf-8') if isinstance(code_bytes, bytes) else code_bytes
+                
+                # 尝试匹配股票池中的完整代码
+                for stock in g_stock_pool:
+                    if stock.startswith(code + '.'):
+                        g_all_found_stocks[stock] = "from_redis"
+                        break
+            
+            log_redis(f">>> 已加载到内存: {len(g_all_found_stocks)} 只股票")
+            
+            # 打印部分股票用于验证
+            if g_all_found_stocks:
+                sample_stocks = list(g_all_found_stocks.keys())[:5]
+                log_redis(f">>> 示例: {', '.join([s.split('.')[0] for s in sample_stocks])}")
+        else:
+            log_redis(f">>> Redis中暂无今天的股票数据 (key: {key})")
+    
+    except Exception as e:
+        log_redis(f">>> 从Redis加载股票失败: {str(e)}", "ERROR")
+
+
 def get_date_with_weekday():
     """获取星期，格式：星期日"""
     weekdays = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日']
@@ -550,18 +634,37 @@ def preload_history_data(ContextInfo):
     total = len(g_stock_pool)
     success_count = 0
     
+    # 如果设置了参考日期，使用指定日期；否则使用今天
+    if REFERENCE_DATE:
+        log(f">>> 使用参考日期: {REFERENCE_DATE}")
+        end_date = REFERENCE_DATE
+    else:
+        log(f">>> 使用今天作为参考日期")
+        end_date = ""
+    
     for i in range(0, total, batch_size):
         batch = g_stock_pool[i:i+batch_size]
         batch_num = i // batch_size + 1
         total_batches = (total + batch_size - 1) // batch_size
         
         try:
-            data = ContextInfo.get_market_data(
-                ['open', 'high', 'low', 'close'], 
-                batch, 
-                period='1d', 
-                count=15
-            )
+            if end_date:
+                # 使用参考日期获取历史数据
+                data = ContextInfo.get_market_data_ex(
+                    batch,
+                    period='1d',
+                    end_time=end_date,
+                    count=15,
+                    dividend_type='front'
+                )
+            else:
+                # 使用今天获取历史数据
+                data = ContextInfo.get_market_data(
+                    ['open', 'high', 'low', 'close'], 
+                    batch, 
+                    period='1d', 
+                    count=15
+                )
             
             if data is not None:
                 for stock in batch:
@@ -619,30 +722,52 @@ def scan_stocks(ContextInfo):
     global g_qualified_stocks, g_scan_count
     
     current_time = datetime.now()
-    if CHECK_TRADING_TIME and not is_trading_time(current_time):
+    
+    # 如果设置了参考日期，跳过交易时间检查
+    if not REFERENCE_DATE and CHECK_TRADING_TIME and not is_trading_time(current_time):
         return
     
     g_scan_count += 1
     log("")
     log("#" * 70)
-    log(f"############## 第 {g_scan_count} 轮扫描开始（阴线都向上） ##############")
+    if REFERENCE_DATE:
+        log(f"############## 历史选股 {REFERENCE_DATE} ##############")
+    else:
+        log(f"############## 第 {g_scan_count} 轮扫描开始（阴线都向上） ##############")
     log("#" * 70)
     
     start_time = datetime.now()
     
     # 获取实时行情
     log("")
-    log(">>> 步骤1: 获取实时行情")
-    tick_start = datetime.now()
-    
-    try:
-        all_ticks = ContextInfo.get_full_tick(g_stock_pool)
-        tick_count = len(all_ticks) if all_ticks else 0
-        tick_elapsed = (datetime.now() - tick_start).total_seconds()
-        log(f">>> 行情获取完成: {tick_count} 只, 耗时 {tick_elapsed:.3f} 秒")
-    except Exception as e:
-        log(f">>> 行情获取失败: {e}", "ERROR")
+    if REFERENCE_DATE:
+        log(">>> 步骤1: 使用历史数据作为参考日行情")
         all_ticks = {}
+        for stock, hist in g_history_data.items():
+            if len(hist['closes']) > 0:
+                all_ticks[stock] = {
+                    'high': hist['highs'][-1],
+                    'low': hist['lows'][-1],
+                    'open': hist['opens'][-1],
+                    'lastPrice': hist['closes'][-1],
+                    'price': hist['closes'][-1],
+                    'volume': 0,
+                    'circulatingMarketCap': 0
+                }
+        tick_count = len(all_ticks)
+        log(f">>> 历史行情加载完成: {tick_count} 只")
+    else:
+        log(">>> 步骤1: 获取实时行情")
+        tick_start = datetime.now()
+        
+        try:
+            all_ticks = ContextInfo.get_full_tick(g_stock_pool)
+            tick_count = len(all_ticks) if all_ticks else 0
+            tick_elapsed = (datetime.now() - tick_start).total_seconds()
+            log(f">>> 行情获取完成: {tick_count} 只, 耗时 {tick_elapsed:.3f} 秒")
+        except Exception as e:
+            log(f">>> 行情获取失败: {e}", "ERROR")
+            all_ticks = {}
     
     if not all_ticks:
         log(">>> 无行情数据，跳过本轮扫描", "WARN")
@@ -661,8 +786,11 @@ def scan_stocks(ContextInfo):
         'removed': 0  # 新增：记录从Redis删除的股票数量
     }
     
-    # 获取日期字符串（用于Redis删除）
-    date_str = current_time.strftime('%Y-%m-%d')
+    # 获取日期字符串（用于Redis保存/删除）
+    if REFERENCE_DATE:
+        date_str = f"{REFERENCE_DATE[:4]}-{REFERENCE_DATE[4:6]}-{REFERENCE_DATE[6:8]}"
+    else:
+        date_str = current_time.strftime('%Y-%m-%d')
     
     for stock in g_stock_pool:
         result = check_stock_yxdxs(stock, all_ticks, stats, ContextInfo)
@@ -747,7 +875,7 @@ def scan_stocks(ContextInfo):
     log(f"无历史数据: {stats['no_hist']}")
     log(f"第1道淘汰(今日最高涨幅<4.5%): {stats['fail_zf45']}")
     log(f"第2道淘汰(拉升次数<5): {stats['fail_ls_count']}")
-    log(f"第3道淘汰(阴线数量>3): {stats['fail_yinxian']}")
+    log(f"第3道淘汰(阴线数量>4): {stats['fail_yinxian']}")
     log(f"第4道淘汰(阴线都向上不满足): {stats['fail_yin_up']}")
     log(f"全部通过: {stats['pass']}")
     log(f"动态剔除(不再满足条件): {stats['removed']}")
@@ -768,18 +896,29 @@ def check_stock_yxdxs(stock, all_ticks, stats, ContextInfo):
     条件：
     1. 今日最高涨幅>4.5%
     2. 最近10个交易日（包括今天）内最高涨幅≥6.85%次数大于等于5（拉升次数）
-    3. 10天内（包括今天）阴线的次数<=3或者没有阴线
+    3. 10天内（包括今天）阴线的次数<=4或者没有阴线
     4. 10天内如果出现阴线则满足阴线都向上
     """
+    code = stock.split('.')[0]
+    name = g_stock_names.get(stock, code)
+    
+    log_stock_check(f"\n{'='*80}")
+    log_stock_check(f"开始检查: {name}({code}) - {stock}")
+    log_stock_check(f"{'='*80}")
+    
     tick = all_ticks.get(stock)
     if not tick:
+        log_stock_check(f"✗ 淘汰原因: 无行情数据")
         stats['no_tick'] += 1
         return None
     
     prev_close = g_prev_close_cache.get(stock)
     if not prev_close or prev_close <= 0:
+        log_stock_check(f"✗ 淘汰原因: 无昨收价或昨收价<=0, 昨收={prev_close}")
         stats['no_prev'] += 1
         return None
+    
+    log_stock_check(f"基础数据: 昨收={prev_close:.2f}")
     
     # 获取今日实时数据
     today_high = tick.get('high', 0)
@@ -789,18 +928,29 @@ def check_stock_yxdxs(stock, all_ticks, stats, ContextInfo):
     if not current_price:
         current_price = tick.get('price', tick.get('last', 0))
     
+    log_stock_check(f"今日数据: 开={today_open:.2f}, 高={today_high:.2f}, 低={today_low:.2f}, 现价={current_price:.2f}")
+    
     if not today_high or today_high <= 0:
+        log_stock_check(f"✗ 淘汰原因: 今日最高价无效, 最高价={today_high}")
         stats['no_tick'] += 1
         return None
     
     # 第1道: 今日最高涨幅>4.5%
     today_max_gain = calc_max_gain(today_high, prev_close)
+    log_stock_check(f"\n【第1道】今日最高涨幅检查:")
+    log_stock_check(f"  今日最高涨幅 = (最高{today_high:.2f} - 昨收{prev_close:.2f}) / 昨收{prev_close:.2f} * 100 = {today_max_gain:.2f}%")
+    log_stock_check(f"  判断条件: 今日最高涨幅 > 4.5%")
+    
     if today_max_gain <= 4.5:
+        log_stock_check(f"  ✗ 不通过: {today_max_gain:.2f}% <= 4.5%")
         stats['fail_zf45'] += 1
         return None
+    else:
+        log_stock_check(f"  ✓ 通过: {today_max_gain:.2f}% > 4.5%")
     
     hist = g_history_data.get(stock)
     if not hist:
+        log_stock_check(f"✗ 淘汰原因: 无历史数据")
         stats['no_hist'] += 1
         return None
     
@@ -809,32 +959,51 @@ def check_stock_yxdxs(stock, all_ticks, stats, ContextInfo):
     highs = hist['highs']
     lows = hist['lows']
     
+    log_stock_check(f"历史数据: 共{len(closes)}天")
+    
     if len(closes) < 10:
+        log_stock_check(f"✗ 淘汰原因: 历史数据不足10天, 实际{len(closes)}天")
         stats['no_hist'] += 1
         return None
     
     # ========== 第2道: 最近10个交易日（包括今天）内最高涨幅≥6.85%次数（拉升次数） ==========
     # 历史9天 + 今天 = 10天
+    log_stock_check(f"\n【第2道】拉升次数检查（最近10天最高涨幅≥6.85%）:")
     ls_num = 0  # 拉升次数
+    ls_details = []
+    
     # 历史9天
-    for i in range(len(closes) - 9, len(closes)):
+    for idx, i in enumerate(range(len(closes) - 9, len(closes))):
+        day_label = f"T-{9-idx}"
         if i >= 1 and closes[i-1] > 0:
             max_gain = calc_max_gain(highs[i], closes[i-1])
             if max_gain >= 6.85:
                 ls_num += 1
+                ls_details.append(f"{day_label}: {max_gain:.2f}%")
+    
     # 今天（盘中动态）
     if today_max_gain >= 6.85:
         ls_num += 1
+        ls_details.append(f"今日: {today_max_gain:.2f}%")
+    
+    log_stock_check(f"  拉升详情: {' | '.join(ls_details) if ls_details else '无'}")
+    log_stock_check(f"  拉升次数: {ls_num}次")
+    log_stock_check(f"  判断条件: 拉升次数 >= 5次")
     
     if ls_num < 5:
+        log_stock_check(f"  ✗ 不通过: {ls_num}次 < 5次")
         stats['fail_ls_count'] += 1
         return None
+    else:
+        log_stock_check(f"  ✓ 通过: {ls_num}次 >= 5次")
     
-    # ========== 第3道: 10天内（包括今天）阴线的次数<=3 ==========
+    # ========== 第3道: 10天内（包括今天）阴线的次数<=4 ==========
+    log_stock_check(f"\n【第3道】阴线次数检查（10天内阴线<=4根）:")
     yinxian_count = 0
     yin_indices = []  # 历史阴线索引
     is_today_yin = False  # 今天是否为阴线
     yin_details = []  # 记录阴线详细信息（用于日志）
+    yin_list = []  # 阴线列表用于日志
     
     # 历史9天
     for idx, i in enumerate(range(len(closes) - 9, len(closes))):
@@ -844,6 +1013,7 @@ def check_stock_yxdxs(stock, all_ticks, stats, ContextInfo):
         if is_yin:
             yinxian_count += 1
             yin_indices.append(i)
+            yin_list.append(f"{day_label}(开{opens[i]:.2f}>收{closes[i]:.2f})")
             
             # 获取前一天收盘价（用于计算最高涨幅）
             prev_c = closes[i-1] if i >= 1 else 0
@@ -862,6 +1032,7 @@ def check_stock_yxdxs(stock, all_ticks, stats, ContextInfo):
     if current_price < today_open:
         yinxian_count += 1
         is_today_yin = True
+        yin_list.append(f"今日(开{today_open:.2f}>收{current_price:.2f})")
         yin_details.append({
             'label': '今日',
             'open': today_open,
@@ -872,34 +1043,83 @@ def check_stock_yxdxs(stock, all_ticks, stats, ContextInfo):
             'is_today': True
         })
     
-    if yinxian_count > 3:
+    log_stock_check(f"  阴线详情: {' | '.join(yin_list) if yin_list else '无阴线'}")
+    log_stock_check(f"  阴线次数: {yinxian_count}根")
+    log_stock_check(f"  判断条件: 阴线次数 <= 4根")
+    
+    if yinxian_count > 4:
+        log_stock_check(f"  ✗ 不通过: {yinxian_count}根 > 4根")
         stats['fail_yinxian'] += 1
         return None
+    else:
+        log_stock_check(f"  ✓ 通过: {yinxian_count}根 <= 4根")
     
     # ========== 第4道: 10天内如果出现阴线则满足阴线都向上 ==========
+    log_stock_check(f"\n【第4道】阴线都向上检查:")
     if yinxian_count > 0:
+        log_stock_check(f"  共有{yinxian_count}根阴线，需逐一检查是否满足'阴线向上'")
+        log_stock_check(f"  阴线向上定义: (上引线>实体 且 上引线>下引线) 或 (最高涨幅≥6.85%)")
+        
         all_yin_up = True
+        fail_yin_info = []
         
         # 检查历史阴线
-        for i in yin_indices:
+        for idx, i in enumerate(yin_indices):
             o = opens[i]
             c = closes[i]
             h = highs[i]
             l = lows[i]
             prev_c = closes[i-1] if i >= 1 else 0
             
-            if not check_yin_up(o, c, h, l, prev_c):
+            day_label = f"T-{9-(i-(len(closes)-9))}"
+            entity = o - c
+            upper_shadow = h - o
+            lower_shadow = c - l
+            max_gain = calc_max_gain(h, prev_c) if prev_c > 0 else 0
+            
+            cond1 = (upper_shadow > entity and upper_shadow > lower_shadow)
+            cond2 = max_gain >= 6.85
+            is_yin_up = cond1 or cond2
+            
+            log_stock_check(f"    {day_label}: 开{o:.2f} 收{c:.2f} 高{h:.2f} 低{l:.2f}")
+            log_stock_check(f"      实体={entity:.2f}, 上影={upper_shadow:.2f}, 下影={lower_shadow:.2f}, 最高涨幅={max_gain:.2f}%")
+            log_stock_check(f"      条件1(上影{upper_shadow:.2f}>实体{entity:.2f} 且 上影{upper_shadow:.2f}>下影{lower_shadow:.2f}): {cond1}")
+            log_stock_check(f"      条件2(最高涨幅{max_gain:.2f}%≥6.85%): {cond2}")
+            log_stock_check(f"      结果: {'✓ 阴线向上' if is_yin_up else '✗ 不满足阴线向上'}")
+            
+            if not is_yin_up:
                 all_yin_up = False
+                fail_yin_info.append(f"{day_label}")
                 break
         
         # 检查今天如果是阴线
         if all_yin_up and is_today_yin:
-            if not check_yin_up(today_open, current_price, today_high, today_low, prev_close):
+            entity = today_open - current_price
+            upper_shadow = today_high - today_open
+            lower_shadow = current_price - today_low
+            
+            cond1 = (upper_shadow > entity and upper_shadow > lower_shadow)
+            cond2 = today_max_gain >= 6.85
+            is_today_yin_up = cond1 or cond2
+            
+            log_stock_check(f"    今日: 开{today_open:.2f} 收{current_price:.2f} 高{today_high:.2f} 低{today_low:.2f}")
+            log_stock_check(f"      实体={entity:.2f}, 上影={upper_shadow:.2f}, 下影={lower_shadow:.2f}, 最高涨幅={today_max_gain:.2f}%")
+            log_stock_check(f"      条件1(上影{upper_shadow:.2f}>实体{entity:.2f} 且 上影{upper_shadow:.2f}>下影{lower_shadow:.2f}): {cond1}")
+            log_stock_check(f"      条件2(最高涨幅{today_max_gain:.2f}%≥6.85%): {cond2}")
+            log_stock_check(f"      结果: {'✓ 阴线向上' if is_today_yin_up else '✗ 不满足阴线向上'}")
+            
+            if not is_today_yin_up:
                 all_yin_up = False
+                fail_yin_info.append("今日")
         
         if not all_yin_up:
+            log_stock_check(f"  ✗ 不通过: 存在不满足'阴线向上'的阴线 ({', '.join(fail_yin_info)})")
             stats['fail_yin_up'] += 1
             return None
+        else:
+            log_stock_check(f"  ✓ 通过: 所有{yinxian_count}根阴线都满足'阴线向上'")
+    else:
+        log_stock_check(f"  无阴线，自动通过")
     
     # ========== 计算不下杀次数（10天内，包括今天） ==========
     no_xs_num = 0
@@ -917,6 +1137,13 @@ def check_stock_yxdxs(stock, all_ticks, stats, ContextInfo):
         no_xs_num += 1
     
     # 通过所有条件
+    log_stock_check(f"\n【结果】✓✓✓ 通过所有检查 ✓✓✓")
+    log_stock_check(f"  拉升次数: {ls_num}次")
+    log_stock_check(f"  阴线次数: {yinxian_count}根")
+    log_stock_check(f"  不下杀次数: {no_xs_num}次")
+    log_stock_check(f"  今日最高涨幅: {today_max_gain:.2f}%")
+    log_stock_check(f"  当前涨幅: {((current_price - prev_close) / prev_close * 100):.2f}%")
+    
     stats['pass'] += 1
     
     volume = tick.get('volume', tick.get('vol', 0))
@@ -1175,7 +1402,7 @@ def delete_stock_from_redis(stock_code, stock_name, date_str, max_retries=3):
         return False
     
     file_date = date_str.replace('-', '')
-    key = f"yxdxs:{file_date}"
+    key = f"stocks_yxdxs:{file_date}"
     
     for retry in range(max_retries):
         try:
@@ -1214,8 +1441,14 @@ def process_results(qualified, current_time, ContextInfo):
     global g_qualified_stocks, g_all_found_stocks
     
     current_time_str = current_time.strftime('%H:%M:%S')
-    date_str = current_time.strftime('%Y-%m-%d')
-    time_str = current_time.strftime('%H:%M')
+    
+    # 使用参考日期或当前日期
+    if REFERENCE_DATE:
+        date_str = f"{REFERENCE_DATE[:4]}-{REFERENCE_DATE[4:6]}-{REFERENCE_DATE[6:8]}"
+        time_str = "历史"
+    else:
+        date_str = current_time.strftime('%Y-%m-%d')
+        time_str = current_time.strftime('%H:%M')
     
     new_stocks = []
     for item in qualified:
