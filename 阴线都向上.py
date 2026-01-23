@@ -676,10 +676,49 @@ def scan_stocks(ContextInfo):
             # 检查是否为新股票
             is_new_stock = stock not in g_all_found_stocks
             
+            # 基本信息日志
             if is_new_stock:
                 log(f"  ★ 新发现: {stock} {name} | 涨幅:{result['current_gain']}% | 拉升:{result['ls_num']}次 | 阴线:{result['yinxian_count']}天 | 不下杀:{result['no_xs_num']}次", "SUCCESS")
             else:
                 log(f"  ● 已存在: {stock} {name} | 涨幅:{result['current_gain']}% | 拉升:{result['ls_num']}次 | 阴线:{result['yinxian_count']}天 | 不下杀:{result['no_xs_num']}次")
+            
+            # 打印10天阴线详细信息
+            yin_details = result.get('yin_details', [])
+            if yin_details:
+                log(f"    【10天阴线详情】共{len(yin_details)}根阴线:")
+                for yin in yin_details:
+                    label = yin['label']
+                    o = yin['open']
+                    c = yin['close']
+                    h = yin['high']
+                    l = yin['low']
+                    prev_c = yin.get('prev_close', 0)
+                    
+                    # 计算实体和引线
+                    entity = abs(o - c)
+                    upper_shadow = h - max(o, c)
+                    lower_shadow = min(o, c) - l
+                    
+                    # 计算最高涨幅
+                    max_gain = calc_max_gain(h, prev_c) if prev_c > 0 else 0
+                    
+                    # 判断是否满足"阴线向上"（两个条件之一）
+                    cond1 = (upper_shadow > entity and upper_shadow > lower_shadow)
+                    cond2 = max_gain >= 6.85
+                    is_yin_up = cond1 or cond2
+                    
+                    # 生成标记
+                    yin_up_marks = []
+                    if cond1:
+                        yin_up_marks.append("上影>实体且上影>下影")
+                    if cond2:
+                        yin_up_marks.append(f"最高涨幅{max_gain:.2f}%≥6.85%")
+                    
+                    yin_up_info = " | ✓阴线向上(" + ",".join(yin_up_marks) + ")" if is_yin_up else " | ✗不满足阴线向上"
+                    
+                    log(f"      {label}: 开{o:.2f} 收{c:.2f} 高{h:.2f} 低{l:.2f} | 实体{entity:.2f} 上影{upper_shadow:.2f} 下影{lower_shadow:.2f}{yin_up_info}")
+            else:
+                log(f"    【10天阴线详情】无阴线")
         else:
             # ❌ 不满足条件
             # 如果之前存在于 g_all_found_stocks，说明之前满足条件，现在不满足了，需要从Redis删除
@@ -795,17 +834,43 @@ def check_stock_yxdxs(stock, all_ticks, stats, ContextInfo):
     yinxian_count = 0
     yin_indices = []  # 历史阴线索引
     is_today_yin = False  # 今天是否为阴线
+    yin_details = []  # 记录阴线详细信息（用于日志）
     
     # 历史9天
-    for i in range(len(closes) - 9, len(closes)):
-        if closes[i] < opens[i]:
+    for idx, i in enumerate(range(len(closes) - 9, len(closes))):
+        day_label = f"T-{9-idx}"
+        is_yin = closes[i] < opens[i]
+        
+        if is_yin:
             yinxian_count += 1
             yin_indices.append(i)
+            
+            # 获取前一天收盘价（用于计算最高涨幅）
+            prev_c = closes[i-1] if i >= 1 else 0
+            
+            yin_details.append({
+                'label': day_label,
+                'open': opens[i],
+                'close': closes[i],
+                'high': highs[i],
+                'low': lows[i],
+                'prev_close': prev_c,
+                'is_today': False
+            })
     
     # 今天（盘中动态判断）
     if current_price < today_open:
         yinxian_count += 1
         is_today_yin = True
+        yin_details.append({
+            'label': '今日',
+            'open': today_open,
+            'close': current_price,
+            'high': today_high,
+            'low': today_low,
+            'prev_close': prev_close,  # 今天的昨收价
+            'is_today': True
+        })
     
     if yinxian_count > 3:
         stats['fail_yinxian'] += 1
@@ -868,6 +933,7 @@ def check_stock_yxdxs(stock, all_ticks, stats, ContextInfo):
         'current_gain': round(current_gain, 2),  # 当前价格涨幅
         'ls_num': ls_num,  # 拉升次数
         'yinxian_count': yinxian_count,  # 阴线次数
+        'yin_details': yin_details,  # 阴线详细信息
         'no_xs_num': no_xs_num,  # 不下杀次数
         'market_cap': market_cap,  # 市值（从tick获取）
         'current_price': current_price,
