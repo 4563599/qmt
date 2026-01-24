@@ -54,7 +54,16 @@ g_redis_client = None
 DEBUG_MODE = True
 CHECK_TRADING_TIME = True
 PRINT_PROGRESS = True
-LOG_ENABLED = True
+LOG_ENABLED = True  # 日志开关，True=开启日志打印
+LOG_FILE = r"C:\Users\Administrator\Desktop\日志\5拉升阴线前后强\日志.log"  # 日志文件路径
+
+# ========== 个股判断日志配置 ==========
+STOCK_CHECK_LOG_ENABLED = True  # 个股判断日志开关
+STOCK_CHECK_LOG_FILE = r"C:\Users\Administrator\Desktop\日志\5拉升阴线前后强\个股判断.log"  # 个股判断日志文件
+
+# ========== Redis专用日志配置 ==========
+REDIS_LOG_ENABLED = True  # Redis日志开关
+REDIS_LOG_FILE = r"C:\Users\Administrator\Desktop\日志\5拉升阴线前后强\redis日志.log"  # Redis操作日志文件
 
 # ========== Redis配置 ==========
 REDIS_ENABLED = True
@@ -80,8 +89,72 @@ WXPUSHER_ENABLED = False
 def log(msg, level="INFO"):
     if not LOG_ENABLED:
         return
+    
+    import os
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    print(f"[{timestamp}] [{level}] {msg}")
+    log_msg = f"[{timestamp}] [{level}] {msg}"
+    
+    # 打印到控制台
+    print(log_msg)
+    
+    # 写入日志文件
+    try:
+        # 确保日志目录存在
+        log_dir = os.path.dirname(LOG_FILE)
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        
+        with open(LOG_FILE, 'a', encoding='utf-8') as f:
+            f.write(log_msg + '\n')
+    except Exception as e:
+        print(f"[ERROR] 写入日志文件失败: {e}")
+
+
+def log_redis(msg, level="INFO"):
+    """Redis专用日志，同时打印到控制台和Redis专用日志文件"""
+    if not REDIS_LOG_ENABLED:
+        return
+    
+    import os
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    log_msg = f"[{timestamp}] [{level}] {msg}"
+    
+    # 打印到控制台
+    print(log_msg)
+    
+    # 写入Redis专用日志文件
+    try:
+        # 确保日志目录存在
+        log_dir = os.path.dirname(REDIS_LOG_FILE)
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        
+        with open(REDIS_LOG_FILE, 'a', encoding='utf-8') as f:
+            f.write(log_msg + '\n')
+    except Exception as e:
+        print(f"[ERROR] 写入Redis日志文件失败: {e}")
+
+
+def log_stock_check(msg, level="INFO"):
+    """个股判断专用日志，只写入到个股判断日志文件"""
+    if not STOCK_CHECK_LOG_ENABLED:
+        return
+    
+    import os
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]  # 精确到毫秒
+    log_msg = f"[{timestamp}] [{level}] {msg}"
+    
+    # 写入个股判断日志文件
+    try:
+        # 确保日志目录存在
+        log_dir = os.path.dirname(STOCK_CHECK_LOG_FILE)
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        
+        with open(STOCK_CHECK_LOG_FILE, 'a', encoding='utf-8') as f:
+            f.write(log_msg + '\n')
+    except Exception as e:
+        print(f"[ERROR] 写入个股判断日志文件失败: {e}")
 
 
 def init_redis():
@@ -89,8 +162,13 @@ def init_redis():
     global g_redis_client
     
     if not REDIS_ENABLED:
-        log(">>> Redis模块未安装，跳过Redis初始化", "WARN")
+        log_redis(">>> Redis模块未安装，跳过Redis初始化", "WARN")
         return False
+    
+    log_redis("=" * 60)
+    log_redis("开始连接Redis")
+    log_redis("=" * 60)
+    log_redis(f"连接信息: {REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}")
     
     try:
         # 增加超时设置，避免网络延迟导致的超时问题
@@ -121,12 +199,18 @@ def init_redis():
             )
         
         # 测试连接
+        log_redis("正在测试连接...")
         g_redis_client.ping()
-        log(f">>> Redis连接成功: {REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}")
-        log(f"  连接配置: 超时30s, 自动重试, 保持连接")
+        
+        info = g_redis_client.info()
+        log_redis("✅ Redis连接成功！")
+        log_redis(f"Redis版本: {info.get('redis_version', 'N/A')}")
+        log_redis(f"已用内存: {info.get('used_memory_human', 'N/A')}")
+        log_redis(f"连接配置: 超时30s, 自动重试, 保持连接")
+        log_redis("=" * 60)
         return True
     except Exception as e:
-        log(f">>> Redis连接失败: {e}", "ERROR")
+        log_redis(f"❌ Redis连接失败: {e}", "ERROR")
         g_redis_client = None
         return False
 
@@ -158,21 +242,30 @@ def save_single_stock_to_redis(stock_data, redis_key, max_retries=3):
             # 设置过期时间（只需要设置一次）
             g_redis_client.expire(redis_key, 30 * 24 * 60 * 60)
             
-            # 成功则返回
-            if retry > 0:
-                log(f"  ✓ Redis保存成功(重试{retry}次): {stock_name}({stock_code})")
-            return True
+            # 验证写入
+            verify_data = g_redis_client.hget(redis_key, stock_code)
+            if verify_data:
+                if retry > 0:
+                    log_redis(f"✅ Redis保存成功(重试{retry}次): {stock_name}({stock_code})")
+                else:
+                    log_redis(f"✅ Redis保存成功: {stock_name}({stock_code})")
+                return True
+            else:
+                log_redis(f"⚠️ Redis验证失败: {stock_name}({stock_code})", "WARN")
+                if retry < max_retries - 1:
+                    continue
+                return False
             
         except Exception as e:
             if retry < max_retries - 1:
-                log(f"  ✗ Redis保存失败(第{retry+1}次尝试): {stock_name}({stock_code}) - {str(e)}", "WARN")
+                log_redis(f"❌ Redis保存失败(第{retry+1}次尝试): {stock_name}({stock_code}) - {str(e)}", "WARN")
                 # 尝试重新连接
                 try:
                     g_redis_client.ping()
                 except:
-                    log(f"  尝试重新连接Redis...", "WARN")
+                    log_redis(f"🔄 尝试重新连接Redis...", "WARN")
             else:
-                log(f"  ✗ Redis保存失败(已重试{max_retries}次): {stock_name}({stock_code}) - {str(e)}", "ERROR")
+                log_redis(f"❌ Redis保存失败(已重试{max_retries}次): {stock_name}({stock_code}) - {str(e)}", "ERROR")
                 return False
     
     return False
@@ -199,7 +292,9 @@ def delete_stock_from_redis(stock_code, stock_name, redis_key, max_retries=3):
             if result > 0:
                 # 成功删除
                 if retry > 0:
-                    log(f"  ✓ Redis删除成功(重试{retry}次): {stock_name}({stock_code})")
+                    log_redis(f"✅ Redis删除成功(重试{retry}次): {stock_name}({stock_code})")
+                else:
+                    log_redis(f"✅ Redis删除成功: {stock_name}({stock_code})")
                 return True
             else:
                 # 字段不存在（可能已经被删除了）
@@ -207,14 +302,14 @@ def delete_stock_from_redis(stock_code, stock_name, redis_key, max_retries=3):
             
         except Exception as e:
             if retry < max_retries - 1:
-                log(f"  ✗ Redis删除失败(第{retry+1}次尝试): {stock_name}({stock_code}) - {str(e)}", "WARN")
+                log_redis(f"❌ Redis删除失败(第{retry+1}次尝试): {stock_name}({stock_code}) - {str(e)}", "WARN")
                 # 尝试重新连接
                 try:
                     g_redis_client.ping()
                 except:
-                    log(f"  尝试重新连接Redis...", "WARN")
+                    log_redis(f"🔄 尝试重新连接Redis...", "WARN")
             else:
-                log(f"  ✗ Redis删除失败(已重试{max_retries}次): {stock_name}({stock_code}) - {str(e)}", "ERROR")
+                log_redis(f"❌ Redis删除失败(已重试{max_retries}次): {stock_name}({stock_code}) - {str(e)}", "ERROR")
                 return False
     
     return False
@@ -226,15 +321,17 @@ def save_to_redis(stocks, date_str):
     每个Field为股票代码，Value为该股票的JSON数据
     """
     if not g_redis_client:
-        log(">>> Redis未连接，跳过保存", "WARN")
+        log_redis(">>> Redis未连接，跳过保存", "WARN")
         return
     
     # 生成Redis key
     file_date = date_str.replace('-', '')  # 20260121
     redis_key = f"{REDIS_KEY_PREFIX}:{file_date}"
     
-    log(f">>> 开始逐只保存到Redis: {redis_key}")
-    log(f"  待保存股票数量: {len(stocks)}")
+    log_redis("=" * 60)
+    log_redis(f"开始保存股票到Redis: {redis_key}")
+    log_redis("=" * 60)
+    log_redis(f"待保存股票数量: {len(stocks)}")
     
     success_count = 0
     failed_stocks = []
@@ -264,19 +361,19 @@ def save_to_redis(stocks, date_str):
         # 立即保存到Redis（带重试）
         if save_single_stock_to_redis(stock_info, redis_key, max_retries=3):
             success_count += 1
-            log(f"  [{idx}/{len(stocks)}] ✓ {stock_name}({code}) 已保存到Redis")
         else:
             failed_stocks.append(f"{stock_name}({code})")
-            log(f"  [{idx}/{len(stocks)}] ✗ {stock_name}({code}) 保存失败", "ERROR")
     
     # 汇总结果
-    log(f">>> Redis保存完成: 成功 {success_count}/{len(stocks)} 只")
+    log_redis("=" * 60)
+    log_redis(f"Redis保存完成: 成功 {success_count}/{len(stocks)} 只")
     if failed_stocks:
-        log(f"  失败股票: {', '.join(failed_stocks)}", "ERROR")
+        log_redis(f"失败股票: {', '.join(failed_stocks)}", "ERROR")
+    log_redis("=" * 60)
     
     # 尝试补救失败的股票（再试一次）
     if failed_stocks and success_count > 0:
-        log(f"  正在尝试补救失败的 {len(failed_stocks)} 只股票...")
+        log_redis(f"正在尝试补救失败的 {len(failed_stocks)} 只股票...")
         retry_success = 0
         for item in stocks:
             code = item['stock'].split('.')[0]
@@ -301,35 +398,95 @@ def save_to_redis(stocks, date_str):
                 if save_single_stock_to_redis(stock_info, redis_key, max_retries=2):
                     retry_success += 1
         if retry_success > 0:
-            log(f"  补救成功: {retry_success} 只")
+            log_redis(f"补救成功: {retry_success} 只")
             success_count += retry_success
 
 
 def get_from_redis(date_str):
     """从Redis读取数据"""
     if not g_redis_client:
-        log(">>> Redis未连接，无法读取", "WARN")
+        log_redis(">>> Redis未连接，无法读取", "WARN")
         return None
     
     try:
         file_date = date_str.replace('-', '')
         redis_key = f"{REDIS_KEY_PREFIX}:{file_date}"
         
+        log_redis(f"开始从Redis读取: {redis_key}")
         json_data = g_redis_client.get(redis_key)
         if json_data:
             stock_data = json.loads(json_data)
-            log(f">>> 从Redis读取成功: {redis_key} ({len(stock_data)}只股票)")
+            log_redis(f"✅ 从Redis读取成功: {redis_key} ({len(stock_data)}只股票)")
             return stock_data
         else:
-            log(f">>> Redis中无数据: {redis_key}", "WARN")
+            log_redis(f"⚠️ Redis中无数据: {redis_key}", "WARN")
             return None
     except Exception as e:
-        log(f">>> 从Redis读取失败: {e}", "ERROR")
+        log_redis(f"❌ 从Redis读取失败: {e}", "ERROR")
         return None
+
+
+def clear_today_files():
+    """清理今天的所有日志文件和输出文件"""
+    import os
+    from datetime import datetime
+    
+    today = datetime.now()
+    date_str = today.strftime('%Y-%m-%d')
+    file_date = today.strftime('%Y%m%d')
+    
+    # 1. 清理输出文件
+    output_file = os.path.join(OUTPUT_DIR, f"{file_date}{STRATEGY_NAME}.txt")
+    if os.path.exists(output_file):
+        try:
+            with open(output_file, 'w', encoding='utf-8') as f:
+                pass  # 清空文件
+            print(f"[清理] 已清理输出文件: {output_file}")
+        except Exception as e:
+            print(f"[错误] 清理输出文件失败: {e}")
+    
+    # 2. 清理主日志文件
+    if os.path.exists(LOG_FILE):
+        try:
+            log_dir = os.path.dirname(LOG_FILE)
+            if not os.path.exists(log_dir):
+                os.makedirs(log_dir)
+            with open(LOG_FILE, 'w', encoding='utf-8') as f:
+                pass  # 清空文件
+            print(f"[清理] 已清理主日志: {LOG_FILE}")
+        except Exception as e:
+            print(f"[错误] 清理主日志失败: {e}")
+    
+    # 3. 清理Redis日志文件
+    if os.path.exists(REDIS_LOG_FILE):
+        try:
+            log_dir = os.path.dirname(REDIS_LOG_FILE)
+            if not os.path.exists(log_dir):
+                os.makedirs(log_dir)
+            with open(REDIS_LOG_FILE, 'w', encoding='utf-8') as f:
+                pass  # 清空文件
+            print(f"[清理] 已清理Redis日志: {REDIS_LOG_FILE}")
+        except Exception as e:
+            print(f"[错误] 清理Redis日志失败: {e}")
+    
+    # 4. 清理个股判断日志文件
+    if os.path.exists(STOCK_CHECK_LOG_FILE):
+        try:
+            log_dir = os.path.dirname(STOCK_CHECK_LOG_FILE)
+            if not os.path.exists(log_dir):
+                os.makedirs(log_dir)
+            with open(STOCK_CHECK_LOG_FILE, 'w', encoding='utf-8') as f:
+                pass  # 清空文件
+            print(f"[清理] 已清理个股判断日志: {STOCK_CHECK_LOG_FILE}")
+        except Exception as e:
+            print(f"[错误] 清理个股判断日志失败: {e}")
 
 
 def init(ContextInfo):
     global g_stock_pool, g_initialized, g_context
+    
+    # 首先清理今天的所有日志文件
+    clear_today_files()
     
     g_context = ContextInfo
     log("=" * 60)
@@ -728,50 +885,44 @@ def calc_max_gain(h, prev_c):
 
 def check_stock(stock, all_ticks, stats):
     """检查单只股票"""
-    # 判断是否为605118力鼎光电，需要打印详细日志
     stock_code = stock.split('.')[0]
     stock_name = g_stock_names.get(stock, stock_code)
-    is_debug_stock = stock_code == "605118"
     
-    if is_debug_stock:
-        log(f"\n{'='*80}")
-        log(f"【调试】开始检查 {stock_name}({stock_code})")
-        log(f"{'='*80}")
+    log_stock_check(f"\n{'='*80}")
+    log_stock_check(f"开始检查 {stock_name}({stock_code})")
+    log_stock_check(f"{'='*80}")
     
     tick = all_ticks.get(stock)
     if not tick:
         stats['no_tick'] += 1
-        if is_debug_stock:
-            log(f"【调试】❌ 淘汰原因：无行情数据")
+        log_stock_check(f"❌ 淘汰原因：无行情数据")
+        log_stock_check(f"{'='*80}\n")
         return None
     
-    if is_debug_stock:
-        log(f"【调试】✓ 获取到行情数据")
-        log(f"  lastPrice: {tick.get('lastPrice', 0)}")
-        log(f"  high: {tick.get('high', 0)}")
-        log(f"  low: {tick.get('low', 0)}")
-        log(f"  open: {tick.get('open', 0)}")
-        log(f"  volume: {tick.get('volume', 0)}")
+    log_stock_check(f"✓ 获取到行情数据")
+    log_stock_check(f"  lastPrice: {tick.get('lastPrice', 0)}")
+    log_stock_check(f"  high: {tick.get('high', 0)}")
+    log_stock_check(f"  low: {tick.get('low', 0)}")
+    log_stock_check(f"  open: {tick.get('open', 0)}")
+    log_stock_check(f"  volume: {tick.get('volume', 0)}")
     
     prev_close = g_prev_close_cache.get(stock)
     if not prev_close or prev_close <= 0:
         stats['no_prev'] += 1
-        if is_debug_stock:
-            log(f"【调试】❌ 淘汰原因：无昨收价或昨收价≤0，昨收价={prev_close}")
+        log_stock_check(f"❌ 淘汰原因：无昨收价或昨收价≤0，昨收价={prev_close}")
+        log_stock_check(f"{'='*80}\n")
         return None
     
-    if is_debug_stock:
-        log(f"【调试】✓ 昨收价: {prev_close:.2f}")
+    log_stock_check(f"✓ 昨收价: {prev_close:.2f}")
     
     hist = g_history_data.get(stock)
     if not hist:
         stats['no_hist'] += 1
-        if is_debug_stock:
-            log(f"【调试】❌ 淘汰原因：无历史数据")
+        log_stock_check(f"❌ 淘汰原因：无历史数据")
+        log_stock_check(f"{'='*80}\n")
         return None
     
-    if is_debug_stock:
-        log(f"【调试】✓ 获取到历史数据，数据长度: {len(hist['closes'])}")
+    log_stock_check(f"✓ 获取到历史数据，数据长度: {len(hist['closes'])}")
     
     closes = hist['closes']
     opens = hist['opens']
@@ -781,9 +932,11 @@ def check_stock(stock, all_ticks, stats):
     
     if len(closes) < 21:
         stats['no_hist'] += 1
-        if is_debug_stock:
-            log(f"【调试】❌ 淘汰原因：历史数据不足21天，实际: {len(closes)}天")
+        log_stock_check(f"❌ 淘汰原因：历史数据不足21天，实际: {len(closes)}天")
+        log_stock_check(f"{'='*80}\n")
         return None
+    
+    log_stock_check(f"✓ 历史数据充足: {len(closes)}天")
     
     # 获取今日数据（参考日）
     current_price = tick.get('lastPrice', 0)
@@ -797,35 +950,36 @@ def check_stock(stock, all_ticks, stats):
     
     if current_price <= 0 or current_high <= 0:
         stats['no_tick'] += 1
-        if is_debug_stock:
-            log(f"【调试】❌ 淘汰原因：当前价格或最高价≤0")
-            log(f"  current_price: {current_price}, current_high: {current_high}")
+        log_stock_check(f"❌ 淘汰原因：当前价格或最高价≤0")
+        log_stock_check(f"  current_price: {current_price}, current_high: {current_high}")
+        log_stock_check(f"{'='*80}\n")
         return None
     
     # 参考日最高涨幅
     ref_max_gain = calc_max_gain(current_high, prev_close)
     
-    if is_debug_stock:
-        log(f"【调试】✓ 今日数据:")
-        log(f"  当前价: {current_price:.2f}")
-        log(f"  最高价: {current_high:.2f}")
-        log(f"  最低价: {current_low:.2f}")
-        log(f"  开盘价: {current_open:.2f}")
-        log(f"  成交量: {current_volume}")
-        log(f"  今日最高涨幅: {ref_max_gain:.2f}%")
+    log_stock_check(f"\n--- 今日数据 ---")
+    log_stock_check(f"  当前价: {current_price:.2f}")
+    log_stock_check(f"  最高价: {current_high:.2f}")
+    log_stock_check(f"  最低价: {current_low:.2f}")
+    log_stock_check(f"  开盘价: {current_open:.2f}")
+    log_stock_check(f"  成交量: {current_volume}")
+    log_stock_check(f"  今日最高涨幅: {ref_max_gain:.2f}%")
     
     # ========== 获取有效的9个历史交易日（排除停牌） ==========
     # 注意：这里获取9天，因为要加上今天（参考日）一起算10天
+    log_stock_check(f"\n--- 获取历史有效交易日（9天） ---")
     valid_days_9 = get_valid_trading_days(closes, opens, highs, lows, volumes, 9, stock_code)
     
-    if is_debug_stock:
-        log(f"【调试】获取到 {len(valid_days_9)} 个历史有效交易日")
+    log_stock_check(f"获取到 {len(valid_days_9)} 个历史有效交易日")
     
     if len(valid_days_9) < 9:
         stats['no_enough_data'] += 1
-        if is_debug_stock:
-            log(f"【调试】❌ 淘汰原因：历史有效交易日不足9天，实际: {len(valid_days_9)}天")
+        log_stock_check(f"❌ 淘汰原因：历史有效交易日不足9天，实际: {len(valid_days_9)}天")
+        log_stock_check(f"{'='*80}\n")
         return None
+    
+    log_stock_check(f"✓ 历史有效交易日充足: {len(valid_days_9)}天")
     
     # ========== 构建今日数据（参考日），加入到10天计算中 ==========
     # 判断今日是否为阴线（盘中判断）
@@ -864,28 +1018,29 @@ def check_stock(stock, all_ticks, stats):
     # 将今日数据插入到列表最前面，组成完整的10天
     valid_days_10 = [today_data] + valid_days_9
     
-    if is_debug_stock:
-        log(f"【调试】包含今日参考日后，共 {len(valid_days_10)} 个交易日用于计算")
+    log_stock_check(f"\n--- 构建10天完整数据 ---")
+    log_stock_check(f"包含今日参考日后，共 {len(valid_days_10)} 个交易日用于计算")
+    log_stock_check(f"今日是阴线: {today_is_yin}")
+    log_stock_check(f"今日是十字星: {today_is_cross_star}")
+    log_stock_check(f"今日阴线实体百分比: {today_yin_entity_pct:.2f}%")
     
     # ========== 条件1：最近10个交易日（含今日）的阴线次数 ≤ 3 ==========
     yin_count_10 = 0
     yin_entity_sum = 0  # 阴线实体百分比总和
     yin_days_info = []  # 记录阴线日期信息，用于后续检查
     
-    if is_debug_stock:
-        log(f"\n【调试】========== 检查条件1：10天阴线次数 ≤ 3（含今日） ==========")
+    log_stock_check(f"\n--- 条件1：10天阴线次数 ≤ 3（含今日） ---")
     
     for idx, day in enumerate(valid_days_10, 1):
         # 阴线：收盘价 < 开盘价，或者跌停（包括一字跌停）
         is_yin = day['close'] < day['open'] or day['is_limit_down']
         
-        if is_debug_stock:
-            day_label = "今日" if idx == 1 else f"第{idx}天"
-            log(f"  {day_label}: 开{day['open']:.2f} 收{day['close']:.2f} 高{day['high']:.2f} "
-                f"昨收{day['prev_close']:.2f} 最高涨幅{day['max_gain_today']:.2f}% "
-                f"{'阴线' if is_yin else '阳线'} "
-                f"{'跌停' if day['is_limit_down'] else ''} "
-                f"{'十字星' if day['is_cross_star'] else ''}")
+        day_label = "今日" if idx == 1 else f"第{idx}天"
+        log_stock_check(f"  {day_label}: 开{day['open']:.2f} 收{day['close']:.2f} 高{day['high']:.2f} "
+            f"昨收{day['prev_close']:.2f} 最高涨幅{day['max_gain_today']:.2f}% "
+            f"{'阴线' if is_yin else '阳线'} "
+            f"{'跌停' if day['is_limit_down'] else ''} "
+            f"{'十字星' if day['is_cross_star'] else ''}")
         
         if is_yin:
             yin_count_10 += 1
@@ -901,24 +1056,20 @@ def check_stock(stock, all_ticks, stats):
                 'max_gain_today': day['max_gain_today']
             })
             
-            if is_debug_stock:
-                log(f"    → 阴线实体: {day['yin_entity_percentage']:.2f}%")
+            log_stock_check(f"    → 阴线实体: {day['yin_entity_percentage']:.2f}%")
     
-    if is_debug_stock:
-        log(f"【调试】条件1结果: 10天阴线次数={yin_count_10}, 阴线实体总和={yin_entity_sum:.2f}%")
+    log_stock_check(f"条件1结果: 10天阴线次数={yin_count_10}, 阴线实体总和={yin_entity_sum:.2f}%")
     
     if yin_count_10 > 3:
         stats['fail_yin_10'] += 1
-        if is_debug_stock:
-            log(f"【调试】❌ 淘汰原因：10天阴线次数={yin_count_10} > 3")
+        log_stock_check(f"❌ 淘汰原因：10天阴线次数={yin_count_10} > 3")
+        log_stock_check(f"{'='*80}\n")
         return None
     
-    if is_debug_stock:
-        log(f"【调试】✓ 通过条件1")
+    log_stock_check(f"✓ 通过条件1")
     
     # ========== 条件2：10天内（含今日） 最高>昨收*1.065 的次数>=5 ==========
-    if is_debug_stock:
-        log(f"\n【调试】========== 检查条件2：10天拉升次数 ≥ 5（含今日，盘中动态） ==========")
+    log_stock_check(f"\n--- 条件2：10天拉升次数 ≥ 5（含今日，盘中动态） ---")
     
     pull_count_10 = 0
     for idx, day in enumerate(valid_days_10, 1):
@@ -929,47 +1080,40 @@ def check_stock(stock, all_ticks, stats):
             if is_pull:
                 pull_count_10 += 1
             
-            if is_debug_stock:
-                day_label = "今日(实时)" if idx == 1 else f"第{idx}天"
-                log(f"  {day_label}: 昨收{day['prev_close']:.2f} 最高{day['high']:.2f} "
-                    f"目标{target_price:.2f} {'✓拉升' if is_pull else '×未拉升'}")
+            day_label = "今日(实时)" if idx == 1 else f"第{idx}天"
+            log_stock_check(f"  {day_label}: 昨收{day['prev_close']:.2f} 最高{day['high']:.2f} "
+                f"目标{target_price:.2f} {'✓拉升' if is_pull else '×未拉升'}")
     
-    if is_debug_stock:
-        log(f"【调试】条件2结果: 10天拉升次数={pull_count_10}")
+    log_stock_check(f"条件2结果: 10天拉升次数={pull_count_10}")
     
     if pull_count_10 < 5:
         stats['fail_pull_10'] += 1
-        if is_debug_stock:
-            log(f"【调试】❌ 淘汰原因：10天拉升次数={pull_count_10} < 5")
+        log_stock_check(f"❌ 淘汰原因：10天拉升次数={pull_count_10} < 5")
+        log_stock_check(f"{'='*80}\n")
         return None
     
-    if is_debug_stock:
-        log(f"【调试】✓ 通过条件2")
+    log_stock_check(f"✓ 通过条件2")
     
     # ========== 判断属于哪个组 ==========
-    if is_debug_stock:
-        log(f"\n【调试】========== 检查分组条件 ==========")
+    log_stock_check(f"\n--- 检查分组条件 ---")
     
     groups = []
     
     # 检查共同条件：所有阴线的前一天或后一天必须满足最高涨幅≥6.5%
-    if is_debug_stock:
-        log(f"【调试】共同条件：所有阴线前后必有大涨(≥6.5%)")
-        log(f"  共有{len(yin_days_info)}个阴线需要检查")
+    log_stock_check(f"共同条件：所有阴线前后必有大涨(≥6.5%)")
+    log_stock_check(f"  共有{len(yin_days_info)}个阴线需要检查")
     
     yin_neighbor_check_pass = True
     for idx, yin_info in enumerate(yin_days_info, 1):
         # 如果是今天（day_num=1），后一天不存在，只检查前一天
         if yin_info['day_num'] == 1:
             has_big_gain = yin_info['max_gain_prev'] >= 6.5
-            if is_debug_stock:
-                log(f"  阴线{idx}(今日): 前一天涨幅{yin_info['max_gain_prev']:.2f}% "
-                    f"后一天涨幅[盘中无] "
-                    f"{'✓通过' if has_big_gain else '×不通过'}")
+            log_stock_check(f"  阴线{idx}(今日): 前一天涨幅{yin_info['max_gain_prev']:.2f}% "
+                f"后一天涨幅[盘中无] "
+                f"{'✓通过' if has_big_gain else '×不通过'}")
         else:
             has_big_gain = yin_info['max_gain_prev'] >= 6.5 or yin_info['max_gain_next'] >= 6.5
-            if is_debug_stock:
-                log(f"  阴线{idx}: 前一天涨幅{yin_info['max_gain_prev']:.2f}% "
+            log_stock_check(f"  阴线{idx}: 前一天涨幅{yin_info['max_gain_prev']:.2f}% "
                     f"后一天涨幅{yin_info['max_gain_next']:.2f}% "
                     f"{'✓通过' if has_big_gain else '×不通过'}")
         
@@ -979,66 +1123,58 @@ def check_stock(stock, all_ticks, stats):
     
     if not yin_neighbor_check_pass:
         stats['fail_yin_neighbor'] += 1
-        if is_debug_stock:
-            log(f"【调试】❌ 淘汰原因：有阴线前后都没有大涨(≥6.5%)")
+        log_stock_check(f"❌ 淘汰原因：有阴线前后都没有大涨(≥6.5%)")
+        log_stock_check(f"{'='*80}\n")
         return None
     
-    if is_debug_stock:
-        log(f"【调试】✓ 通过共同条件")
+    log_stock_check(f"✓ 通过共同条件")
     
     # 第一组条件：今日最高涨幅 > 4.5%
-    if is_debug_stock:
-        log(f"\n【调试】检查第一组条件: 今日最高涨幅 > 4.5%")
-        log(f"  今日最高涨幅: {ref_max_gain:.2f}%")
+    log_stock_check(f"\n--- 第一组条件：今日最高涨幅 > 4.5% ---")
+    log_stock_check(f"  今日最高涨幅: {ref_max_gain:.2f}%")
     
     if ref_max_gain > 4.5:
         groups.append("第一组")
-        if is_debug_stock:
-            log(f"  ✓ 满足第一组条件")
+        log_stock_check(f"  ✓ 满足第一组条件")
     else:
-        if is_debug_stock:
-            log(f"  × 不满足第一组条件")
+        log_stock_check(f"  × 不满足第一组条件")
     
     # 第二组条件：所有阴线满足十字星或最高涨幅≥6.5%
-    if is_debug_stock:
-        log(f"\n【调试】检查第二组条件: 所有阴线为十字星或当天涨幅≥6.5%")
+    log_stock_check(f"\n--- 第二组条件：所有阴线为十字星或当天涨幅≥6.5% ---")
     
     all_yin_meet_group2 = True
     for idx, yin_info in enumerate(yin_days_info, 1):
         # 阴线必须是十字星 或者 当天最高涨幅≥6.5%
         meet_condition = yin_info['is_cross_star'] or yin_info['max_gain_today'] >= 6.5
         
-        if is_debug_stock:
-            log(f"  阴线{idx}: 十字星={yin_info['is_cross_star']} "
-                f"当天涨幅={yin_info['max_gain_today']:.2f}% "
-                f"{'✓满足' if meet_condition else '×不满足'}")
+        log_stock_check(f"  阴线{idx}: 十字星={yin_info['is_cross_star']} "
+            f"当天涨幅={yin_info['max_gain_today']:.2f}% "
+            f"{'✓满足' if meet_condition else '×不满足'}")
         
         if not meet_condition:
             all_yin_meet_group2 = False
     
     if all_yin_meet_group2:
         groups.append("第二组")
-        if is_debug_stock:
-            log(f"  ✓ 满足第二组条件")
+        log_stock_check(f"  ✓ 满足第二组条件")
     else:
-        if is_debug_stock:
-            log(f"  × 不满足第二组条件")
+        log_stock_check(f"  × 不满足第二组条件")
     
     # 判断是否通过
     if not groups:
         stats['fail_no_group'] += 1
-        if is_debug_stock:
-            log(f"\n【调试】❌ 淘汰原因：两组条件都不满足")
+        log_stock_check(f"\n❌ 淘汰原因：两组条件都不满足")
+        log_stock_check(f"{'='*80}\n")
         return None
     
     # 生成分组标签
     group = "+".join(groups)
     stats['pass'] += 1
     
-    if is_debug_stock:
-        log(f"\n【调试】✅ 通过所有筛选！")
-        log(f"【调试】分组: {group}")
-        log(f"{'='*80}\n")
+    log_stock_check(f"\n✅ 通过所有筛选！")
+    log_stock_check(f"分组: {group}")
+    log_stock_check(f"统计: 10天{yin_count_10}阴{pull_count_10}拉 | 阴实体{yin_entity_sum:.2f}% | 今日最高涨幅{ref_max_gain:.2f}%")
+    log_stock_check(f"{'='*80}\n")
     
     # 计算涨幅
     gain = (current_price - prev_close) / prev_close * 100

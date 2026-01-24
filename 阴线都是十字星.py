@@ -65,9 +65,16 @@ g_ma5_cache = {}  # 5日均价缓存
 DEBUG_MODE = True
 CHECK_TRADING_TIME = True
 PRINT_PROGRESS = True
-LOG_ENABLED = False
-REDIS_LOG_ENABLED = True
-LOG_FILE = r"C:\Users\lyy\Desktop\股票\预警\阴线都是十字星.log"
+LOG_ENABLED = True  # 日志开关，True=开启日志打印
+REDIS_LOG_ENABLED = True  # Redis日志开关，True=打印Redis相关日志
+LOG_FILE = r"C:\Users\Administrator\Desktop\日志\阴线都是十字星\日志.log"  # 日志文件路径
+
+# ========== 个股判断日志配置 ==========
+STOCK_CHECK_LOG_ENABLED = True  # 个股判断日志开关
+STOCK_CHECK_LOG_FILE = r"C:\Users\Administrator\Desktop\日志\阴线都是十字星\个股判断.log"  # 个股判断日志文件
+
+# ========== Redis专用日志配置 ==========
+REDIS_LOG_FILE = r"C:\Users\Administrator\Desktop\日志\阴线都是十字星\redis日志.log"  # Redis操作日志文件
 
 # ========== 写入文件开关 ==========
 WRITE_FILE_ENABLED = True
@@ -112,22 +119,17 @@ g_email_queue = queue.Queue()
 def log(msg, level="INFO"):
     if not LOG_ENABLED:
         return
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    print(f"[{timestamp}] [{level}] {msg}")
-
-
-def log_redis(msg, level="INFO"):
-    """Redis专用日志"""
-    if not REDIS_LOG_ENABLED:
-        return
     
     import os
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     log_msg = f"[{timestamp}] [{level}] {msg}"
     
+    # 打印到控制台
     print(log_msg)
     
+    # 写入日志文件
     try:
+        # 确保日志目录存在
         log_dir = os.path.dirname(LOG_FILE)
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
@@ -136,6 +138,53 @@ def log_redis(msg, level="INFO"):
             f.write(log_msg + '\n')
     except Exception as e:
         print(f"[ERROR] 写入日志文件失败: {e}")
+
+
+def log_redis(msg, level="INFO"):
+    """Redis专用日志，同时打印到控制台和Redis专用日志文件"""
+    if not REDIS_LOG_ENABLED:
+        return
+    
+    import os
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    log_msg = f"[{timestamp}] [{level}] {msg}"
+    
+    # 打印到控制台
+    print(log_msg)
+    
+    # 写入Redis专用日志文件
+    try:
+        # 确保日志目录存在
+        log_dir = os.path.dirname(REDIS_LOG_FILE)
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        
+        with open(REDIS_LOG_FILE, 'a', encoding='utf-8') as f:
+            f.write(log_msg + '\n')
+    except Exception as e:
+        print(f"[ERROR] 写入Redis日志文件失败: {e}")
+
+
+def log_stock_check(msg, level="INFO"):
+    """个股判断专用日志，只写入到个股判断日志文件"""
+    if not STOCK_CHECK_LOG_ENABLED:
+        return
+    
+    import os
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]  # 精确到毫秒
+    log_msg = f"[{timestamp}] [{level}] {msg}"
+    
+    # 写入个股判断日志文件
+    try:
+        # 确保日志目录存在
+        log_dir = os.path.dirname(STOCK_CHECK_LOG_FILE)
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        
+        with open(STOCK_CHECK_LOG_FILE, 'a', encoding='utf-8') as f:
+            f.write(log_msg + '\n')
+    except Exception as e:
+        print(f"[ERROR] 写入个股判断日志文件失败: {e}")
 
 
 def connect_redis():
@@ -494,28 +543,46 @@ def delete_stock_from_redis(stock_code, stock_name, date_str, max_retries=3):
 
 
 def clear_today_files():
-    """清除今天的输出文件和日志文件"""
+    """清除今天的输出文件和所有日志文件"""
     import os
     
     try:
+        # 获取今天的日期
         today = datetime.now().strftime('%Y%m%d')
         
+        # 文件1：YYYYMMDD阴线都是十字星.txt
         output_filename = f"{today}阴线都是十字星.txt"
         output_file = os.path.join(OUTPUT_DIR, output_filename)
         
+        # 文件2：日志.log
         log_file = LOG_FILE
         
-        files_to_clear = [output_file, log_file]
+        # 文件3：redis日志.log
+        redis_log_file = REDIS_LOG_FILE
+        
+        # 文件4：个股判断.log
+        stock_check_log_file = STOCK_CHECK_LOG_FILE
+        
+        files_to_clear = [output_file, log_file, redis_log_file, stock_check_log_file]
         
         for file_path in files_to_clear:
             if os.path.exists(file_path):
                 try:
+                    # 清空文件内容（保留文件）
                     with open(file_path, 'w', encoding='utf-8') as f:
                         f.write('')
                     print(f"✓ 已清空文件: {file_path}")
                 except Exception as e:
                     print(f"✗ 清空文件失败 [{file_path}]: {e}")
             else:
+                # 确保日志目录存在
+                log_dir = os.path.dirname(file_path)
+                if log_dir and not os.path.exists(log_dir):
+                    try:
+                        os.makedirs(log_dir)
+                        print(f"✓ 已创建目录: {log_dir}")
+                    except Exception as e:
+                        print(f"✗ 创建目录失败 [{log_dir}]: {e}")
                 print(f"○ 文件不存在，跳过: {file_path}")
         
         print("")
@@ -949,15 +1016,26 @@ def check_stock_yxdszx(stock, all_ticks, stats, ContextInfo):
     - 今日最高涨幅≥6.85%
     - 策略：阴线都是十字星
     """
+    code = stock.split('.')[0]
+    name = g_stock_names.get(stock, code)
+    
+    log_stock_check(f"\n{'='*80}")
+    log_stock_check(f"开始检查: {name}({code}) - {stock}")
+    log_stock_check(f"{'='*80}")
+    
     tick = all_ticks.get(stock)
     if not tick:
+        log_stock_check(f"✗ 淘汰原因: 无行情数据")
         stats['no_tick'] += 1
         return None
     
     prev_close = g_prev_close_cache.get(stock)
     if not prev_close or prev_close <= 0:
+        log_stock_check(f"✗ 淘汰原因: 无昨收价或昨收价<=0, 昨收={prev_close}")
         stats['no_prev'] += 1
         return None
+    
+    log_stock_check(f"基础数据: 昨收={prev_close:.2f}")
     
     # 获取今日实时数据
     today_high = tick.get('high', 0)
@@ -967,12 +1045,16 @@ def check_stock_yxdszx(stock, all_ticks, stats, ContextInfo):
     if not current_price:
         current_price = tick.get('price', tick.get('last', 0))
     
+    log_stock_check(f"今日数据: 开={today_open:.2f}, 高={today_high:.2f}, 低={today_low:.2f}, 现价={current_price:.2f}")
+    
     if not today_high or today_high <= 0:
+        log_stock_check(f"✗ 淘汰原因: 今日最高价无效, 最高价={today_high}")
         stats['no_tick'] += 1
         return None
     
     hist = g_history_data.get(stock)
     if not hist:
+        log_stock_check(f"✗ 淘汰原因: 无历史数据")
         stats['no_hist'] += 1
         return None
     
@@ -981,76 +1063,136 @@ def check_stock_yxdszx(stock, all_ticks, stats, ContextInfo):
     highs = hist['highs']
     lows = hist['lows']
     
+    log_stock_check(f"历史数据: 共{len(closes)}天")
+    
     if len(closes) < 10:
+        log_stock_check(f"✗ 淘汰原因: 历史数据不足10天, 实际{len(closes)}天")
         stats['no_hist'] += 1
         return None
     
     # 获取5日均价
     ma5_list = g_ma5_cache.get(stock, [])
     if len(ma5_list) < len(closes):
+        log_stock_check(f"✗ 淘汰原因: 5日均价数据不足")
         stats['no_hist'] += 1
         return None
     
     # 今日最高涨幅
     today_max_gain = calc_max_gain(today_high, prev_close)
+    log_stock_check(f"今日最高涨幅: {today_max_gain:.2f}%")
     
     # ========== 第1道: 最近10个交易日（包括今天）内最高涨幅≥6.85%次数（拉升次数） ==========
-    # 历史9天 + 今天 = 10天
+    log_stock_check(f"\n【第1道】拉升次数检查（最近10天最高涨幅≥6.85%）:")
     ls_num = 0
+    ls_details = []
+    
     # 历史9天
-    for i in range(len(closes) - 9, len(closes)):
+    for idx, i in enumerate(range(len(closes) - 9, len(closes))):
+        day_label = f"T-{9-idx}"
         if i >= 1 and closes[i-1] > 0:
             max_gain = calc_max_gain(highs[i], closes[i-1])
             if max_gain >= 6.85:
                 ls_num += 1
+                ls_details.append(f"{day_label}: {max_gain:.2f}%")
+    
     # 今天（盘中动态）
     if today_max_gain >= 6.85:
         ls_num += 1
+        ls_details.append(f"今日: {today_max_gain:.2f}%")
+    
+    log_stock_check(f"  拉升详情: {' | '.join(ls_details) if ls_details else '无'}")
+    log_stock_check(f"  拉升次数: {ls_num}次")
+    log_stock_check(f"  判断条件: 拉升次数 >= 4次")
     
     if ls_num < 4:
+        log_stock_check(f"  ✗ 不通过: {ls_num}次 < 4次")
         stats['fail_ls_count'] += 1
         return None
+    else:
+        log_stock_check(f"  ✓ 通过: {ls_num}次 >= 4次")
     
     # ========== 第2道: 10天内（包括今天）阴线的次数<=3 ==========
+    log_stock_check(f"\n【第2道】阴线次数检查（10天内阴线<=3根）:")
     yinxian_count = 0
     yin_indices = []  # 历史阴线索引
     is_today_yin = False  # 今天是否为阴线
+    yin_list = []  # 阴线列表用于日志
     
     # 历史9天
-    for i in range(len(closes) - 9, len(closes)):
-        if closes[i] < opens[i]:
+    for idx, i in enumerate(range(len(closes) - 9, len(closes))):
+        day_label = f"T-{9-idx}"
+        is_yin = closes[i] < opens[i]
+        
+        if is_yin:
             yinxian_count += 1
             yin_indices.append(i)
+            yin_list.append(f"{day_label}(开{opens[i]:.2f}>收{closes[i]:.2f})")
     
     # 今天（盘中动态判断）
     if current_price < today_open:
         yinxian_count += 1
         is_today_yin = True
+        yin_list.append(f"今日(开{today_open:.2f}>收{current_price:.2f})")
+    
+    log_stock_check(f"  阴线详情: {' | '.join(yin_list) if yin_list else '无阴线'}")
+    log_stock_check(f"  阴线次数: {yinxian_count}根")
+    log_stock_check(f"  判断条件: 阴线次数 <= 3根")
     
     if yinxian_count > 3:
+        log_stock_check(f"  ✗ 不通过: {yinxian_count}根 > 3根")
         stats['fail_yinxian'] += 1
         return None
+    else:
+        log_stock_check(f"  ✓ 通过: {yinxian_count}根 <= 3根")
     
     # ========== 第3道: 10天内如果出现阴线则满足十字星 ==========
+    log_stock_check(f"\n【第3道】阴线十字星检查:")
     if yinxian_count > 0:
+        log_stock_check(f"  共有{yinxian_count}根阴线，需逐一检查是否满足'十字星'")
+        log_stock_check(f"  十字星定义: |收盘价-开盘价|/开盘价*100 <= 1.68%")
+        
         all_cross = True
+        fail_cross_info = []
+        
         # 检查历史阴线
-        for i in yin_indices:
+        for idx, i in enumerate(yin_indices):
             o = opens[i]
             c = closes[i]
+            day_label = f"T-{9-(i-(len(closes)-9))}"
             
-            if not is_cross_star(o, c):
+            amplitude = abs(c - o) / o * 100 if o > 0 else 0
+            is_cross = is_cross_star(o, c)
+            
+            log_stock_check(f"    {day_label}: 开{o:.2f} 收{c:.2f}")
+            log_stock_check(f"      幅度={amplitude:.2f}%")
+            log_stock_check(f"      结果: {'✓ 十字星' if is_cross else '✗ 不是十字星'}")
+            
+            if not is_cross:
                 all_cross = False
+                fail_cross_info.append(f"{day_label}")
                 break
         
-        # 检查今天是否为阴线并且是否十字星
+        # 检查今天如果是阴线
         if all_cross and is_today_yin:
-            if not is_cross_star(today_open, current_price):
+            amplitude = abs(current_price - today_open) / today_open * 100 if today_open > 0 else 0
+            is_today_cross = is_cross_star(today_open, current_price)
+            
+            log_stock_check(f"    今日: 开{today_open:.2f} 收{current_price:.2f}")
+            log_stock_check(f"      幅度={amplitude:.2f}%")
+            log_stock_check(f"      结果: {'✓ 十字星' if is_today_cross else '✗ 不是十字星'}")
+            
+            if not is_today_cross:
                 all_cross = False
+                fail_cross_info.append("今日")
         
         if not all_cross:
+            log_stock_check(f"  ✗ 不通过: 存在不满足'十字星'的阴线 ({', '.join(fail_cross_info)})")
             stats['fail_cross'] += 1
             return None
+        else:
+            log_stock_check(f"  ✓ 通过: 所有{yinxian_count}根阴线都满足'十字星'")
+    else:
+        log_stock_check(f"  无阴线，自动通过")
     
     # ========== 计算不下杀次数（10天内，包括今天） ==========
     no_xs_num = 0
@@ -1068,6 +1210,7 @@ def check_stock_yxdszx(stock, all_ticks, stats, ContextInfo):
         no_xs_num += 1
     
     # ========== 判断分组 ==========
+    log_stock_check(f"\n【第4道】分组判断:")
     strategy = None
     
     # 计算今天的5日均价（需要用到最近5天的收盘价，包括今天的当前价）
@@ -1077,40 +1220,84 @@ def check_stock_yxdszx(stock, all_ticks, stats, ContextInfo):
     else:
         ma5_today = 0
     
+    log_stock_check(f"  今日5日均价: {ma5_today:.2f}")
+    
     # 分组1：如果出现阴线，所有阴线的最低价>=5日均价，且今日最高涨幅≥5%
     if yinxian_count == 0:
+        log_stock_check(f"  检查分组1(全阳):")
+        log_stock_check(f"    条件: 今日最高涨幅≥5%")
+        log_stock_check(f"    今日最高涨幅: {today_max_gain:.2f}%")
+        
         # 全阳，需要今日最高涨幅≥5%
         if today_max_gain >= 5.0:
             strategy = "全阳"
             stats['pass_group1'] += 1
+            log_stock_check(f"    ✓ 满足分组1: 全阳")
+        else:
+            log_stock_check(f"    ✗ 不满足分组1: 今日最高涨幅{today_max_gain:.2f}% < 5%")
     elif yinxian_count > 0:
+        log_stock_check(f"  检查分组1(十字并不碰):")
+        log_stock_check(f"    条件1: 所有阴线的最低价>=5日均价")
+        log_stock_check(f"    条件2: 今日最高涨幅≥5%")
+        
         # 检查所有阴线的最低价是否>=5日均价
         all_above_ma5 = True
+        fail_ma5_info = []
         
         # 检查历史阴线
         for i in yin_indices:
             ma5 = ma5_list[i]
+            day_label = f"T-{9-(i-(len(closes)-9))}"
+            
+            log_stock_check(f"      {day_label}: 最低价{lows[i]:.2f}, 5日均价{ma5:.2f}")
+            
             if ma5 <= 0 or lows[i] < ma5:
                 all_above_ma5 = False
-                break
+                fail_ma5_info.append(f"{day_label}(低{lows[i]:.2f}<均{ma5:.2f})")
+                log_stock_check(f"        ✗ 不满足: 最低价 < 5日均价")
+            else:
+                log_stock_check(f"        ✓ 满足: 最低价 >= 5日均价")
         
         # 检查今天如果是阴线
         if all_above_ma5 and is_today_yin:
+            log_stock_check(f"      今日: 最低价{today_low:.2f}, 5日均价{ma5_today:.2f}")
+            
             if ma5_today <= 0 or today_low < ma5_today:
                 all_above_ma5 = False
+                fail_ma5_info.append(f"今日(低{today_low:.2f}<均{ma5_today:.2f})")
+                log_stock_check(f"        ✗ 不满足: 最低价 < 5日均价")
+            else:
+                log_stock_check(f"        ✓ 满足: 最低价 >= 5日均价")
+        
+        if all_above_ma5:
+            log_stock_check(f"    条件1: ✓ 所有阴线最低价>=5日均价")
+        else:
+            log_stock_check(f"    条件1: ✗ 存在阴线不满足 ({', '.join(fail_ma5_info)})")
+        
+        log_stock_check(f"    条件2: 今日最高涨幅{today_max_gain:.2f}% {'≥' if today_max_gain >= 5.0 else '<'} 5%")
         
         if all_above_ma5 and today_max_gain >= 5.0:
             # 十字并不碰，且今日最高涨幅≥5%
             strategy = "十字并不碰"
             stats['pass_group1'] += 1
+            log_stock_check(f"    ✓ 满足分组1: 十字并不碰")
+        else:
+            log_stock_check(f"    ✗ 不满足分组1")
     
     # 如果不满足分组1，检查分组2
     if strategy is None:
+        log_stock_check(f"  检查分组2(阴线都是十字星):")
+        log_stock_check(f"    条件: 今日最高涨幅≥6.85%")
+        log_stock_check(f"    今日最高涨幅: {today_max_gain:.2f}%")
+        
         # 分组2：今日最高涨幅≥6.85%
         if today_max_gain >= 6.85:
             strategy = "阴线都是十字星"
             stats['pass_group2'] += 1
+            log_stock_check(f"    ✓ 满足分组2: 阴线都是十字星")
         else:
+            log_stock_check(f"    ✗ 不满足分组2: 今日最高涨幅{today_max_gain:.2f}% < 6.85%")
+            log_stock_check(f"\n【结果】✗✗✗ 不满足任何分组 ✗✗✗")
             # 不满足任何分组
             return None
     
@@ -1118,6 +1305,14 @@ def check_stock_yxdszx(stock, all_ticks, stats, ContextInfo):
         return None
     
     # 通过所有条件
+    log_stock_check(f"\n【结果】✓✓✓ 通过所有检查 ✓✓✓")
+    log_stock_check(f"  策略: {strategy}")
+    log_stock_check(f"  拉升次数: {ls_num}次")
+    log_stock_check(f"  阴线次数: {yinxian_count}根")
+    log_stock_check(f"  不下杀次数: {no_xs_num}次")
+    log_stock_check(f"  今日最高涨幅: {today_max_gain:.2f}%")
+    log_stock_check(f"  当前涨幅: {((current_price - prev_close) / prev_close * 100):.2f}%")
+    
     volume = tick.get('volume', tick.get('vol', 0))
     
     current_gain = (current_price - prev_close) / prev_close * 100 if current_price > 0 else today_max_gain

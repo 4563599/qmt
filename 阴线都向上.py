@@ -58,13 +58,16 @@ g_stock_names = {}
 DEBUG_MODE = True
 CHECK_TRADING_TIME = True  # 开启交易时间检查，收盘后停止执行
 PRINT_PROGRESS = True
-LOG_ENABLED = False  # 日志开关，False=关闭日志打印
+LOG_ENABLED = True  # 日志开关，True=开启日志打印
 REDIS_LOG_ENABLED = True  # Redis日志开关，True=打印Redis相关日志
-LOG_FILE = r"C:\Users\lyy\Desktop\股票\预警\阴线都向上.log"  # 日志文件路径
+LOG_FILE = r"C:\Users\Administrator\Desktop\日志\阴线都向上\日志.log"  # 日志文件路径
 
 # ========== 个股判断日志配置 ==========
 STOCK_CHECK_LOG_ENABLED = True  # 个股判断日志开关
-STOCK_CHECK_LOG_FILE = r"C:\Users\lyy\Desktop\股票\预警\阴线都向上个股判断.log"  # 个股判断日志文件
+STOCK_CHECK_LOG_FILE = r"C:\Users\Administrator\Desktop\日志\阴线都向上\个股判断.log"  # 个股判断日志文件
+
+# ========== Redis专用日志配置 ==========
+REDIS_LOG_FILE = r"C:\Users\Administrator\Desktop\日志\阴线都向上\redis日志.log"  # Redis操作日志文件
 
 # ========== 写入文件开关 ==========
 WRITE_FILE_ENABLED = True  # True=写入文件，False=不写入（测试模式）
@@ -109,14 +112,6 @@ g_email_queue = queue.Queue()  # 邮件发送队列
 def log(msg, level="INFO"):
     if not LOG_ENABLED:
         return
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    print(f"[{timestamp}] [{level}] {msg}")
-
-
-def log_redis(msg, level="INFO"):
-    """Redis专用日志，同时打印到控制台和文件"""
-    if not REDIS_LOG_ENABLED:
-        return
     
     import os
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -136,6 +131,31 @@ def log_redis(msg, level="INFO"):
             f.write(log_msg + '\n')
     except Exception as e:
         print(f"[ERROR] 写入日志文件失败: {e}")
+
+
+def log_redis(msg, level="INFO"):
+    """Redis专用日志，同时打印到控制台和Redis专用日志文件"""
+    if not REDIS_LOG_ENABLED:
+        return
+    
+    import os
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    log_msg = f"[{timestamp}] [{level}] {msg}"
+    
+    # 打印到控制台
+    print(log_msg)
+    
+    # 写入Redis专用日志文件
+    try:
+        # 确保日志目录存在
+        log_dir = os.path.dirname(REDIS_LOG_FILE)
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        
+        with open(REDIS_LOG_FILE, 'a', encoding='utf-8') as f:
+            f.write(log_msg + '\n')
+    except Exception as e:
+        print(f"[ERROR] 写入Redis日志文件失败: {e}")
 
 
 def log_stock_check(msg, level="INFO"):
@@ -414,7 +434,7 @@ def send_email_message(data):
 
 
 def clear_today_files():
-    """清除今天的输出文件和日志文件"""
+    """清除今天的输出文件和所有日志文件"""
     import os
     
     try:
@@ -425,10 +445,16 @@ def clear_today_files():
         output_filename = f"{today}阴线都向上.txt"
         output_file = os.path.join(OUTPUT_DIR, output_filename)
         
-        # 文件2：阴线都向上.log
+        # 文件2：日志.log
         log_file = LOG_FILE
         
-        files_to_clear = [output_file, log_file]
+        # 文件3：redis日志.log
+        redis_log_file = REDIS_LOG_FILE
+        
+        # 文件4：个股判断.log
+        stock_check_log_file = STOCK_CHECK_LOG_FILE
+        
+        files_to_clear = [output_file, log_file, redis_log_file, stock_check_log_file]
         
         for file_path in files_to_clear:
             if os.path.exists(file_path):
@@ -440,6 +466,14 @@ def clear_today_files():
                 except Exception as e:
                     print(f"✗ 清空文件失败 [{file_path}]: {e}")
             else:
+                # 确保日志目录存在
+                log_dir = os.path.dirname(file_path)
+                if log_dir and not os.path.exists(log_dir):
+                    try:
+                        os.makedirs(log_dir)
+                        print(f"✓ 已创建目录: {log_dir}")
+                    except Exception as e:
+                        print(f"✗ 创建目录失败 [{log_dir}]: {e}")
                 print(f"○ 文件不存在，跳过: {file_path}")
         
         print("")
