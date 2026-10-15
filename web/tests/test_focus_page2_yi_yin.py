@@ -218,8 +218,19 @@ def test_focus_typography_is_slightly_smaller_without_scaling_the_layout(client)
     assert 'font-size: calc(14px * var(--focus-text-scale, 1));' in style
     assert not re.search(r'font-size:\s*\d+px;', style)
     assert re.search(r'\.focus-page2-extra\s*\{[^}]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);', style)
-    assert re.search(r'@media \(max-width: 900px\)\s*\{\s*\.focus-page2-extra\s*\{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);', style)
+    extra_rules = re.findall(r'\.focus-page2-extra\s*\{([^}]*)\}', style)
+    assert all('repeat(2,' not in rule for rule in extra_rules)
     assert 'zoom:' not in style and 'transform: scale' not in style
     push_log_html = client.get('/推送日志').get_data(as_text=True)
     assert '<body class="focus-mode">' in html
     assert '<body class="focus-mode">' not in push_log_html
+
+
+def test_mobile_page_two_keeps_four_columns_and_stacks_details_inside_cells(client):
+    html = client.get('/重点关注').get_data(as_text=True)
+    style = re.search(r'<style>(.*?)</style>', html, re.S).group(1)
+    assert re.search(r'@media \(max-width: 900px\)\s*\{\s*\.focus-page2-column \.stock-card-body\s*\{\s*grid-template-columns: minmax\(0, 1fr\)', style)
+    assert re.search(r'\.focus-page2-column \.stock-main\s*\{[^}]*flex-direction: column;[^}]*align-items: flex-start;', style)
+    assert re.search(r'\.focus-page2-column \.stock-meta\s*\{[^}]*flex-direction: column;[^}]*align-items: flex-start;', style)
+    assert re.search(r'\.focus-page2-heading \.header-count\s*\{[^}]*display: block;[^}]*margin-left: 0;', style)
+    assert 'min-height: 66px;' in style
