@@ -135,12 +135,12 @@
         .focus-content-layout { width: 100%; }
         .focus-page2-extra {
             display: grid;
-            grid-template-columns: repeat(6, minmax(0, 1fr));
+            grid-template-columns: repeat(4, minmax(0, 1fr));
             align-items: start;
             margin-bottom: 18px;
         }
         .focus-page2-extra[hidden] { display: none; }
-        .focus-page2-column { grid-column: span 2; min-width: 0; border: 1px solid #8f8f8f; }
+        .focus-page2-column { min-width: 0; border: 1px solid #8f8f8f; }
         .focus-page2-heading {
             margin: 0;
             padding: 12px 10px;
@@ -709,6 +709,9 @@
             background: #fff;
         }
         body.focus-mode .push-kline-image { min-height: 0; }
+        @media (max-width: 900px) {
+            .focus-page2-extra { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
         @media (max-width: 720px) {
             .page { width: calc(100% - 16px); margin-top: 12px; }
             .focus-page2-heading { padding: 10px 6px; font-size: calc(13px * var(--focus-text-scale, 1)); }
@@ -1058,7 +1061,8 @@
         const REFRESH_MS = 3000;
         const FOCUS_PAGE2_EXTRA_COLUMNS = [
             { key: 'yi_yin_yi_yang', title: '5拉一阴一阳' },
-            { key: 'qiangchi', title: '5拉强吃' }
+            { key: 'qiangchi', title: '5拉强吃' },
+            { key: 'pz1_five_pull_yin_pull_next_or_eaten', title: '5拉阴后拉' }
         ];
         const FOCUS_SHAPE_TAGS = [
             { field: 'is_quanyang_10d', label: '没有阴线' },

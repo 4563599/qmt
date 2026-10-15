@@ -98,6 +98,53 @@ def test_second_page_does_not_fall_back_to_another_date(client):
     assert response.status_code == 404
 
 
+def test_second_page_next_pull_list_reads_pz1_without_a_five_percent_floor(client):
+    redis_client = redis_with({
+        'pz:20261015': {
+            '600001': {'ref_gain': 8, 'yin_count_10d': 1,
+                       'five_pull_yin_pull_next_or_eaten': 1},
+        },
+        'pz1:20261015': {
+            '600002': {'name': 'Negative gain', 'ref_gain': -2, 'yin_count_10d': 1,
+                       'five_pull_yin_pull_next_or_eaten': 1, 'is_quanyang_10d': 0},
+            '600003': {'ref_gain': 4.99, 'yin_count_10d': 0,
+                       'five_pull_yin_pull_next_or_eaten': True, 'is_quanyang_10d': 1},
+            '600004': {'ref_gain': 0, 'yin_count_10d': 1,
+                       'five_pull_yin_pull_next': '1', 'five_pull_all_yin_up': 1},
+            '600005': {'ref_gain': 10, 'yin_count_10d': 0,
+                       'five_pull_yin_pull_next_or_eaten': 0, 'five_pull_yin_pull_next': 1},
+            '600006': {'ref_gain': 10, 'yin_count_10d': 0, 'qiangchi': 1},
+        },
+        'pz1:20261014': {'600007': {'five_pull_yin_pull_next_or_eaten': 1}},
+    })
+    with patch('app.get_redis_client', return_value=redis_client):
+        response = client.get('/api/pz1/focus?date=2026-10-15&page=2')
+    assert response.status_code == 200
+    groups = response.get_json()['groups']
+    stocks = groups['pz1_five_pull_yin_pull_next_or_eaten']
+    assert [item['code'] for item in stocks] == ['600003', '600004', '600002']
+    assert [item['ref_gain'] for item in stocks] == [4.99, 0, -2]
+    assert stocks[0]['is_quanyang_10d'] == 1
+    assert stocks[1]['five_pull_all_yin_up'] == 1
+    assert stocks[1]['five_pull_yin_pull_next_or_eaten'] == 1
+    assert [item['code'] for item in groups['five_pull_yin_pull_next_or_eaten']] == ['600001']
+    assert [item['code'] for item in groups['qiangchi']] == ['600006']
+    redis_client.hset.assert_not_called()
+    redis_client.set.assert_not_called()
+
+
+def test_second_page_next_pull_list_works_when_only_pz1_has_data(client):
+    with patch('app.get_redis_client', return_value=redis_with({
+        'pz1:20261015': {'600002': {'ref_gain': 2, 'yin_count_10d': 3,
+                                  'five_pull_yin_pull_next': 1}},
+    })):
+        response = client.get('/api/pz1/focus?date=2026-10-15&page=2')
+    assert response.status_code == 200
+    assert [item['code'] for item in response.get_json()['groups'][
+        'pz1_five_pull_yin_pull_next_or_eaten'
+    ]] == ['600002']
+
+
 def test_second_page_dates_include_both_sources_newest_first(client):
     redis_client = redis_with({
         'pz:20260929': {}, 'pz1:20260930': {}, 'pz1:20260929': {},
@@ -144,6 +191,9 @@ def test_page_has_extra_lists_and_independent_limit_buttons(client):
     html = client.get('/重点关注').get_data(as_text=True)
     assert html.index('id="focusPage2Extra"') < html.index('id="focusSheetWrap"')
     assert '5拉一阴一阳' in html and '5拉强吃' in html
+    extra_columns = re.search(r'const FOCUS_PAGE2_EXTRA_COLUMNS = \[(.*?)\];', html, re.S).group(1)
+    assert "key: 'pz1_five_pull_yin_pull_next_or_eaten', title: '5拉阴后拉'" in extra_columns
+    assert extra_columns.index("key: 'qiangchi'") < extra_columns.index("key: 'pz1_five_pull_yin_pull_next_or_eaten'")
     assert 'id="focusNotLimitUpOnly"' in html
     assert re.search(r'<button[^>]+id="focusLimitUpOnly"[^>]*>涨停</button>', html)
     assert re.search(r'<button[^>]+id="focusNotLimitUpOnly"[^>]*>未涨停</button>', html)
@@ -167,8 +217,8 @@ def test_focus_typography_is_slightly_smaller_without_scaling_the_layout(client)
     assert 'font-size: calc(13px * var(--focus-text-scale, 1));' in style
     assert 'font-size: calc(14px * var(--focus-text-scale, 1));' in style
     assert not re.search(r'font-size:\s*\d+px;', style)
-    assert 'grid-template-columns: repeat(6, minmax(0, 1fr));' in style
-    assert 'grid-column: span 2;' in style
+    assert re.search(r'\.focus-page2-extra\s*\{[^}]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);', style)
+    assert re.search(r'@media \(max-width: 900px\)\s*\{\s*\.focus-page2-extra\s*\{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);', style)
     assert 'zoom:' not in style and 'transform: scale' not in style
     push_log_html = client.get('/推送日志').get_data(as_text=True)
     assert '<body class="focus-mode">' in html

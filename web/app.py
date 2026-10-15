@@ -7264,6 +7264,11 @@ def get_pz1_focus():
                 for field in fields
             }
             extra_records = []
+            extra_fields = {
+                'yi_yin_yi_yang': 'yi_yin_yi_yang',
+                'qiangchi': 'qiangchi',
+                'pz1_five_pull_yin_pull_next_or_eaten': 'five_pull_yin_pull_next_or_eaten',
+            }
             for redis_code, raw_info in _ztorgj_load_hash_payloads(
                 redis_client, extra_redis_key
             ):
@@ -7275,6 +7280,10 @@ def get_pz1_focus():
                     field: int(_ztorgj_truthy_flag(item.get(field)))
                     for field in ('yi_yin_yi_yang', 'qiangchi')
                 }
+                next_pull = item.get('five_pull_yin_pull_next_or_eaten')
+                if next_pull is None:
+                    next_pull = item.get('five_pull_yin_pull_next', 0)
+                flags['five_pull_yin_pull_next_or_eaten'] = int(_ztorgj_truthy_flag(next_pull))
                 if not any(flags.values()):
                     continue
                 gain = _ztorgj_parse_float(
@@ -7297,8 +7306,8 @@ def get_pz1_focus():
                 updated_at = str(item.get('updated_at') or item.get('snapshot_at') or '').strip()
                 if updated_at:
                     updated_times.append(updated_at)
-            for field in ('yi_yin_yi_yang', 'qiangchi'):
-                groups[field] = sorted(
+            for group_key, field in extra_fields.items():
+                groups[group_key] = sorted(
                     (item for item in extra_records if item[field] == 1),
                     key=lambda item: (item['yin_count_10d'], -item['ref_gain'], item['code']),
                 )
