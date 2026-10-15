@@ -61,21 +61,56 @@
             }).sort(compareStocks);
             return Object.assign({}, board, { stocks: stocks });
         }).filter(function(board) { return board.stocks.length; });
-        var selected = boards.find(function(board) { return boardName(board) === selectedName; }) || boards[0];
-        var buckets = new Map();
-        (selected ? selected.stocks : []).forEach(function(stock) {
-            var value = condition.grouped ? countValue(stock, condition.key) : null;
-            if (!buckets.has(value)) buckets.set(value, []);
-            buckets.get(value).push(stock);
-        });
-        var groups = Array.from(buckets.keys()).sort(function(left, right) { return left - right; }).map(function(value) {
-            return { value: value, stocks: buckets.get(value).sort(compareStocks) };
-        });
         var uniqueCodes = new Set();
         boards.forEach(function(board) {
             board.stocks.forEach(function(stock) {
                 if (stock.code) uniqueCodes.add(String(stock.code));
             });
+        });
+        if (condition.grouped) {
+            var listed = new Map();
+            var countBuckets = new Map();
+            boards.forEach(function(board) {
+                var name = boardName(board);
+                board.stocks.forEach(function(stock) {
+                    var identity = stock.code ? String(stock.code) : stock;
+                    if (listed.has(identity)) {
+                        var names = listed.get(identity).ths_board_names;
+                        if (!names.includes(name)) names.push(name);
+                        return;
+                    }
+                    var copy = Object.assign({}, stock, { ths_board_names: [name] });
+                    listed.set(identity, copy);
+                    var value = countValue(stock, condition.key);
+                    if (!countBuckets.has(value)) countBuckets.set(value, []);
+                    countBuckets.get(value).push(copy);
+                });
+            });
+            var countGroups = Array.from(countBuckets.keys()).sort(function(left, right) {
+                return left - right;
+            }).map(function(value) { return { value: value, stocks: countBuckets.get(value) }; });
+            var selectedGroup = countGroups.find(function(group) {
+                return String(group.value) === String(selectedName);
+            }) || countGroups[0];
+            return {
+                condition: condition,
+                boards: boards,
+                boardName: '',
+                groupValue: selectedGroup ? selectedGroup.value : null,
+                groups: countGroups,
+                stocks: selectedGroup ? selectedGroup.stocks : [],
+                uniqueCount: uniqueCodes.size
+            };
+        }
+        var selected = boards.find(function(board) { return boardName(board) === selectedName; }) || boards[0];
+        var buckets = new Map();
+        (selected ? selected.stocks : []).forEach(function(stock) {
+            var value = null;
+            if (!buckets.has(value)) buckets.set(value, []);
+            buckets.get(value).push(stock);
+        });
+        var groups = Array.from(buckets.keys()).sort(function(left, right) { return left - right; }).map(function(value) {
+            return { value: value, stocks: buckets.get(value).sort(compareStocks) };
         });
         return {
             condition: condition,

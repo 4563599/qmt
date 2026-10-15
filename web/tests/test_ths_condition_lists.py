@@ -75,7 +75,10 @@ const stocks = [
 ];
 const result = core.build([{board_name:'A',stocks}], key);
 assert.deepEqual(result.groups.map(group => group.value), [0, 2, 5]);
-assert.deepEqual(result.stocks.map(stock => stock.code), ['000002','000001','000003','000004','000005']);
+assert.equal(result.groupValue, 0);
+assert.deepEqual(result.stocks.map(stock => stock.code), ['000002']);
+assert.deepEqual(core.build([{board_name:'A',stocks}], key, '2').stocks.map(stock => stock.code),
+    ['000001','000003','000004']);
 """.replace("KEY", json.dumps(key)))
 
 
@@ -85,7 +88,57 @@ const values = [undefined, null, '', ' ', false, true, -1, 1.5, 'NaN', 'Infinity
 const stocks = values.map((value,index) => ({code:String(index).padStart(6,'0'), yin_count_10d:value}));
 const result = core.build([{board_name:'A',stocks}], 'yin_count_10d');
 assert.deepEqual(result.groups.map(group => group.value), [0,3]);
-assert.equal(result.stocks.length,2);
+assert.equal(result.uniqueCount,2);
+assert.equal(result.stocks.length,1);
+""")
+
+
+@pytest.mark.parametrize("key", ["yin_count_10d", "yin_count_20"])
+def test_numeric_sidebar_groups_all_boards_and_lists_stock_board_names(key):
+    run_core("""
+const key = KEY;
+const shared = Object.freeze({code:'000001', [key]:2, ref_gain:3});
+const boards = Object.freeze([
+    Object.freeze({board_name:'B', stocks:Object.freeze([
+        shared, Object.freeze({code:'000003', [key]:2, ref_gain:8}),
+        Object.freeze({code:'000002', [key]:0, ref_gain:1})
+    ])}),
+    Object.freeze({board_name:'A', stocks:Object.freeze([
+        shared, Object.freeze({code:'000004', [key]:2, ref_gain:10}),
+        Object.freeze({code:'000005', [key]:5, ref_gain:4})
+    ])}),
+]);
+const before = JSON.stringify(boards);
+const result = core.build(boards, key, '2');
+assert.deepEqual(result.groups.map(group => [group.value, group.stocks.length]), [[0,1],[2,3],[5,1]]);
+assert.equal(result.groupValue,2);
+assert.equal(result.boardName,'');
+assert.equal(result.uniqueCount,5);
+assert.deepEqual(result.stocks.map(stock => stock.code), ['000003','000001','000004']);
+assert.deepEqual(result.stocks[1].ths_board_names, ['B','A']);
+assert.deepEqual(result.stocks[2].ths_board_names, ['A']);
+assert.equal(JSON.stringify(boards),before);
+assert.equal(Object.hasOwn(shared,'ths_board_names'),false);
+assert.equal(core.build(boards,key,'missing').groupValue,0);
+assert.equal(core.build(boards,key,0).groupValue,0);
+assert.equal(core.build(boards,key,'5').groupValue,5);
+assert.equal(core.build([],key,'2').groupValue,null);
+assert.deepEqual(core.build([],key,'2').stocks,[]);
+""".replace("KEY", json.dumps(key)))
+
+
+def test_numeric_groups_use_current_filtered_payload_and_gain_callback():
+    run_core("""
+const boards = [{board_name:'A',stocks:[
+    {code:'000002',yin_count_10d:3,ref_gain:10,custom_gain:1},
+    {code:'000001',yin_count_10d:3,ref_gain:1,custom_gain:8},
+]}];
+const result=core.build(boards,'yin_count_10d','3',stock=>stock.custom_gain);
+assert.deepEqual(result.stocks.map(stock=>stock.code),['000001','000002']);
+assert.equal(result.groupValue,3);
+const filtered=boards.map(board=>({...board,stocks:board.stocks.filter(stock=>stock.code==='000002')}));
+assert.equal(core.build(filtered,'yin_count_10d','3').uniqueCount,1);
+assert.deepEqual(core.build(filtered,'yin_count_10d','3').stocks.map(stock=>stock.code),['000002']);
 """)
 
 
@@ -137,6 +190,13 @@ def test_template_embeds_lower_list_and_reuses_existing_data_and_kline_handlers(
     assert "'page6-conditions'" in html
     assert 'focusPage6ConditionRows?.contains(state.openKlineAnchor)' in html
     assert 'grid-template-columns: 98px 104px minmax(0, 1fr)' in html
+    assert 'id="focusPage6ConditionSidebarTitle"' in html
+    assert 'id="focusPage6ConditionSidebar"' in html
+    assert 'id="focusPage6ConditionColumns"' in html
+    assert 'data-ths-yin-count=' in html
+    assert "'data-ths-yin-count', 'page6ConditionGroup'" in html
+    assert 'stock.ths_board_names' in html
+    assert 'focus-page6-condition-board' in html
 
 
 def test_unchanged_polling_preserves_controls_and_open_kline_elements():
