@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>阴线都是十字星测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .debug-info {
+            background: #f0f0f0;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .group {
+            margin: 20px 0;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .group-header {
+            background: #F3F4F6;
+            color: #374151;
+            padding: 10px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background: #4CAF50;
+            color: white;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .container {
+                max-width: none;
+                padding: 12px;
+            }
+            .debug-info,
+            .group {
+                padding: 12px;
+            }
+            .group {
+                overflow-x: hidden;
+            }
+            table {
+                min-width: 0;
+                width: 100%;
+                table-layout: fixed;
+            }
+            th, td {
+                font-size: 12px;
+                padding: 6px;
+                white-space: normal !important;
+                word-break: break-all;
+                overflow-wrap: anywhere;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>阴线都是十字星 - 诊断页面</h1>
+        
+        <h2>API响应原始数据：</h2>
+        <div id="rawData" class="debug-info">加载中...</div>
+        
+        <h2>分组统计：</h2>
+        <div id="groupStats" class="debug-info">加载中...</div>
+        
+        <h2>分组显示：</h2>
+        <div id="groupsDisplay"></div>
+    </div>
+
+    <script>
+        async function loadAndTest() {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const url = `/api/doji_star/stocks?date=${today}`;
+                
+                console.log('请求URL:', url);
+                
+                const response = await fetch(url);
+                const result = await response.json();
+                
+                // 显示原始数据
+                document.getElementById('rawData').textContent = JSON.stringify(result, null, 2);
+                
+                if (!result.success || !result.data || result.data.length === 0) {
+                    document.getElementById('groupStats').innerHTML = '<span class="error">无数据</span>';
+                    return;
+                }
+                
+                const stocksData = result.data;
+                
+                // 统计分组
+                const groups = {};
+                stocksData.forEach(stock => {
+                    const groupKey = stock.group || '未分组';
+                    if (!groups[groupKey]) {
+                        groups[groupKey] = [];
+                    }
+                    groups[groupKey].push(stock);
+                });
+                
+                // 显示分组统计
+                let statsHtml = '分组统计：\n';
+                Object.keys(groups).forEach(key => {
+                    statsHtml += `${key}: ${groups[key].length}只\n`;
+                });
+                document.getElementById('groupStats').textContent = statsHtml;
+                
+                // 定义分组顺序（阴线都是十字星的分组）
+                const groupOrder = [
+                    '分组1',
+                    '分组2',
+                    '分组3',
+                    '分组4'
+                ];
+                
+                const groupNames = {
+                    '分组1': '全阳',
+                    '分组2': '十字星并不碰',
+                    '分组3': '阴线向上',
+                    '分组4': '其他'
+                };
+                
+                // 显示分组
+                let groupsHtml = '';
+                let globalIndex = 0;
+                
+                groupOrder.forEach(groupKey => {
+                    if (!groups[groupKey] || groups[groupKey].length === 0) {
+                        return;
+                    }
+                    
+                    const groupData = groups[groupKey];
+                    groupData.sort((a, b) => (b.today_change || 0) - (a.today_change || 0));
+                    
+                    groupsHtml += `
+                        <div class="group">
+                            <div class="group-header">
+                                ${groupKey} - ${groupNames[groupKey] || groupKey} (${groupData.length}只)
+                            </div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>序号</th>
+                                        <th>代码</th>
+                                        <th>名称</th>
+                                        <th>涨跌幅</th>
+                                        <th>策略</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+                    
+                    groupData.forEach(stock => {
+                        globalIndex++;
+                        groupsHtml += `
+                            <tr>
+                                <td>${globalIndex}</td>
+                                <td>${stock.code}</td>
+                                <td>${stock.name}</td>
+                                <td>${(stock.today_change || 0).toFixed(2)}%</td>
+                                <td>${(stock.strategies || []).join(', ')}</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    groupsHtml += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                });
+                
+                document.getElementById('groupsDisplay').innerHTML = groupsHtml;
+                
+            } catch (error) {
+                console.error('测试失败:', error);
+                document.getElementById('rawData').innerHTML = `<span class="error">错误: ${error.message}</span>`;
+            }
+        }
+        
+        // 页面加载时执行
+        loadAndTest();
+    </script>
+</body>
+</html>

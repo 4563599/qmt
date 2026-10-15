@@ -1,0 +1,1651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>连续5不碰</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: #ffffff; min-height: 100vh; padding: 20px; margin: 0;
+        }
+        .container { max-width: 1520px; margin: 0 auto; }
+
+        .nav-buttons { margin-bottom: 10px; display: flex; justify-content: flex-start; align-items: center; gap: 15px; flex-wrap: wrap; }
+        .nav-left { display: flex; gap: 10px; align-items: center; }
+        .nav-right { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; justify-content: flex-start; }
+        .nav-btn {
+            display: inline-block; padding: 5px 9px; color: white; text-decoration: none;
+            border-radius: 8px; transition: all 0.3s; font-size: 13px; font-weight: 500;
+            letter-spacing: 0.1px; white-space: nowrap; flex-shrink: 0;
+        }
+        .nav-btn-home    { background: #667eea; }
+        .nav-btn-home:hover    { background: #5568d3; transform: translateY(-2px); }
+        .nav-btn-5lsys3  { background: #ec4899; }
+        .nav-btn-5lsys3:hover  { background: #db2777; transform: translateY(-2px); }
+        .nav-btn-doji    { background: #f59e0b; }
+        .nav-btn-doji:hover    { background: #d97706; transform: translateY(-2px); }
+        .nav-btn-up      { background: #0ea5e9; }
+        .nav-btn-up:hover      { background: #0284c7; transform: translateY(-2px); }
+        .nav-btn-yx205   { background: #06b6d4; }
+        .nav-btn-yx205:hover   { background: #0891b2; transform: translateY(-2px); }
+        .nav-btn-lszty   { background: #e11d48; }
+        .nav-btn-lszty:hover   { background: #be123c; transform: translateY(-2px); }
+        .nav-btn-sbzt    { background: #f43f5e; }
+        .nav-btn-sbzt:hover    { background: #e11d48; transform: translateY(-2px); }
+        .nav-btn-lx5bp   { background: #f43f5e; }
+        .nav-btn-lx5bp:hover   { background: #e11d48; transform: translateY(-2px); }
+        .nav-btn-ztorgj  { background: #d946ef; }
+        .nav-btn-ztorgj:hover  { background: #c026d3; transform: translateY(-2px); }
+        .nav-btn-ztqq    { background: #7c3aed; }
+        .nav-btn-ztqq:hover    { background: #6d28d9; transform: translateY(-2px); }
+        .nav-btn-5ls     { background: #8b5cf6; }
+        .nav-btn-5ls:hover     { background: #7c3aed; transform: translateY(-2px); }
+        .nav-btn-5lsy2   { background: #ef4444; }
+        .nav-btn-5lsy2:hover   { background: #dc2626; transform: translateY(-2px); }
+        .nav-btn-5las3gj { background: #f97316; }
+        .nav-btn-5las3gj:hover { background: #ea6c0a; transform: translateY(-2px); }
+        .nav-btn-jpgz    { background: #f59e0b; }
+        .nav-btn-jpgz:hover    { background: #d97706; transform: translateY(-2px); }
+        .nav-btn-yhy     { background: #e11d48; }
+        .nav-btn-yhy:hover     { background: #be123c; transform: translateY(-2px); }
+
+        .date-selector { display: flex; align-items: center; gap: 6px; background: white; padding: 4px 8px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .date-nav-btn { background: #f43f5e; color: white; border: none; padding: 5px 8px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.3s; font-weight: 500; min-width: 28px; display: flex; align-items: center; justify-content: center; }
+        .date-nav-btn:hover { background: #e11d48; transform: scale(1.05); }
+        .date-nav-btn:disabled { background: #ccc; cursor: not-allowed; transform: scale(1); }
+        #datePicker { background: linear-gradient(135deg, #f43f5e, #e11d48); color: white; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; text-align: center; width: auto; min-width: 95px; max-width: 105px; }
+        .flatpickr-calendar { box-shadow: 0 20px 60px rgba(0,0,0,0.3) !important; border-radius: 12px !important; border: none !important; z-index: 99999 !important; }
+        .flatpickr-day.selected { background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%) !important; border-color: #f43f5e !important; }
+        .flatpickr-months .flatpickr-month { background: #f43f5e !important; color: white !important; }
+        .flatpickr-current-month .flatpickr-monthDropdown-months { background: #f43f5e !important; color: white !important; }
+        .flatpickr-weekdays { background: #f2f2f7 !important; }
+        span.flatpickr-weekday { color: #8e8e93 !important; font-weight: 600 !important; }
+
+        .page-title { background: white; border-radius: 10px; padding: 12px 16px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .page-title h1 { font-size: 22px; font-weight: 700; color: #1d1d1f; margin: 0; }
+        .page-title .badge { color: white; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+        .page-title .desc { color: #6b7280; font-size: 13px; }
+        .page-title .count-badge { background: #fff1f2; color: #be123c; font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 20px; border: 1px solid #fecdd3; }
+        .page-title .scan-info-text { color: #2563eb; font-size: 13px; font-weight: 700; }
+
+        .focus-alert-panels {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .focus-alert-panel {
+            background: linear-gradient(135deg, #fff7ed 0%, #fff1f2 100%);
+            border: 1px solid #fed7aa;
+            border-radius: 10px;
+            box-shadow: 0 4px 14px rgba(225,29,72,0.10);
+            padding: 10px 12px;
+        }
+        .focus-alert-panel.secondary {
+            background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
+            border-color: #bfdbfe;
+            box-shadow: 0 4px 14px rgba(37,99,235,0.10);
+        }
+        .focus-alert-panel.secondary .focus-alert-title { color: #1d4ed8; }
+        .focus-alert-panel.secondary .focus-alert-sub { color: #0369a1; }
+        .focus-alert-panel.secondary .focus-alert-count { color: #1d4ed8; border-color: #bfdbfe; }
+        .focus-alert-panel.secondary .focus-alert-card { border-color: #bfdbfe; }
+        .focus-alert-panel.secondary .focus-alert-meta { color: #075985; }
+        .focus-alert-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .focus-alert-title { color: #9f1239; font-size: 15px; font-weight: 800; }
+        .focus-alert-sub { color: #9a3412; font-size: 12px; margin-top: 2px; }
+        .focus-alert-count {
+            color: #be123c;
+            background: rgba(255,255,255,0.78);
+            border: 1px solid #fecdd3;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 800;
+            padding: 3px 10px;
+            white-space: nowrap;
+        }
+        .focus-alert-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+            gap: 8px;
+        }
+        .focus-alert-card {
+            background: rgba(255,255,255,0.86);
+            border: 1px solid #fecdd3;
+            border-radius: 8px;
+            padding: 8px 10px;
+            cursor: pointer;
+            transition: background 0.15s ease, transform 0.15s ease;
+        }
+        .focus-alert-card:hover {
+            background: #fff;
+            transform: translateY(-1px);
+        }
+        .focus-alert-card-top {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .focus-alert-name { color: #111827; font-size: 13px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .focus-alert-code { color: #6b7280; font-size: 11px; font-weight: 700; }
+        .focus-alert-meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            color: #7f1d1d;
+            font-size: 11px;
+            font-weight: 700;
+            margin-top: 5px;
+        }
+        .focus-alert-empty { color: #9a3412; font-size: 12px; padding: 4px 0 1px; }
+        .focus-alert-badge {
+            display: inline-block;
+            margin-left: 4px;
+            padding: 1px 5px;
+            border-radius: 999px;
+            background: #fb7185;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 800;
+            vertical-align: middle;
+        }
+        .stock-row-focus-alert { background: #fff7ed; }
+        .stock-row-focus-alert:hover { background: #ffedd5; }
+
+        .columns-grid {
+            display: grid;
+            grid-template-columns: 220px 320px 320px 320px 250px;
+            justify-content: start;
+            align-items: start;
+            gap: 12px;
+            min-width: 0;
+        }
+        .metric-column {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            border: 1px solid #e0e0e0;
+            width: 220px;
+            min-width: 220px;
+        }
+        .tips-card {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            border: 1px solid #e0e0e0;
+            width: 250px;
+            min-width: 250px;
+        }
+        .info-panel {
+            width: 250px;
+            min-width: 250px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .shadow-column {
+            width: 320px;
+            min-width: 320px;
+        }
+        .task-side-panel {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 14px rgba(124,58,237,0.12);
+            border: 1px solid #ddd6fe;
+            width: 240px;
+            min-width: 240px;
+        }
+        .task-panel-header {
+            padding: 10px 12px;
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            color: white;
+        }
+        .task-panel-title { font-size: 13px; font-weight: 700; text-align: center; }
+        .task-panel-sub { margin-top: 4px; font-size: 11px; opacity: 0.92; text-align: center; line-height: 1.5; }
+        .task-panel-count {
+            margin: 8px auto 0;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            min-width: 74px;
+            padding: 3px 10px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.16);
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .task-panel-header-wrap { display: flex; flex-direction: column; align-items: center; }
+        .task-panel-body { background: #faf5ff; }
+        .task-group-block { border-top: 1px solid #ede9fe; background: white; }
+        .task-group-block:first-child { border-top: none; }
+        .task-group-header {
+            padding: 8px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            background: #f5f3ff;
+        }
+        .task-group-title { font-size: 13px; font-weight: 700; color: #5b21b6; }
+        .task-group-count {
+            font-size: 10px;
+            font-weight: 700;
+            color: #6d28d9;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: #ede9fe;
+        }
+        .task-row-header {
+            display: grid;
+            grid-template-columns: 1.8fr 1fr 0.9fr 0.9fr;
+            gap: 6px;
+            padding: 4px 8px;
+            border-top: 1px solid #ede9fe;
+            border-bottom: 1px solid #ede9fe;
+            background: #faf5ff;
+        }
+        .task-row-header span {
+            font-size: 10px;
+            font-weight: 600;
+            color: #6b7280;
+            text-align: center;
+        }
+        .task-row {
+            display: grid;
+            grid-template-columns: 1.8fr 1fr 0.9fr 0.9fr;
+            gap: 6px;
+            align-items: center;
+            padding: 7px 8px;
+            border-bottom: 1px solid #f3f4f6;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+        .task-row:hover { background: #faf5ff; }
+        .task-row:last-child { border-bottom: none; }
+        .task-stock-name {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1px;
+        }
+        .task-stock-name .s-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: #111827;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+        .task-stock-name .s-code { font-size: 10px; font-weight: 600; color: #4b5563; }
+        .task-cell { font-size: 12px; font-weight: 700; text-align: center; }
+        .task-empty-alert {
+            padding: 14px 10px;
+            text-align: center;
+            color: #dc2626;
+            font-size: 13px;
+            font-weight: 800;
+        }
+        .task-context-menu {
+            position: fixed;
+            display: none;
+            min-width: 162px;
+            background: #fff;
+            border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 14px;
+            box-shadow: 0 18px 36px rgba(0,0,0,0.16);
+            z-index: 10030;
+            overflow: hidden;
+            backdrop-filter: blur(12px);
+        }
+        .task-context-btn {
+            width: 100%;
+            border: 0;
+            background: #fff;
+            padding: 11px 14px;
+            text-align: left;
+            font-size: 14px;
+            font-weight: 600;
+            color: #111827;
+            cursor: pointer;
+        }
+        .task-context-btn + .task-context-btn { border-top: 1px solid #f3f4f6; }
+        .task-context-btn:hover { background: #f9fafb; }
+        .task-context-btn-danger { color: #dc2626; }
+        .task-ios-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+            z-index: 10040;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .task-ios-modal {
+            width: min(320px, calc(100vw - 32px));
+            background: #fff;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 12px 42px rgba(0,0,0,0.24);
+        }
+        .task-ios-title {
+            padding: 18px 18px 6px;
+            text-align: center;
+            font-size: 17px;
+            font-weight: 700;
+            color: #111827;
+        }
+        .task-ios-body {
+            padding: 4px 18px 16px;
+            text-align: center;
+            font-size: 14px;
+            color: #111827;
+            line-height: 1.65;
+        }
+        .task-ios-body .task-kline-tip { margin-bottom: 8px; text-align: center; }
+        .task-ios-body .task-kline-list { margin: 0 auto; width: fit-content; text-align: left; color: #7c3aed; font-weight: 700; }
+        .task-ios-body .task-warn-text { color: #dc2626; font-weight: 800; font-size: 18px; }
+        .task-ios-body .task-gain-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 6px; }
+        .task-ios-body .task-gain-option { border: 0; border-radius: 14px; min-height: 108px; aspect-ratio: 1 / 1; padding: 10px 12px; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.45; white-space: normal; }
+        .task-ios-body .task-gain-option-green { background: #ecfdf5; color: #15803d; }
+        .task-ios-body .task-gain-option-red { background: #fef2f2; color: #dc2626; }
+        .task-ios-actions { display: flex; min-height: 46px; border-top: 0.5px solid #d1d5db; }
+        .task-ios-btn {
+            flex: 1;
+            border: 0;
+            background: #fff;
+            font-size: 17px;
+            font-weight: 600;
+            color: #007aff;
+            cursor: pointer;
+        }
+        .task-ios-btn + .task-ios-btn { border-left: 0.5px solid #d1d5db; }
+        .task-ios-btn-cancel { color: #6b7280; }
+        .tips-header {
+            padding: 9px 10px;
+            font-size: 13px;
+            font-weight: 700;
+            color: white;
+            background: linear-gradient(135deg, #fda4af, #fb7185);
+        }
+        .tips-body {
+            padding: 12px 14px;
+            color: #374151;
+            font-size: 13px;
+            line-height: 1.7;
+        }
+        .tips-list {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .tips-list li {
+            color: #7c3aed;
+            font-size: 15px;
+            font-weight: 700;
+        }
+        .tips-highlight-red {
+            color: #e11d48;
+            font-weight: 800;
+        }
+        .tips-list li + li {
+            margin-top: 6px;
+        }
+        .image-card {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            border: 1px solid #e0e0e0;
+        }
+        .image-card-header {
+            padding: 9px 10px;
+            font-size: 13px;
+            font-weight: 700;
+            color: white;
+            background: linear-gradient(135deg, #fda4af, #fb7185);
+            text-align: center;
+        }
+        .image-card-body {
+            padding: 8px;
+            background: #ffffff;
+        }
+        .image-card-body img {
+            display: block;
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+            border: 1px solid #f3f4f6;
+            background: #111111;
+        }
+        .col-header {
+            padding: 9px 8px;
+            font-size: 13px;
+            font-weight: 700;
+            color: white;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        .col-header.bare-foot { background: linear-gradient(135deg, #fda4af, #fb7185); }
+        .col-header.shadow-red { background: linear-gradient(135deg, #e11d48, #be123c); }
+        .col-header-sub { font-size: 11px; font-weight: 400; opacity: 0.85; margin-top: 2px; }
+
+        .group-label {
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            color: white;
+            text-align: center;
+        }
+        .group-label.bare-foot { background: rgba(251, 113, 133, 0.88); }
+
+        .stock-row-header {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 0.8fr;
+            padding: 3px 6px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+        }
+        .stock-row-header span { font-size: 10px; font-weight: 600; color: #86868b; text-align: center; }
+
+        .stock-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 0.8fr;
+            align-items: center;
+            padding: 6px 6px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .stock-row:hover { background: #f8f9fa; }
+        .stock-row:last-child { border-bottom: none; }
+        .stock-row-header.shadow-table,
+        .stock-row.shadow-table {
+            grid-template-columns: 1.7fr 0.9fr 1.8fr 0.9fr;
+        }
+        .stock-row-header.strong-table,
+        .stock-row.strong-table {
+            grid-template-columns: 1.55fr 0.8fr 0.8fr 0.95fr 0.8fr;
+        }
+        .stock-row-header.shadow-table span {
+            white-space: nowrap;
+        }
+        .stock-name { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+        .s-name { font-size: 13px; font-weight: 500; color: #1d1d1f; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+        .s-code { font-size: 10px; color: #86868b; margin-top: 1px; }
+        .s-gain { font-size: 13px; font-weight: 700; text-align: center; }
+        .s-metric { font-size: 12px; font-weight: 700; text-align: center; color: #374151; }
+        .positive { color: #e74c3c; }
+        .negative { color: #27ae60; }
+        .neutral  { color: #95a5a6; }
+        .good     { color: #f43f5e; }
+        .extra    { color: #f97316; font-weight: 700; }
+
+        .no-data { padding: 12px 8px; font-size: 12px; color: #bbb; text-align: center; }
+        .loading-msg { text-align: center; padding: 40px; color: #666; font-size: 14px; }
+
+        .stock-tooltip { position: fixed; display: none; background: #fff; border: 1px solid #e1e1e1; border-radius: 8px; padding: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 10000; pointer-events: none; }
+        .stock-tooltip img { display: block; width: 680px; height: 380px; background: #f5f5f7; }
+        .stock-tooltip .tooltip-header { font-size: 12px; color: #666; margin-bottom: 5px; text-align: center; }
+
+        @media (max-width: 1200px) {
+            .nav-left, .nav-right { width: 100%; justify-content: center; }
+            .nav-buttons { flex-wrap: wrap; }
+        }
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .focus-alert-panels { grid-template-columns: 1fr; }
+            .nav-btn { flex: 1 1 calc(50% - 4px); min-width: 0; padding: 8px 6px; font-size: 12px; white-space: normal; word-break: keep-all; line-height: 1.3; text-align: center; }
+            .columns-grid { grid-template-columns: 1fr; }
+            .metric-column, .tips-card, .shadow-column, .info-panel, .task-side-panel { width: 100%; min-width: 0; }
+            .stock-row-header.shadow-table,
+            .stock-row.shadow-table { grid-template-columns: 1.6fr 0.9fr 1.7fr 0.8fr; }
+            .stock-row-header.strong-table,
+            .stock-row.strong-table { grid-template-columns: 1.5fr 0.8fr 0.8fr 1fr 0.8fr; }
+            .stock-tooltip img { width: 100%; max-width: 600px; height: auto; }
+        }
+            /* mobile no-scroll baseline */
+        @media (max-width: 768px) {
+            body {
+                overflow-x: hidden;
+            }
+            .container,
+            .content,
+            .table-container,
+            .group-table-container,
+            .table-wrap {
+                max-width: 100%;
+                overflow-x: hidden !important;
+            }
+            table,
+            .stock-table {
+                width: 100%;
+                table-layout: fixed;
+            }
+            th,
+            td,
+            .stock-table th,
+            .stock-table td,
+            .stock-name,
+            .s-name,
+            .strategy-tag,
+            .nav-btn,
+            .group-title,
+            .group-name {
+                white-space: normal !important;
+                word-break: break-all;
+                overflow-wrap: anywhere;
+            }
+            #datePicker,
+            .date-display {
+                min-width: 0 !important;
+                width: 100%;
+                max-width: 100%;
+            }
+        }
+        @media (max-width: 768px) {
+            body { padding: 10px; overflow-x: hidden; }
+            .nav-buttons { gap: 10px; }
+            .date-selector { width: 100%; justify-content: center; flex-wrap: wrap; }
+            .page-title { padding: 10px 12px; gap: 6px; }
+            .page-title h1 { font-size: 18px; }
+            .page-title .desc,
+            .page-title .count-badge,
+            .page-title .badge,
+            .scan-info-text { font-size: 11px; }
+        }
+</style>
+</head>
+<body>
+
+<div class="stock-tooltip" id="klineTooltip">
+    <div class="tooltip-header" id="klineTtHeader"></div>
+    <img id="klineImage" src="" alt="K线图">
+</div>
+
+<div class="container">
+
+    <div class="nav-buttons">
+        <div class="nav-left">
+            <div class="date-selector">
+                <button class="date-nav-btn" id="prevDateBtn" onclick="prevDate()">◀</button>
+                <input type="text" id="datePicker" placeholder="选择日期" readonly>
+                <button class="date-nav-btn" id="nextDateBtn" onclick="nextDate()">▶</button>
+            </div>
+        </div>
+        <div class="nav-right">
+            <a href="/" class="nav-btn nav-btn-home">首页</a>
+                <a href="/涨停前横盘" class="nav-btn" style="background:#2563eb;">涨停前横盘</a>
+            <a href="/阴后强" class="nav-btn nav-btn-yhy">阴后强</a>
+            <a href="/5拉升" class="nav-btn" style="background:#2563eb;">5拉升</a>
+            <a href="/20阴少跌少横盘" class="nav-btn nav-btn-yx205">20阴少跌少横盘</a>
+            <a href="/阴线跌破5日次数" class="nav-btn" style="background:#ca8a04;">阴线跌破5日次数</a>
+            <a href="/10天大5日线" class="nav-btn" style="background:#0f766e;">10天大5日线</a>
+            <a href="/涨停或光脚" class="nav-btn nav-btn-ztorgj">涨停或光脚</a>
+            <a href="/连续5不碰" class="nav-btn nav-btn-lx5bp" style="font-weight:700;">连续5不碰</a>
+            <a href="/连续涨停" class="nav-btn nav-btn-lszty">连续涨停</a>
+                <a href="/连续4天拉升" class="nav-btn nav-btn-intraday4up" style="background:#f97316;">连续4天拉升</a>
+            <a href="/极品关注" class="nav-btn" style="background:#f59e0b;">极品关注</a>
+            <a href="/同花顺板块" class="nav-btn" style="background:#2563eb;">同花顺板块</a>
+        </div>
+    </div>
+
+    <div class="page-title">
+        <h1>连续5不碰</h1>
+        <span class="badge" style="background: linear-gradient(135deg, #fda4af, #fb7185);">MA5分组</span>
+        <span class="desc">Redis: lx5bp · 第一列按最近3天最高涨幅≥6.5%次数分组展示</span>
+        <span class="count-badge" id="totalCount">加载中...</span>
+        <span class="scan-info-text" id="scanInfoText">扫描耗时--s，扫描完成时间:--，Redis更新:--</span>
+    </div>
+
+    <div id="mainContent">
+        <div class="loading-msg">正在加载数据...</div>
+    </div>
+
+</div>
+
+<div id="taskContextMenu" class="task-context-menu">
+    <button type="button" class="task-context-btn" data-task-type="yizi">添加一字特征</button>
+    <button type="button" class="task-context-btn" data-task-type="changzi">添加厂子特征</button>
+    <button type="button" class="task-context-btn" data-task-type="hengpan">添加横盘调整特征</button>
+    <button type="button" class="task-context-btn task-context-btn-danger" data-task-type="delete" style="display:none;">删除股票</button>
+</div>
+
+<div id="taskIosOverlay" class="task-ios-overlay">
+    <div class="task-ios-modal">
+        <div class="task-ios-title" id="taskIosTitle"></div>
+        <div class="task-ios-body" id="taskIosBody"></div>
+        <div class="task-ios-actions" id="taskIosActions"></div>
+    </div>
+</div>
+
+<script>
+let _stocks = [];
+let _currentDate = null;
+let _availableDates = [];
+let _currentDateIndex = 0;
+let _flatpickrInstance = null;
+let _lastTimestamp = null;
+let _checkTimer = null;
+let _scanInfo = null;
+let _manualTasks = [];
+let _taskContextStock = null;
+let _taskContextMode = 'add';
+const YHY_TASK_API_BASE = '/api/yhy/tasks';
+const YHY_TASK_REDIS_PREFIX = 'myStock:task';
+const TASK_GROUP_META = [
+    { key: 'yizi', title: '一字特征', emptyText: '未添加,请完成今日任务!' },
+    { key: 'changzi', title: '厂子特征', emptyText: '未添加,请完成今日任务!' },
+    { key: 'hengpan', title: '横盘调整特征', emptyText: '暂无数据' }
+];
+
+const tooltip = document.getElementById('klineTooltip');
+const klineImg = document.getElementById('klineImage');
+function getPrefix(code) { return code.startsWith('6') ? '1' : '0'; }
+function showKline(e, code, name) {
+    klineImg.src = `https://webquoteklinepic.eastmoney.com/GetPic.aspx?nid=${getPrefix(code)}.${code}&imageType=KXL&token=44c9d251add88e27b65ed86506f6e5da&at=1`;
+    document.getElementById('klineTtHeader').innerText = `${name} (${code}) - 日K线`;
+    moveTooltip(e);
+    tooltip.style.display = 'block';
+}
+function hideKline() { tooltip.style.display = 'none'; klineImg.src = ''; }
+function moveTooltip(e) {
+    const w = window.innerWidth <= 768 ? Math.min(400, window.innerWidth * 0.95) : 565;
+    const h = window.innerWidth <= 768 ? 250 : 330;
+    let left = e.clientX + 15, top = e.clientY + 15;
+    if (left + w > window.innerWidth) left = e.clientX - w - 15;
+    if (top + h > window.innerHeight) top = e.clientY - h - 15;
+    if (left < 0) left = 10;
+    if (top < 0) top = 10;
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+}
+
+async function loadDates() {
+    try {
+        const resp = await fetch('/api/lx5bp/dates');
+        const result = await resp.json();
+        if (result.success && result.dates && result.dates.length > 0) {
+            _availableDates = result.dates;
+            _currentDate = _availableDates[0];
+            _currentDateIndex = 0;
+        }
+    } catch(e) {}
+    initFlatpickr();
+    await loadStocks();
+    startCheckTimer();
+}
+
+function initFlatpickr() {
+    _flatpickrInstance = flatpickr('#datePicker', {
+        enable: _availableDates,
+        dateFormat: 'Y-m-d',
+        defaultDate: _currentDate,
+        appendTo: document.body,
+        locale: {
+            weekdays: { shorthand: ['日','一','二','三','四','五','六'], longhand: ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'] },
+            months: { shorthand: ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'], longhand: ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'] }
+        },
+        onChange: function(selectedDates, dateStr) {
+            if (dateStr && dateStr !== _currentDate) {
+                _currentDate = dateStr;
+                _currentDateIndex = _availableDates.indexOf(dateStr);
+                loadStocks();
+            }
+        }
+    });
+}
+
+function prevDate() {
+    if (_currentDateIndex < _availableDates.length - 1) {
+        _currentDateIndex++;
+        _currentDate = _availableDates[_currentDateIndex];
+        if (_flatpickrInstance) _flatpickrInstance.setDate(_currentDate, false);
+        loadStocks();
+    }
+}
+
+function nextDate() {
+    if (_currentDateIndex > 0) {
+        _currentDateIndex--;
+        _currentDate = _availableDates[_currentDateIndex];
+        if (_flatpickrInstance) _flatpickrInstance.setDate(_currentDate, false);
+        loadStocks();
+    }
+}
+
+async function loadStocks() {
+    document.getElementById('mainContent').innerHTML = '<div class="loading-msg">正在加载数据...</div>';
+    document.getElementById('totalCount').textContent = '加载中...';
+    try {
+        updateScanInfoDisplay(null);
+        const url = _currentDate ? `/api/lx5bp/stocks?date=${_currentDate}` : '/api/lx5bp/stocks';
+        const resp = await fetch(url);
+        const result = await resp.json();
+        if (result.success) {
+            _stocks = result.data || [];
+            _scanInfo = result.scan_info || null;
+            document.getElementById('totalCount').textContent = `共 ${_stocks.length} 只`;
+            updateScanInfoDisplay(_scanInfo);
+            await loadTaskStocks(_currentDate);
+            renderColumns(_stocks);
+        } else {
+            document.getElementById('mainContent').innerHTML = '<div class="loading-msg">加载失败</div>';
+            document.getElementById('totalCount').textContent = '加载失败';
+            _scanInfo = null;
+            updateScanInfoDisplay(null);
+        }
+    } catch(e) {
+        document.getElementById('mainContent').innerHTML = '<div class="loading-msg">加载失败: ' + e.message + '</div>';
+        document.getElementById('totalCount').textContent = '加载失败';
+        _scanInfo = null;
+        updateScanInfoDisplay(null);
+    }
+}
+
+function formatScanDuration(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return '--';
+    if (Math.abs(n - Math.round(n)) < 0.001) return String(Math.round(n));
+    return n.toFixed(3).replace(/\.?0+$/, '');
+}
+
+function formatScanEndTime(value) {
+    if (!value) return '--';
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
+    if (!match) return String(value);
+    return `${Number(match[2])}月${Number(match[3])}日${Number(match[4])}点${Number(match[5])}分${Number(match[6])}秒`;
+}
+
+function formatRedisUpdateStatus(value) {
+    const status = String(value || '').toLowerCase();
+    if (status === 'success' || status === 'ok') return '成功';
+    if (status === 'pending') return '写入中';
+    if (status === 'skipped_empty') return '跳过空结果';
+    if (status === 'redis_update_failed' || status === 'failed' || status === 'error') return '失败';
+    return status || '--';
+}
+
+function updateScanInfoDisplay(info) {
+    const el = document.getElementById('scanInfoText');
+    if (!el) return;
+    const durationText = formatScanDuration(info && info.last_scan_duration_sec);
+    const scanEndText = formatScanEndTime(info && info.last_scan_end_time);
+    const redisStatusText = formatRedisUpdateStatus(info && info.redis_update_status);
+    const redisTimeText = formatScanEndTime(info && info.redis_update_time);
+    const redisError = info && info.redis_update_error ? `，原因:${info.redis_update_error}` : '';
+    el.textContent = `扫描耗时${durationText}s，扫描完成时间:${scanEndText}，Redis更新:${redisStatusText} ${redisTimeText}${redisError}`;
+}
+
+function getTaskSourcePageName() {
+    return '连续5不碰';
+}
+
+function getVisibleTaskStocksForCurrentPage() {
+    const sourceName = getTaskSourcePageName();
+    return (_manualTasks || []).filter(function(item) {
+        const sourcePages = Array.isArray(item.source_pages) ? item.source_pages : [];
+        return sourcePages.includes(sourceName);
+    });
+}
+
+function sortTaskStocks(stocks) {
+    return (stocks || []).slice().sort(function(a, b) {
+        return Number(b.today_change || b.ref_gain || 0) - Number(a.today_change || a.ref_gain || 0);
+    });
+}
+
+function renderTaskPanelContent() {
+    const host = document.getElementById('taskPanelBody');
+    const countNode = document.getElementById('taskPanelCount');
+    if (!host || !countNode) return;
+    host.innerHTML = '';
+    const visibleTasks = getVisibleTaskStocksForCurrentPage();
+    countNode.textContent = `${visibleTasks.length} 只`;
+
+    TASK_GROUP_META.forEach(function(groupMeta) {
+        const block = document.createElement('div');
+        block.className = 'task-group-block';
+        const groupStocks = sortTaskStocks(visibleTasks.filter(function(item) {
+            return item.task_type === groupMeta.key;
+        }));
+
+        block.innerHTML = `
+            <div class="task-group-header">
+                <div class="task-group-title">${groupMeta.title}</div>
+                <span class="task-group-count">${groupStocks.length} 只</span>
+            </div>
+        `;
+
+        if (!groupStocks.length) {
+            const empty = document.createElement('div');
+            empty.className = groupMeta.key === 'hengpan' ? 'no-data' : 'task-empty-alert';
+            empty.textContent = groupMeta.emptyText;
+            block.appendChild(empty);
+        } else {
+            const header = document.createElement('div');
+            header.className = 'task-row-header';
+            header.innerHTML = '<span>名称</span><span>涨幅</span><span>当前</span><span>10日</span>';
+            block.appendChild(header);
+            groupStocks.forEach(function(stock) {
+                block.appendChild(buildTaskRow(stock));
+            });
+        }
+        host.appendChild(block);
+    });
+}
+
+function buildTaskRow(stock) {
+    const row = document.createElement('div');
+    row.className = 'task-row';
+    row.addEventListener('mouseenter', function(e) {
+        showKline(e, stock.code, stock.name);
+    });
+    row.addEventListener('mouseleave', hideKline);
+    row.addEventListener('mousemove', moveTooltip);
+    row.addEventListener('contextmenu', function(e) {
+        showTaskDeleteMenu(e, stock);
+    });
+    const gain = Number(stock.today_change || stock.ref_gain || 0);
+    const gainClass = gain > 0 ? 'positive' : gain < 0 ? 'negative' : 'neutral';
+    row.innerHTML = `
+        <div class="task-stock-name">
+            <div class="s-name">${stock.name}</div>
+            <div class="s-code">${stock.code}</div>
+        </div>
+        <div class="task-cell ${gainClass}">${gain > 0 ? '+' : ''}${gain.toFixed(2)}%</div>
+        <div class="task-cell">${Number(stock.current_streak || 0)}天</div>
+        <div class="task-cell">${Number(stock.max_streak_10d || 0)}天</div>
+    `;
+    return row;
+}
+
+async function loadTaskStocks(date) {
+    const targetDate = date || _currentDate;
+    if (!targetDate) return;
+    try {
+        const resp = await fetch(`${YHY_TASK_API_BASE}?date=${targetDate}`);
+        const result = await resp.json();
+        if (result.success) {
+            _manualTasks = result.data || [];
+            renderTaskPanelContent();
+        }
+    } catch (e) {
+        console.error('[lx5bp][loadTaskStocks] 请求失败:', e);
+    }
+}
+
+async function persistTaskStock(stock, taskType, gainConfirmLevel) {
+    const resp = await fetch('/api/yhy/tasks/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            date: _currentDate,
+            task_type: taskType,
+            code: stock.code,
+            name: stock.name,
+            stock_code_with_market: stock.stock_code_with_market || '',
+            ref_gain: stock.ref_gain || 0,
+            today_change: stock.ref_gain || 0,
+            market_cap: 0,
+            yin_count: 0,
+            high_gain_count: stock.yang_high_gain_count || 0,
+            gains_10: stock.max_streak_10d || 0,
+            max_drawdown_10d: stock.current_streak || 0,
+            gain_confirm_level: gainConfirmLevel || '',
+            source_page: 'lx5bp'
+        })
+    });
+    const result = await resp.json();
+    if (!result.success) {
+        throw new Error(result.error || '添加失败');
+    }
+    await loadTaskStocks(_currentDate);
+}
+
+async function removeTaskStock(stock) {
+    const resp = await fetch('/api/yhy/tasks/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            date: _currentDate,
+            code: stock.code
+        })
+    });
+    const result = await resp.json();
+    if (!result.success) {
+        throw new Error(result.error || '删除失败');
+    }
+    await loadTaskStocks(_currentDate);
+}
+
+function showTaskContextMenu(event, stock) {
+    event.preventDefault();
+    hideKline();
+    _taskContextStock = stock;
+    _taskContextMode = 'add';
+    const menu = document.getElementById('taskContextMenu');
+    if (!menu) return;
+    menu.querySelectorAll('[data-task-type="yizi"], [data-task-type="changzi"], [data-task-type="hengpan"]').forEach(function(btn) {
+        btn.style.display = '';
+    });
+    const deleteBtn = menu.querySelector('[data-task-type="delete"]');
+    if (deleteBtn) deleteBtn.style.display = 'none';
+    menu.style.display = 'block';
+    const maxLeft = Math.max(8, window.innerWidth - menu.offsetWidth - 8);
+    const maxTop = Math.max(8, window.innerHeight - menu.offsetHeight - 8);
+    menu.style.left = `${Math.min(event.clientX, maxLeft)}px`;
+    menu.style.top = `${Math.min(event.clientY, maxTop)}px`;
+}
+
+function showTaskDeleteMenu(event, stock) {
+    event.preventDefault();
+    hideKline();
+    _taskContextStock = stock;
+    _taskContextMode = 'delete';
+    const menu = document.getElementById('taskContextMenu');
+    if (!menu) return;
+    menu.querySelectorAll('[data-task-type="yizi"], [data-task-type="changzi"], [data-task-type="hengpan"]').forEach(function(btn) {
+        btn.style.display = 'none';
+    });
+    const deleteBtn = menu.querySelector('[data-task-type="delete"]');
+    if (deleteBtn) deleteBtn.style.display = '';
+    menu.style.display = 'block';
+    const maxLeft = Math.max(8, window.innerWidth - menu.offsetWidth - 8);
+    const maxTop = Math.max(8, window.innerHeight - menu.offsetHeight - 8);
+    menu.style.left = `${Math.min(event.clientX, maxLeft)}px`;
+    menu.style.top = `${Math.min(event.clientY, maxTop)}px`;
+}
+
+function hideTaskContextMenu() {
+    const menu = document.getElementById('taskContextMenu');
+    if (menu) menu.style.display = 'none';
+}
+
+function showTaskIosDialog(config) {
+    const overlay = document.getElementById('taskIosOverlay');
+    const titleEl = document.getElementById('taskIosTitle');
+    const bodyEl = document.getElementById('taskIosBody');
+    const actionsEl = document.getElementById('taskIosActions');
+    titleEl.textContent = config.title || '';
+    bodyEl.innerHTML = config.bodyHtml || '';
+    actionsEl.innerHTML = (config.actions || []).map(function(action) {
+        return `<button type="button" class="task-ios-btn ${action.className || ''}" data-modal-value="${action.value}">${action.label}</button>`;
+    }).join('');
+    overlay.style.display = 'flex';
+    return new Promise(function(resolve) {
+        const done = function(value) {
+            overlay.style.display = 'none';
+            bodyEl.innerHTML = '';
+            actionsEl.innerHTML = '';
+            resolve(value);
+        };
+        const clickHandler = function(e) {
+            const button = e.target.closest('[data-modal-value]');
+            if (!button) return;
+            done(button.getAttribute('data-modal-value'));
+        };
+        actionsEl.onclick = clickHandler;
+        bodyEl.onclick = clickHandler;
+        overlay.onclick = function(e) {
+            if (e.target === overlay) done('cancel');
+        };
+    });
+}
+
+async function showTaskKlineConfirmDialog() {
+    return showTaskIosDialog({
+        title: '10天K线特征确认',
+        bodyHtml: `
+            <div class="task-kline-tip">上下阴线不要太多</div>
+            <div class="task-kline-list">
+                <div>1.有上引线无下引线</div>
+                <div>2.有下引线无上引线</div>
+                <div>3.十字星</div>
+            </div>
+        `,
+        actions: [
+            { label: '取消', value: 'cancel', className: 'task-ios-btn-cancel' },
+            { label: '确认', value: 'confirm' }
+        ]
+    });
+}
+
+async function showTaskGainConfirmDialog() {
+    return showTaskIosDialog({
+        title: '10天涨幅确认',
+        bodyHtml: `
+            <div class="task-gain-options">
+                <button type="button" class="task-gain-option task-gain-option-green" data-modal-value="lt35">绿色小于35%</button>
+                <button type="button" class="task-gain-option task-gain-option-red" data-modal-value="gte35">红色大于35%</button>
+            </div>
+        `,
+        actions: [
+            { label: '取消', value: 'cancel', className: 'task-ios-btn-cancel' }
+        ]
+    });
+}
+
+async function showTaskWarnDialog() {
+    return showTaskIosDialog({
+        title: '警告',
+        bodyHtml: '<div class="task-warn-text">涨幅过大</div>',
+        actions: [
+            { label: '取消添加', value: 'cancel', className: 'task-ios-btn-cancel' },
+            { label: '确认添加', value: 'confirm_add' }
+        ]
+    });
+}
+
+async function showTaskDeleteConfirmDialog() {
+    return showTaskIosDialog({
+        title: '删除股票',
+        bodyHtml: '<div>确认删除该股票吗？</div>',
+        actions: [
+            { label: '取消', value: 'cancel', className: 'task-ios-btn-cancel' },
+            { label: '确认', value: 'confirm_delete' }
+        ]
+    });
+}
+
+async function showTaskErrorDialog(message) {
+    return showTaskIosDialog({
+        title: '提示',
+        bodyHtml: `<div>${message}</div>`,
+        actions: [
+            { label: '确定', value: 'ok' }
+        ]
+    });
+}
+
+async function handleTaskMenuAction(taskType) {
+    const stock = _taskContextStock;
+    hideTaskContextMenu();
+    if (!stock) return;
+    try {
+        if (taskType === 'delete') {
+            const confirmed = await showTaskDeleteConfirmDialog();
+            if (confirmed === 'confirm_delete') {
+                await removeTaskStock(stock);
+            }
+            return;
+        }
+        if (taskType === 'hengpan') {
+            await persistTaskStock(stock, 'hengpan', '');
+            return;
+        }
+        const klineConfirm = await showTaskKlineConfirmDialog();
+        if (klineConfirm !== 'confirm') return;
+        const gainConfirm = await showTaskGainConfirmDialog();
+        if (gainConfirm === 'lt35') {
+            await persistTaskStock(stock, taskType, 'lt35');
+            return;
+        }
+        if (gainConfirm !== 'gte35') return;
+        const warnConfirm = await showTaskWarnDialog();
+        if (warnConfirm === 'confirm_add') {
+            await persistTaskStock(stock, taskType, 'gte35');
+        }
+    } catch (e) {
+        console.error('[lx5bp][handleTaskMenuAction] 失败:', e);
+        await showTaskErrorDialog(e.message || '操作失败');
+    }
+}
+
+function startCheckTimer() {
+    if (_checkTimer) clearInterval(_checkTimer);
+    _checkTimer = setInterval(async () => {
+        if (!_currentDate) return;
+        const today = new Date().toISOString().split('T')[0];
+        if (_currentDate !== today) return;
+        try {
+            const resp = await fetch('/api/lx5bp/check_update');
+            const r = await resp.json();
+            if (r.success && r.updated) {
+                if (_lastTimestamp === null) {
+                    _lastTimestamp = r.timestamp;
+                } else if (r.timestamp !== _lastTimestamp) {
+                    _lastTimestamp = r.timestamp;
+                    await loadStocks();
+                }
+            }
+        } catch(e) {}
+    }, 5000);
+}
+
+function renderColumns(stocks) {
+    if (!stocks || stocks.length === 0) {
+        document.getElementById('mainContent').innerHTML = '<div class="loading-msg">暂无数据</div>';
+        return;
+    }
+
+    const safeStocks = Array.isArray(stocks) ? stocks : [];
+
+    const grid = document.createElement('div');
+    grid.className = 'columns-grid';
+
+    const sorted = safeStocks.slice().sort(function(a, b) {
+        const highGainCountDiff = Number(b.three_day_high_gain_count || 0) - Number(a.three_day_high_gain_count || 0);
+        if (highGainCountDiff !== 0) return highGainCountDiff;
+        const lowerShadowDiff = Number(a.three_day_lower_shadow_sum || a.lower_shadow_sum || 0) - Number(b.three_day_lower_shadow_sum || b.lower_shadow_sum || 0);
+        if (lowerShadowDiff !== 0) return lowerShadowDiff;
+        return (b.ref_gain || 0) - (a.ref_gain || 0);
+    });
+
+    const col = {
+        key: 'three_day_high_gain_count',
+        label: '表1 · 三天高涨次数',
+        sub: '按最近3天最高涨幅≥6.5%次数由高到低分组，同组按三天下引线和由低到高',
+        cls: 'bare-foot',
+        fmtVal: v => v + '次',
+        fmtLabel: v => v + '次'
+    };
+
+    const groups = groupByExact(sorted, col.key);
+    grid.appendChild(buildColumn(col, groups));
+    grid.appendChild(buildLowerShadowTable(safeStocks));
+    grid.appendChild(buildRefLimitUpTable(safeStocks));
+    grid.appendChild(buildRefHighGainYangTable(safeStocks));
+    grid.appendChild(buildInfoPanel());
+
+    document.getElementById('mainContent').innerHTML = '';
+    document.getElementById('mainContent').appendChild(buildLx5bpFocusAlertPanels(safeStocks));
+    document.getElementById('mainContent').appendChild(grid);
+}
+
+function buildLowerShadowTable(stocks) {
+    const card = document.createElement('div');
+    card.className = 'metric-column shadow-column';
+
+    const header = document.createElement('div');
+    header.className = 'col-header shadow-red';
+    header.innerHTML = '表2 · 参考日拉升且阳线<div class="col-header-sub">按照拉升次数由高到低排序，同组下引线累加之和由低到高排序</div>';
+    card.appendChild(header);
+
+    const filtered = (stocks || []).filter(function(s) {
+        return Number(s.ref_high_gain_gte_6_5_and_yang || 0) === 1;
+    }).sort(function(a, b) {
+        const highGainCountDiff = Number(b.three_day_high_gain_count || 0) - Number(a.three_day_high_gain_count || 0);
+        if (highGainCountDiff !== 0) return highGainCountDiff;
+        const lowerShadowDiff = Number(a.three_day_lower_shadow_sum || a.lower_shadow_sum || 0) - Number(b.three_day_lower_shadow_sum || b.lower_shadow_sum || 0);
+        if (lowerShadowDiff !== 0) return lowerShadowDiff;
+        return (b.ref_gain || 0) - (a.ref_gain || 0);
+    });
+
+    if (filtered.length === 0) {
+        const nd = document.createElement('div');
+        nd.className = 'no-data';
+        nd.textContent = '暂无数据';
+        card.appendChild(nd);
+        return card;
+    }
+
+    const groups = groupByExact(filtered, 'three_day_high_gain_count');
+
+    groups.forEach(function(group) {
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'group-label bare-foot';
+        labelDiv.textContent = (group.label || 0) + '次  (' + group.stocks.length + ')';
+        card.appendChild(labelDiv);
+
+        const rowHeader = document.createElement('div');
+        rowHeader.className = 'stock-row-header shadow-table';
+        rowHeader.innerHTML = '<span>名称</span><span>涨幅</span><span>拉升次数</span><span>下引线和</span>';
+        card.appendChild(rowHeader);
+
+        group.stocks.sort(function(a, b) {
+            const lowerShadowDiff = Number(a.three_day_lower_shadow_sum || a.lower_shadow_sum || 0) - Number(b.three_day_lower_shadow_sum || b.lower_shadow_sum || 0);
+            if (lowerShadowDiff !== 0) return lowerShadowDiff;
+            return (b.ref_gain || 0) - (a.ref_gain || 0);
+        });
+
+        group.stocks.forEach(function(s) {
+            const row = document.createElement('div');
+            row.className = 'stock-row shadow-table';
+            row.addEventListener('mouseenter', function(e) { showKline(e, s.code, s.name); });
+            row.addEventListener('mouseleave', hideKline);
+            row.addEventListener('mousemove', moveTooltip);
+            row.addEventListener('contextmenu', function(e) { showTaskContextMenu(e, s); });
+
+            const gain = s.ref_gain || 0;
+            const gainClass = gain > 0 ? 'positive' : gain < 0 ? 'negative' : 'neutral';
+            const threeDayHighGainCount = Number(s.three_day_high_gain_count || 0);
+            const threeDayLowerShadowSum = Number(s.three_day_lower_shadow_sum || s.lower_shadow_sum || 0);
+
+            row.innerHTML =
+                '<div class="stock-name"><span class="s-name" title="' + s.code + ' ' + s.name + '">' + s.name + '</span><span class="s-code">' + s.code + '</span></div>' +
+                '<span class="s-gain ' + gainClass + '">' + (gain > 0 ? '+' : '') + gain.toFixed(2) + '%</span>' +
+                '<span class="s-metric good">' + threeDayHighGainCount + '次</span>' +
+                '<span class="s-metric extra">' + threeDayLowerShadowSum.toFixed(2) + '%</span>';
+
+            card.appendChild(row);
+        });
+    });
+
+    return card;
+}
+
+function buildRefLimitUpTable(stocks) {
+    const card = document.createElement('div');
+    card.className = 'metric-column shadow-column';
+
+    const header = document.createElement('div');
+    header.className = 'col-header shadow-red';
+    header.innerHTML = '表3 · 三天强势K<div class="col-header-sub">筛选三天内最高涨幅≥6.5%至少1次，按三天强势K次数由高到低分组，同组下引线累加之和由低到高排序</div>';
+    card.appendChild(header);
+
+    const filtered = (stocks || []).filter(function(s) {
+        return Number(s.three_day_high_gain_count || 0) >= 1;
+    }).sort(function(a, b) {
+        const strongKDiff = Number(b.three_day_strong_k_count || 0) - Number(a.three_day_strong_k_count || 0);
+        if (strongKDiff !== 0) return strongKDiff;
+        const lowerShadowDiff = Number(a.three_day_lower_shadow_sum || a.lower_shadow_sum || 0) - Number(b.three_day_lower_shadow_sum || b.lower_shadow_sum || 0);
+        if (lowerShadowDiff !== 0) return lowerShadowDiff;
+        return (b.ref_gain || 0) - (a.ref_gain || 0);
+    });
+
+    if (filtered.length === 0) {
+        const nd = document.createElement('div');
+        nd.className = 'no-data';
+        nd.textContent = '暂无数据';
+        card.appendChild(nd);
+        return card;
+    }
+
+    const groups = groupByExact(filtered, 'three_day_strong_k_count');
+
+    groups.forEach(function(group) {
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'group-label bare-foot';
+        labelDiv.textContent = (group.label || 0) + '次  (' + group.stocks.length + ')';
+        card.appendChild(labelDiv);
+
+        const rowHeader = document.createElement('div');
+        rowHeader.className = 'stock-row-header shadow-table strong-table';
+        rowHeader.innerHTML = '<span>名称</span><span>涨幅</span><span>强势K</span><span>几乎光脚</span><span>下引线和</span>';
+        card.appendChild(rowHeader);
+
+        group.stocks.sort(function(a, b) {
+            const lowerShadowDiff = Number(a.three_day_lower_shadow_sum || a.lower_shadow_sum || 0) - Number(b.three_day_lower_shadow_sum || b.lower_shadow_sum || 0);
+            if (lowerShadowDiff !== 0) return lowerShadowDiff;
+            return (b.ref_gain || 0) - (a.ref_gain || 0);
+        });
+
+        group.stocks.forEach(function(s) {
+            const row = document.createElement('div');
+            row.className = 'stock-row shadow-table strong-table';
+            if (isLx5bpFocusStock(s)) row.classList.add('stock-row-focus-alert');
+            row.addEventListener('mouseenter', function(e) { showKline(e, s.code, s.name); });
+            row.addEventListener('mouseleave', hideKline);
+            row.addEventListener('mousemove', moveTooltip);
+            row.addEventListener('contextmenu', function(e) { showTaskContextMenu(e, s); });
+
+            const gain = s.ref_gain || 0;
+            const gainClass = gain > 0 ? 'positive' : gain < 0 ? 'negative' : 'neutral';
+            const threeDayStrongKCount = Number(s.three_day_strong_k_count || 0);
+            const threeDayNearBarefootYangCount = Number(s.three_day_near_barefoot_yang_count || 0);
+            const threeDayLowerShadowSum = Number(s.three_day_lower_shadow_sum || s.lower_shadow_sum || 0);
+
+            row.innerHTML =
+                '<div class="stock-name"><span class="s-name" title="' + s.code + ' ' + s.name + '">' + s.name + (isLx5bpFocusStock(s) ? '<span class="focus-alert-badge">重点</span>' : '') + '</span><span class="s-code">' + s.code + '</span></div>' +
+                '<span class="s-gain ' + gainClass + '">' + (gain > 0 ? '+' : '') + gain.toFixed(2) + '%</span>' +
+                '<span class="s-metric good">' + threeDayStrongKCount + '次</span>' +
+                '<span class="s-metric good">' + threeDayNearBarefootYangCount + '次</span>' +
+                '<span class="s-metric extra">' + threeDayLowerShadowSum.toFixed(2) + '%</span>';
+
+            card.appendChild(row);
+        });
+    });
+
+    return card;
+}
+
+
+function buildRefHighGainYangTable(stocks) {
+    const card = document.createElement('div');
+    card.className = 'metric-column shadow-column';
+
+    const header = document.createElement('div');
+    header.className = 'col-header shadow-red';
+    header.innerHTML = '表4 · 参考日拉升阳线<div class="col-header-sub">显示表3中参考日最高涨幅≥6.5%且阳线的股票，按三天强势K次数由高到低分组，同组下引线累加之和由低到高排序</div>';
+    card.appendChild(header);
+
+    const filtered = (stocks || []).filter(function(s) {
+        return Number(s.three_day_high_gain_count || 0) >= 1 && Number(s.ref_high_gain_gte_6_5_and_yang || 0) === 1;
+    }).sort(function(a, b) {
+        const strongKDiff = Number(b.three_day_strong_k_count || 0) - Number(a.three_day_strong_k_count || 0);
+        if (strongKDiff !== 0) return strongKDiff;
+        const lowerShadowDiff = Number(a.three_day_lower_shadow_sum || a.lower_shadow_sum || 0) - Number(b.three_day_lower_shadow_sum || b.lower_shadow_sum || 0);
+        if (lowerShadowDiff !== 0) return lowerShadowDiff;
+        return (b.ref_gain || 0) - (a.ref_gain || 0);
+    });
+
+    if (filtered.length === 0) {
+        const nd = document.createElement('div');
+        nd.className = 'no-data';
+        nd.textContent = '暂无数据';
+        card.appendChild(nd);
+        return card;
+    }
+
+    const groups = groupByExact(filtered, 'three_day_strong_k_count');
+
+    groups.forEach(function(group) {
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'group-label bare-foot';
+        labelDiv.textContent = (group.label || 0) + '次  (' + group.stocks.length + ')';
+        card.appendChild(labelDiv);
+
+        const rowHeader = document.createElement('div');
+        rowHeader.className = 'stock-row-header shadow-table strong-table';
+        rowHeader.innerHTML = '<span>名称</span><span>涨幅</span><span>强势K</span><span>几乎光脚</span><span>下引线和</span>';
+        card.appendChild(rowHeader);
+
+        group.stocks.sort(function(a, b) {
+            const lowerShadowDiff = Number(a.three_day_lower_shadow_sum || a.lower_shadow_sum || 0) - Number(b.three_day_lower_shadow_sum || b.lower_shadow_sum || 0);
+            if (lowerShadowDiff !== 0) return lowerShadowDiff;
+            return (b.ref_gain || 0) - (a.ref_gain || 0);
+        });
+
+        group.stocks.forEach(function(s) {
+            const row = document.createElement('div');
+            row.className = 'stock-row shadow-table strong-table';
+            row.addEventListener('mouseenter', function(e) { showKline(e, s.code, s.name); });
+            row.addEventListener('mouseleave', hideKline);
+            row.addEventListener('mousemove', moveTooltip);
+            row.addEventListener('contextmenu', function(e) { showTaskContextMenu(e, s); });
+
+            const gain = s.ref_gain || 0;
+            const gainClass = gain > 0 ? 'positive' : gain < 0 ? 'negative' : 'neutral';
+            const threeDayStrongKCount = Number(s.three_day_strong_k_count || 0);
+            const threeDayNearBarefootYangCount = Number(s.three_day_near_barefoot_yang_count || 0);
+            const threeDayLowerShadowSum = Number(s.three_day_lower_shadow_sum || s.lower_shadow_sum || 0);
+
+            row.innerHTML =
+                '<div class="stock-name"><span class="s-name" title="' + s.code + ' ' + s.name + '">' + s.name + '</span><span class="s-code">' + s.code + '</span></div>' +
+                '<span class="s-gain ' + gainClass + '">' + (gain > 0 ? '+' : '') + gain.toFixed(2) + '%</span>' +
+                '<span class="s-metric good">' + threeDayStrongKCount + '次</span>' +
+                '<span class="s-metric good">' + threeDayNearBarefootYangCount + '次</span>' +
+                '<span class="s-metric extra">' + threeDayLowerShadowSum.toFixed(2) + '%</span>';
+
+            card.appendChild(row);
+        });
+    });
+
+    return card;
+}
+
+function buildInfoPanel() {
+    const panel = document.createElement('div');
+    panel.className = 'info-panel';
+    panel.appendChild(buildTipsCard());
+    panel.appendChild(buildImageCard('宝丽迪', '/static/lx5bp/baolidi.png'));
+    panel.appendChild(buildImageCard('中科海讯', '/static/lx5bp/zhongkehaixun.png'));
+    panel.appendChild(buildTaskPanel());
+    return panel;
+}
+
+function buildTipsCard() {
+    const card = document.createElement('div');
+    card.className = 'tips-card';
+    card.innerHTML = `
+        <div class="tips-header">提示</div>
+        <div class="tips-body">
+            <ol class="tips-list">
+                <li>找没涨多少的</li>
+                <li>找出<span class="tips-highlight-red">几乎光脚阳线</span>很多的</li>
+            </ol>
+        </div>
+    `;
+    return card;
+}
+
+function buildImageCard(title, imageSrc) {
+    const card = document.createElement('div');
+    card.className = 'image-card';
+    card.innerHTML =
+        '<div class="image-card-header">' + title + '</div>' +
+        '<div class="image-card-body"><img src="' + imageSrc + '" alt="' + title + '"></div>';
+    return card;
+}
+
+function buildTaskPanel() {
+    const panel = document.createElement('div');
+    panel.className = 'task-side-panel';
+    panel.id = 'taskSidePanel';
+    panel.innerHTML = `
+        <div class="task-panel-header">
+            <div class="task-panel-header-wrap">
+                <div class="task-panel-title">今日任务列表</div>
+                <div class="task-panel-sub">手动右键添加 · Redis key: ${YHY_TASK_REDIS_PREFIX}:{yyyymmdd}</div>
+                <div class="task-panel-count" id="taskPanelCount">${getVisibleTaskStocksForCurrentPage().length} 只</div>
+            </div>
+        </div>
+        <div class="task-panel-body" id="taskPanelBody"></div>
+    `;
+    setTimeout(renderTaskPanelContent, 0);
+    return panel;
+}
+
+function groupByExact(sorted, key) {
+    const map = new Map();
+    sorted.forEach(function(s) {
+        const v = s[key] || 0;
+        if (!map.has(v)) map.set(v, []);
+        map.get(v).push(s);
+    });
+    return Array.from(map.entries()).map(function(entry) {
+        return { label: entry[0], stocks: entry[1] };
+    });
+}
+
+function isLx5bpTable4Stock(stock) {
+    return Number(stock && stock.three_day_high_gain_count || 0) >= 1 && Number(stock.ref_high_gain_gte_6_5_and_yang || 0) === 1;
+}
+
+function isLx5bpTable3Stock(stock) {
+    return Number(stock && stock.three_day_high_gain_count || 0) >= 1;
+}
+
+function isLx5bpFocusStock(stock) {
+    return isLx5bpTable4Stock(stock) && Number(stock.three_day_near_barefoot_yang_count || 0) >= 2 && Number(stock.three_day_strong_k_count || 0) === 3;
+}
+
+function getLx5bpLowerShadowSortValue(stock) {
+    return Number(stock && (stock.three_day_lower_shadow_sum || stock.lower_shadow_sum) || 0);
+}
+
+function isLx5bpSecondaryFocusStock(stock) {
+    return isLx5bpTable3Stock(stock) && !isLx5bpFocusStock(stock) && Number(stock.three_day_near_barefoot_yang_count || 0) >= 2 && Number(stock.three_day_strong_k_count || 0) === 3;
+}
+
+function getLx5bpFocusStocks(stocks) {
+    const seen = new Set();
+    return (stocks || []).filter(function(stock) {
+        const code = String(stock && stock.code || '').trim();
+        if (!code || seen.has(code) || !isLx5bpFocusStock(stock)) return false;
+        seen.add(code);
+        return true;
+    }).sort(function(a, b) {
+        const bareDiff = Number(b.three_day_near_barefoot_yang_count || 0) - Number(a.three_day_near_barefoot_yang_count || 0);
+        if (bareDiff !== 0) return bareDiff;
+        const strongDiff = Number(b.three_day_strong_k_count || 0) - Number(a.three_day_strong_k_count || 0);
+        if (strongDiff !== 0) return strongDiff;
+        return Number(b.ref_gain || 0) - Number(a.ref_gain || 0);
+    });
+}
+
+function getLx5bpSecondaryFocusStocks(stocks) {
+    const seen = new Set();
+    return (stocks || []).filter(function(stock) {
+        const code = String(stock && stock.code || '').trim();
+        if (!code || seen.has(code) || !isLx5bpSecondaryFocusStock(stock)) return false;
+        seen.add(code);
+        return true;
+    }).sort(function(a, b) {
+        const lowerShadowDiff = getLx5bpLowerShadowSortValue(a) - getLx5bpLowerShadowSortValue(b);
+        if (lowerShadowDiff !== 0) return lowerShadowDiff;
+        return Number(b.ref_gain || 0) - Number(a.ref_gain || 0);
+    });
+}
+
+function buildLx5bpFocusAlertPanel(stocks, options) {
+    const opts = options || {};
+    const focusStocks = opts.secondary ? getLx5bpSecondaryFocusStocks(stocks) : getLx5bpFocusStocks(stocks);
+    const panel = document.createElement('div');
+    panel.className = 'focus-alert-panel' + (opts.secondary ? ' secondary' : '');
+    panel.innerHTML =
+        '<div class="focus-alert-header">' +
+            '<div>' +
+                '<div class="focus-alert-title">' + (opts.title || '今日重点关注股票') + '</div>' +
+                '<div class="focus-alert-sub">' + (opts.sub || '表4股票中，最近3天几乎光脚阳线次数大于等于2并且强势K等于3') + '</div>' +
+            '</div>' +
+            '<span class="focus-alert-count">' + focusStocks.length + ' 只</span>' +
+        '</div>';
+
+    if (!focusStocks.length) {
+        const empty = document.createElement('div');
+        empty.className = 'focus-alert-empty';
+        empty.textContent = '暂无符合条件股票';
+        panel.appendChild(empty);
+        return panel;
+    }
+
+    const list = document.createElement('div');
+    list.className = 'focus-alert-list';
+    focusStocks.forEach(function(stock) {
+        const gain = Number(stock.ref_gain || 0);
+        const card = document.createElement('div');
+        card.className = 'focus-alert-card';
+        card.addEventListener('mouseenter', function(e) { showKline(e, stock.code, stock.name); });
+        card.addEventListener('mouseleave', hideKline);
+        card.addEventListener('mousemove', moveTooltip);
+        card.addEventListener('contextmenu', function(e) { showTaskContextMenu(e, stock); });
+        card.innerHTML =
+            '<div class="focus-alert-card-top">' +
+                '<span class="focus-alert-name" title="' + stock.code + ' ' + stock.name + '">' + (stock.name || '') + '</span>' +
+                '<span class="focus-alert-code">' + (stock.code || '') + '</span>' +
+            '</div>' +
+            '<div class="focus-alert-meta">' +
+                '<span>几乎光脚 ' + Number(stock.three_day_near_barefoot_yang_count || 0) + ' 次</span>' +
+                '<span>强势K ' + Number(stock.three_day_strong_k_count || 0) + ' 次</span>' +
+            '</div>' +
+            '<div class="focus-alert-meta">' +
+                '<span>' + (gain > 0 ? '+' : '') + gain.toFixed(2) + '%</span>' +
+                '<span>最高 ' + Number(stock.ref_high_gain || 0).toFixed(2) + '%</span>' +
+            '</div>';
+        list.appendChild(card);
+    });
+    panel.appendChild(list);
+    return panel;
+}
+
+function buildLx5bpSecondaryFocusAlertPanel(stocks) {
+    return buildLx5bpFocusAlertPanel(stocks, {
+        secondary: true,
+        title: '今日次重点关注',
+        sub: '表3股票中，几乎光脚大于等于2次且强势K次数为3'
+    });
+}
+
+function buildLx5bpFocusAlertPanels(stocks) {
+    const wrap = document.createElement('div');
+    wrap.className = 'focus-alert-panels';
+    wrap.appendChild(buildLx5bpFocusAlertPanel(stocks));
+    wrap.appendChild(buildLx5bpSecondaryFocusAlertPanel(stocks));
+    return wrap;
+}
+
+function buildColumn(col, groups) {
+    const colDiv = document.createElement('div');
+    colDiv.className = 'metric-column';
+
+    const header = document.createElement('div');
+    header.className = 'col-header ' + col.cls;
+    header.innerHTML = col.label + '<div class="col-header-sub">' + col.sub + '</div>';
+    colDiv.appendChild(header);
+
+    if (!groups || groups.length === 0) {
+        const nd = document.createElement('div');
+        nd.className = 'no-data';
+        nd.textContent = '暂无数据';
+        colDiv.appendChild(nd);
+        return colDiv;
+    }
+
+    groups.forEach(function(group) {
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'group-label ' + col.cls;
+        labelDiv.textContent = col.fmtLabel(group.label) + '  (' + group.stocks.length + ')';
+        colDiv.appendChild(labelDiv);
+
+        const rowHeader = document.createElement('div');
+        rowHeader.className = 'stock-row-header';
+        rowHeader.innerHTML = '<span>名称</span><span>涨幅</span><span>三天高涨</span><span>下引线和</span>';
+        colDiv.appendChild(rowHeader);
+
+        group.stocks.sort(function(a, b) {
+            const lowerShadowDiff = Number(a.three_day_lower_shadow_sum || a.lower_shadow_sum || 0) - Number(b.three_day_lower_shadow_sum || b.lower_shadow_sum || 0);
+            if (lowerShadowDiff !== 0) return lowerShadowDiff;
+            return (b.ref_gain || 0) - (a.ref_gain || 0);
+        });
+
+        group.stocks.forEach(function(s) {
+            const row = document.createElement('div');
+            row.className = 'stock-row';
+            row.addEventListener('mouseenter', function(e) { showKline(e, s.code, s.name); });
+            row.addEventListener('mouseleave', hideKline);
+            row.addEventListener('mousemove', moveTooltip);
+            row.addEventListener('contextmenu', function(e) { showTaskContextMenu(e, s); });
+
+            const gain = s.ref_gain || 0;
+            const gainClass = gain > 0 ? 'positive' : gain < 0 ? 'negative' : 'neutral';
+            const threeDayHighGainCount = Number(s.three_day_high_gain_count || 0);
+            const threeDayLowerShadowSum = Number(s.three_day_lower_shadow_sum || s.lower_shadow_sum || 0);
+
+            row.innerHTML =
+                '<div class="stock-name"><span class="s-name" title="' + s.code + ' ' + s.name + '">' + s.name + '</span><span class="s-code">' + s.code + '</span></div>' +
+                '<span class="s-gain ' + gainClass + '">' + (gain > 0 ? '+' : '') + gain.toFixed(2) + '%</span>' +
+                '<span class="s-metric good">' + threeDayHighGainCount + '次</span>' +
+                '<span class="s-metric extra">' + threeDayLowerShadowSum.toFixed(2) + '%</span>';
+
+            colDiv.appendChild(row);
+        });
+    });
+
+    return colDiv;
+}
+
+loadDates();
+document.getElementById('taskContextMenu').addEventListener('click', function(e) {
+    const action = e.target.closest('[data-task-type]');
+    if (!action) return;
+    handleTaskMenuAction(action.getAttribute('data-task-type'));
+});
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#taskContextMenu')) {
+        hideTaskContextMenu();
+    }
+});
+window.addEventListener('scroll', hideTaskContextMenu, true);
+window.addEventListener('resize', hideTaskContextMenu);
+</script>
+</body>
+</html>

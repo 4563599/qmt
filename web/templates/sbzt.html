@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>首板涨停</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: #ffffff; min-height: 100vh; padding: 20px; margin: 0;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        /* ── 导航栏 ── */
+        .nav-buttons { margin-bottom: 10px; display: flex; justify-content: flex-start; align-items: center; gap: 15px; flex-wrap: wrap; }
+        .nav-left { display: flex; gap: 10px; align-items: center; }
+        .nav-right { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; justify-content: flex-start; }
+        .nav-btn {
+            display: inline-block; padding: 5px 9px; color: white; text-decoration: none;
+            border-radius: 8px; transition: all 0.3s; font-size: 13px; font-weight: 500;
+            letter-spacing: 0.1px; white-space: nowrap; flex-shrink: 0;
+        }
+        .nav-btn-home    { background: #667eea; }
+        .nav-btn-home:hover    { background: #5568d3; transform: translateY(-2px); }
+        .nav-btn-5lsys3  { background: #ec4899; }
+        .nav-btn-5lsys3:hover  { background: #db2777; transform: translateY(-2px); }
+        .nav-btn-doji    { background: #f59e0b; }
+        .nav-btn-doji:hover    { background: #d97706; transform: translateY(-2px); }
+        .nav-btn-up      { background: #0ea5e9; }
+        .nav-btn-up:hover      { background: #0284c7; transform: translateY(-2px); }
+        .nav-btn-yx205   { background: #06b6d4; }
+        .nav-btn-yx205:hover   { background: #0891b2; transform: translateY(-2px); }
+        .nav-btn-lszty   { background: #e11d48; }
+        .nav-btn-lszty:hover   { background: #be123c; transform: translateY(-2px); }
+        .nav-btn-sbzt    { background: #f43f5e; }
+        .nav-btn-sbzt:hover    { background: #e11d48; transform: translateY(-2px); }
+        .nav-btn-ztorgj  { background: #d946ef; }
+        .nav-btn-ztorgj:hover  { background: #c026d3; transform: translateY(-2px); }
+        .nav-btn-ztqq    { background: #7c3aed; }
+        .nav-btn-ztqq:hover    { background: #6d28d9; transform: translateY(-2px); }
+        .nav-btn-5ls     { background: #8b5cf6; }
+        .nav-btn-5ls:hover     { background: #7c3aed; transform: translateY(-2px); }
+        .nav-btn-5lsy2   { background: #ef4444; }
+        .nav-btn-5lsy2:hover   { background: #dc2626; transform: translateY(-2px); }
+        .nav-btn-5las3gj { background: #f97316; }
+        .nav-btn-5las3gj:hover { background: #ea6c0a; transform: translateY(-2px); }
+        .nav-btn-jpgz    { background: #f59e0b; }
+        .nav-btn-jpgz:hover    { background: #d97706; transform: translateY(-2px); }
+        .nav-btn-yhy     { background: #e11d48; }
+        .nav-btn-yhy:hover     { background: #be123c; transform: translateY(-2px); }
+
+        /* ── 日期选择器 ── */
+        .date-selector { display: flex; align-items: center; gap: 6px; background: white; padding: 4px 8px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .date-nav-btn { background: #f43f5e; color: white; border: none; padding: 5px 8px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.3s; font-weight: 500; min-width: 28px; display: flex; align-items: center; justify-content: center; }
+        .date-nav-btn:hover { background: #e11d48; transform: scale(1.05); }
+        .date-nav-btn:disabled { background: #ccc; cursor: not-allowed; transform: scale(1); }
+        #datePicker { background: linear-gradient(135deg, #f43f5e, #e11d48); color: white; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; text-align: center; width: auto; min-width: 95px; max-width: 105px; }
+        .flatpickr-calendar { box-shadow: 0 20px 60px rgba(0,0,0,0.3) !important; border-radius: 12px !important; border: none !important; z-index: 99999 !important; }
+        .flatpickr-day.selected { background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%) !important; border-color: #f43f5e !important; }
+        .flatpickr-months .flatpickr-month { background: #f43f5e !important; color: white !important; }
+        .flatpickr-current-month .flatpickr-monthDropdown-months { background: #f43f5e !important; color: white !important; }
+        .flatpickr-weekdays { background: #f2f2f7 !important; }
+        span.flatpickr-weekday { color: #8e8e93 !important; font-weight: 600 !important; }
+
+        /* ── 页面标题 ── */
+        .page-title { background: white; border-radius: 10px; padding: 12px 16px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .page-title h1 { font-size: 22px; font-weight: 700; color: #1d1d1f; margin: 0; }
+        .page-title .badge { color: white; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+        .page-title .desc { color: #6b7280; font-size: 13px; }
+
+        /* ── 7列网格 ── */
+        .columns-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+            min-width: 0;
+        }
+
+        /* ── 单列容器 ── */
+        .metric-column {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            border: 1px solid #e0e0e0;
+            min-width: 160px;
+        }
+
+        /* ── 列标题 ── */
+        .col-header {
+            padding: 9px 8px;
+            font-size: 13px;
+            font-weight: 700;
+            color: white;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        .col-header.bare-foot   { background: linear-gradient(135deg, #fda4af, #fb7185); }
+        .col-header.yin-count   { background: linear-gradient(135deg, #0ea5e9, #0284c7); }
+        .col-header.drawdown    { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+        .col-header.max-drop    { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .col-header.min-body    { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+        .col-header.sum-body    { background: linear-gradient(135deg, #ec4899, #db2777); }
+        .col-header.ma5-days    { background: linear-gradient(135deg, #e11d48, #be123c); }
+        .col-header-sub { font-size: 11px; font-weight: 400; opacity: 0.85; margin-top: 2px; }
+
+        /* ── 分组标题 ── */
+        .group-label {
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            color: white;
+            text-align: center;
+        }
+        .group-label.bare-foot { background: rgba(251, 113, 133, 0.88); }
+        .group-label.yin-count { background: rgba(14,165,233,0.8); }
+        .group-label.drawdown  { background: rgba(59,130,246,0.8); }
+        .group-label.max-drop  { background: rgba(245,158,11,0.8); }
+        .group-label.min-body  { background: rgba(139,92,246,0.8); }
+        .group-label.sum-body  { background: rgba(236,72,153,0.8); }
+        .group-label.ma5-days  { background: rgba(225,29,72,0.8); }
+
+        /* ── 股票行表头 ── */
+        .stock-row-header {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 0.8fr;
+            padding: 3px 6px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+        }
+        .stock-row-header span { font-size: 10px; font-weight: 600; color: #86868b; text-align: center; }
+
+        /* ── 股票行 ── */
+        .stock-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 0.8fr;
+            align-items: center;
+            padding: 6px 6px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .stock-row:hover { background: #f8f9fa; }
+        .stock-row:last-child { border-bottom: none; }
+        .s-name { font-size: 13px; font-weight: 500; color: #1d1d1f; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .s-gain { font-size: 13px; font-weight: 700; text-align: center; }
+        .s-metric { font-size: 12px; font-weight: 700; text-align: center; color: #374151; }
+        .positive { color: #e74c3c; }
+        .negative { color: #27ae60; }
+        .neutral  { color: #95a5a6; }
+        .good     { color: #f43f5e; }
+
+        .no-data { padding: 12px 8px; font-size: 12px; color: #bbb; text-align: center; }
+        .loading-msg { text-align: center; padding: 40px; color: #666; font-size: 14px; }
+
+        /* ── K线图提示框 ── */
+        .stock-tooltip { position: fixed; display: none; background: #fff; border: 1px solid #e1e1e1; border-radius: 8px; padding: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 10000; pointer-events: none; }
+        .stock-tooltip img { display: block; width: 680px; height: 380px; background: #f5f5f7; }
+        .stock-tooltip .tooltip-header { font-size: 12px; color: #666; margin-bottom: 5px; text-align: center; }
+
+        @media (max-width: 1200px) {
+            .nav-left, .nav-right { width: 100%; justify-content: center; }
+            .nav-buttons { flex-wrap: wrap; }
+        }
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .nav-btn { flex: 1 1 calc(50% - 4px); min-width: 0; padding: 8px 6px; font-size: 12px; white-space: normal; word-break: keep-all; line-height: 1.3; text-align: center; }
+            .columns-grid { grid-template-columns: repeat(2, 1fr); }
+            .metric-column { min-width: unset; }
+            .stock-tooltip img { width: 100%; max-width: 600px; height: auto; }
+        }
+            /* mobile no-scroll baseline */
+        @media (max-width: 768px) {
+            body {
+                overflow-x: hidden;
+            }
+            .container,
+            .content,
+            .table-container,
+            .group-table-container,
+            .table-wrap {
+                max-width: 100%;
+                overflow-x: hidden !important;
+            }
+            table,
+            .stock-table {
+                width: 100%;
+                table-layout: fixed;
+            }
+            th,
+            td,
+            .stock-table th,
+            .stock-table td,
+            .stock-name,
+            .s-name,
+            .strategy-tag,
+            .nav-btn,
+            .group-title,
+            .group-name {
+                white-space: normal !important;
+                word-break: break-all;
+                overflow-wrap: anywhere;
+            }
+            #datePicker,
+            .date-display {
+                min-width: 0 !important;
+                width: 100%;
+                max-width: 100%;
+            }
+        }
+</style>
+</head>
+<body>
+
+<div class="stock-tooltip" id="klineTooltip">
+    <div class="tooltip-header" id="klineTtHeader"></div>
+    <img id="klineImage" src="" alt="K线图">
+</div>
+
+<div class="container">
+
+    <div class="nav-buttons">
+        <div class="nav-left">
+            <div class="date-selector">
+                <button class="date-nav-btn" id="prevDateBtn" onclick="prevDate()">◀</button>
+                <input type="text" id="datePicker" placeholder="选择日期" readonly>
+                <button class="date-nav-btn" id="nextDateBtn" onclick="nextDate()">▶</button>
+            </div>
+        </div>
+        <div class="nav-right">
+            <a href="/" class="nav-btn nav-btn-home">首页</a>
+                <a href="/涨停前横盘" class="nav-btn" style="background:#2563eb;">涨停前横盘</a>
+            <a href="/阴后强" class="nav-btn nav-btn-yhy">阴后强</a>
+            <a href="/5拉升" class="nav-btn" style="background:#2563eb;">5拉升</a>
+            <a href="/20阴少跌少横盘" class="nav-btn nav-btn-yx205">20阴少跌少横盘</a>
+            <a href="/阴线跌破5日次数" class="nav-btn" style="background:#ca8a04;">阴线跌破5日次数</a>
+            <a href="/10天大5日线" class="nav-btn" style="background:#0f766e;">10天大5日线</a>
+            <a href="/涨停或光脚" class="nav-btn nav-btn-ztorgj">涨停或光脚</a>
+            <a href="/连续5不碰" class="nav-btn" style="background:#f43f5e;">连续5不碰</a>
+            <a href="/连续涨停" class="nav-btn nav-btn-lszty">连续涨停</a>
+                <a href="/连续4天拉升" class="nav-btn nav-btn-intraday4up" style="background:#f97316;">连续4天拉升</a>
+            <a href="/极品关注" class="nav-btn" style="background:#f59e0b;">极品关注</a>
+            <a href="/同花顺板块" class="nav-btn" style="background:#2563eb;">同花顺板块</a>
+        </div>
+    </div>
+
+    <div class="page-title">
+        <h1>首板涨停</h1>
+        <span class="badge" style="background: linear-gradient(135deg, #f43f5e, #e11d48);">多维分析</span>
+        <span class="desc">首次涨停 · 7维指标分组 · 近10交易日数据</span>
+    </div>
+
+    <div id="mainContent">
+        <div class="loading-msg">正在加载数据...</div>
+    </div>
+
+</div>
+
+<script>
+let _stocks = [];
+let _currentDate = null;
+let _availableDates = [];
+let _currentDateIndex = 0;
+let _flatpickrInstance = null;
+let _lastTimestamp = null;
+let _checkTimer = null;
+
+// ── K线图 ──────────────────────────────────────────────────────────────
+const tooltip = document.getElementById('klineTooltip');
+const klineImg = document.getElementById('klineImage');
+function getPrefix(code) { return code.startsWith('6') ? '1' : '0'; }
+function showKline(e, code, name) {
+    klineImg.src = `https://webquoteklinepic.eastmoney.com/GetPic.aspx?nid=${getPrefix(code)}.${code}&imageType=KXL&token=44c9d251add88e27b65ed86506f6e5da&at=1`;
+    document.getElementById('klineTtHeader').innerText = `${name} (${code}) - 日K线`;
+    moveTooltip(e);
+    tooltip.style.display = 'block';
+}
+function hideKline() { tooltip.style.display = 'none'; klineImg.src = ''; }
+function moveTooltip(e) {
+    const w = window.innerWidth <= 768 ? Math.min(400, window.innerWidth * 0.95) : 565;
+    const h = window.innerWidth <= 768 ? 250 : 330;
+    let left = e.clientX + 15, top = e.clientY + 15;
+    if (left + w > window.innerWidth) left = e.clientX - w - 15;
+    if (top + h > window.innerHeight) top = e.clientY - h - 15;
+    if (left < 0) left = 10; if (top < 0) top = 10;
+    tooltip.style.left = left + 'px'; tooltip.style.top = top + 'px';
+}
+
+// ── 日期 ───────────────────────────────────────────────────────────────
+async function loadDates() {
+    try {
+        const resp = await fetch('/api/sbzt/dates');
+        const result = await resp.json();
+        if (result.success && result.dates && result.dates.length > 0) {
+            _availableDates = result.dates;
+            _currentDate = _availableDates[0];
+            _currentDateIndex = 0;
+        }
+    } catch(e) {}
+    initFlatpickr();
+    await loadStocks();
+    startCheckTimer();
+}
+
+function initFlatpickr() {
+    _flatpickrInstance = flatpickr("#datePicker", {
+        enable: _availableDates,
+        dateFormat: "Y-m-d",
+        defaultDate: _currentDate,
+        appendTo: document.body,
+        locale: {
+            weekdays: { shorthand: ['日','一','二','三','四','五','六'], longhand: ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'] },
+            months: { shorthand: ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'], longhand: ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'] }
+        },
+        onChange: function(selectedDates, dateStr) {
+            if (dateStr && dateStr !== _currentDate) {
+                _currentDate = dateStr;
+                _currentDateIndex = _availableDates.indexOf(dateStr);
+                loadStocks();
+            }
+        }
+    });
+}
+
+function prevDate() {
+    if (_currentDateIndex < _availableDates.length - 1) {
+        _currentDateIndex++;
+        _currentDate = _availableDates[_currentDateIndex];
+        if (_flatpickrInstance) _flatpickrInstance.setDate(_currentDate, false);
+        loadStocks();
+    }
+}
+function nextDate() {
+    if (_currentDateIndex > 0) {
+        _currentDateIndex--;
+        _currentDate = _availableDates[_currentDateIndex];
+        if (_flatpickrInstance) _flatpickrInstance.setDate(_currentDate, false);
+        loadStocks();
+    }
+}
+
+// ── 数据加载 ────────────────────────────────────────────────────────────
+async function loadStocks() {
+    document.getElementById('mainContent').innerHTML = '<div class="loading-msg">正在加载数据...</div>';
+    try {
+        const url = _currentDate ? `/api/sbzt/stocks?date=${_currentDate}` : '/api/sbzt/stocks';
+        const resp = await fetch(url);
+        const result = await resp.json();
+        if (result.success) {
+            _stocks = result.data || [];
+            renderColumns(_stocks);
+        } else {
+            document.getElementById('mainContent').innerHTML = '<div class="loading-msg">加载失败</div>';
+        }
+    } catch(e) {
+        document.getElementById('mainContent').innerHTML = '<div class="loading-msg">加载失败: ' + e.message + '</div>';
+    }
+}
+
+// ── 自动刷新 ────────────────────────────────────────────────────────────
+function startCheckTimer() {
+    if (_checkTimer) clearInterval(_checkTimer);
+    _checkTimer = setInterval(async () => {
+        if (!_currentDate) return;
+        const today = new Date().toISOString().split('T')[0];
+        if (_currentDate !== today) return;
+        try {
+            const resp = await fetch('/api/sbzt/check_update');
+            const r = await resp.json();
+            if (r.success && r.updated) {
+                if (_lastTimestamp === null) { _lastTimestamp = r.timestamp; }
+                else if (r.timestamp !== _lastTimestamp) { _lastTimestamp = r.timestamp; await loadStocks(); }
+            }
+        } catch(e) {}
+    }, 5000);
+}
+
+// ── 渲染 7 列 ──────────────────────────────────────────────────────────
+function renderColumns(stocks) {
+    if (!stocks || stocks.length === 0) {
+        document.getElementById('mainContent').innerHTML = '<div class="loading-msg">暂无数据</div>';
+        return;
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'columns-grid';
+
+    // 列定义（第1列：几乎光脚K次数，由高到低）
+    const COLS = [
+        {
+            key: 'nearly_bare_foot_count', label: '几乎光脚K', sub: '近10日次数(0~10)，由大到小',
+            cls: 'bare-foot', asc: false, groupFn: groupByExact,
+            fmtVal: v => v + '次', fmtLabel: v => v + '次'
+        },
+        {
+            key: 'yin_count', label: '阴线次数', sub: '近10日，次数越少越好',
+            cls: 'yin-count', asc: true, groupFn: groupByExact,
+            fmtVal: v => v + '阴', fmtLabel: v => v + '阴'
+        },
+        {
+            key: 'max_drawdown', label: '最大回撤', sub: '近10日最大回撤%，越小越好',
+            cls: 'drawdown', asc: true, groupFn: groupByDrawdown,
+            fmtVal: v => v.toFixed(2) + '%', fmtLabel: v => v
+        },
+        {
+            key: 'max_drop', label: '最大跌幅', sub: '近10日单日最大跌幅%，越小越好',
+            cls: 'max-drop', asc: true, groupFn: groupByDrop,
+            fmtVal: v => v.toFixed(2) + '%', fmtLabel: v => v
+        },
+        {
+            key: 'max_yin_body', label: '最大阴线实体', sub: '近10日最大阴线实体%，越小越好',
+            cls: 'min-body', asc: true, groupFn: groupByMaxBody,
+            fmtVal: v => v === 0 ? '无阴' : v.toFixed(2) + '%', fmtLabel: v => v
+        },
+        {
+            key: 'sum_yin_body', label: '阴线累加实体', sub: '近10日阴线实体合计%，越小越好',
+            cls: 'sum-body', asc: true, groupFn: groupBySumBody,
+            fmtVal: v => v.toFixed(2) + '%', fmtLabel: v => v
+        },
+        {
+            key: 'max_above_ma5_days', label: '连续高于MA5', sub: '最低价>5日均价最大天数，越多越好',
+            cls: 'ma5-days', asc: false, groupFn: groupByExact,
+            fmtVal: v => v + '天', fmtLabel: v => v + '天'
+        },
+    ];
+
+    COLS.forEach(function(col) {
+        const sorted = stocks.slice().sort(function(a, b) {
+            return col.asc ? (a[col.key] - b[col.key]) : (b[col.key] - a[col.key]);
+        });
+        const groups = col.groupFn(sorted, col.key, col.asc);
+        grid.appendChild(buildColumn(col, groups));
+    });
+
+    document.getElementById('mainContent').innerHTML = '';
+    document.getElementById('mainContent').appendChild(grid);
+}
+
+// ── 分组函数 ────────────────────────────────────────────────────────────
+
+// 精确值分组（整数）— sorted 已按目标方向排好，直接按插入顺序取分组
+function groupByExact(sorted, key) {
+    const map = new Map();
+    sorted.forEach(function(s) {
+        const v = s[key];
+        if (!map.has(v)) map.set(v, []);
+        map.get(v).push(s);
+    });
+    return Array.from(map.entries()).map(function([v, stocks]) { return { label: v, stocks }; });
+}
+
+// 最大回撤分组（%）
+function groupByDrawdown(sorted, key) {
+    const ranges = [
+        { label: '0%（无回撤）', min: 0, max: 0.001 },
+        { label: '0~2%', min: 0.001, max: 2 },
+        { label: '2~5%', min: 2, max: 5 },
+        { label: '5~10%', min: 5, max: 10 },
+        { label: '>10%', min: 10, max: Infinity },
+    ];
+    return buildRangeGroups(sorted, key, ranges);
+}
+
+// 最大跌幅分组（%）
+function groupByDrop(sorted, key) {
+    const ranges = [
+        { label: '0%（无跌幅）', min: 0, max: 0.001 },
+        { label: '0~2%', min: 0.001, max: 2 },
+        { label: '2~5%', min: 2, max: 5 },
+        { label: '5~10%', min: 5, max: 10 },
+        { label: '>10%', min: 10, max: Infinity },
+    ];
+    return buildRangeGroups(sorted, key, ranges);
+}
+
+// 最大阴线实体分组（%）
+function groupByMaxBody(sorted, key) {
+    const ranges = [
+        { label: '无阴线', min: 0, max: 0.001 },
+        { label: '0~1%', min: 0.001, max: 1 },
+        { label: '1~3%', min: 1, max: 3 },
+        { label: '3~5%', min: 3, max: 5 },
+        { label: '>5%', min: 5, max: Infinity },
+    ];
+    return buildRangeGroups(sorted, key, ranges);
+}
+
+// 阴线累加实体分组（%）
+function groupBySumBody(sorted, key) {
+    const ranges = [
+        { label: '0%（全阳）', min: 0, max: 0.001 },
+        { label: '0~3%', min: 0.001, max: 3 },
+        { label: '3~8%', min: 3, max: 8 },
+        { label: '8~15%', min: 8, max: 15 },
+        { label: '>15%', min: 15, max: Infinity },
+    ];
+    return buildRangeGroups(sorted, key, ranges);
+}
+
+function buildRangeGroups(sorted, key, ranges) {
+    const result = [];
+    ranges.forEach(function(r) {
+        const stocks = sorted.filter(function(s) { return s[key] >= r.min && s[key] < r.max; });
+        if (stocks.length > 0) result.push({ label: r.label, stocks });
+    });
+    return result;
+}
+
+// ── 构建单列 DOM ────────────────────────────────────────────────────────
+function buildColumn(col, groups) {
+    const colDiv = document.createElement('div');
+    colDiv.className = 'metric-column';
+
+    const header = document.createElement('div');
+    header.className = 'col-header ' + col.cls;
+    header.innerHTML = col.label + '<div class="col-header-sub">' + col.sub + '</div>';
+    colDiv.appendChild(header);
+
+    if (!groups || groups.length === 0) {
+        const nd = document.createElement('div');
+        nd.className = 'no-data'; nd.textContent = '暂无数据';
+        colDiv.appendChild(nd);
+        return colDiv;
+    }
+
+    groups.forEach(function(group) {
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'group-label ' + col.cls;
+        labelDiv.textContent = typeof group.label === 'number'
+            ? col.fmtLabel(group.label)
+            : group.label;
+        labelDiv.textContent += '  (' + group.stocks.length + ')';
+        colDiv.appendChild(labelDiv);
+
+        const rowHeader = document.createElement('div');
+        rowHeader.className = 'stock-row-header';
+        rowHeader.innerHTML = '<span>名称</span><span>涨幅</span><span>' + col.label + '</span><span>拉升</span>';
+        colDiv.appendChild(rowHeader);
+
+        // 组内按拉升次数由高到低排序
+        group.stocks.sort(function(a, b) { return (b.pull_up_count || 0) - (a.pull_up_count || 0); });
+
+        group.stocks.forEach(function(s) {
+            const row = document.createElement('div');
+            row.className = 'stock-row';
+            row.addEventListener('mouseenter', function(e) { showKline(e, s.code, s.name); });
+            row.addEventListener('mouseleave', hideKline);
+            row.addEventListener('mousemove', moveTooltip);
+
+            const gain = s.ref_gain || 0;
+            const gainClass = gain > 0 ? 'positive' : gain < 0 ? 'negative' : 'neutral';
+            const metricVal = s[col.key];
+            let metricDisplay = col.fmtVal(metricVal);
+            let metricClass = 'good';
+            // 对于越小越好的指标，较小值用绿色
+            if (col.asc && metricVal > 0) metricClass = 'positive';
+            if (!col.asc && metricVal >= 5) metricClass = 'good';
+
+            row.innerHTML =
+                '<span class="s-name" title="' + s.code + ' ' + s.name + '">' + s.name + '</span>' +
+                '<span class="s-gain ' + gainClass + '">' + (gain > 0 ? '+' : '') + gain.toFixed(2) + '%</span>' +
+                '<span class="s-metric ' + metricClass + '">' + metricDisplay + '</span>' +
+                '<span class="s-metric" style="color:#f97316;font-weight:700;">' + (s.pull_up_count || 0) + '</span>';
+
+            colDiv.appendChild(row);
+        });
+    });
+
+    return colDiv;
+}
+
+// ── 启动 ────────────────────────────────────────────────────────────────
+loadDates();
+</script>
+
+<!-- iOS 提醒弹窗（备用） -->
+<div id="ios-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);backdrop-filter:blur(3px);z-index:99999;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:14px;width:270px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.25);">
+        <div id="ios-modal-msg" style="padding:20px 16px 14px;text-align:center;font-size:16px;font-weight:600;color:#000;line-height:1.5;display:flex;align-items:center;justify-content:center;min-height:70px;white-space:pre-line;"></div>
+        <div style="height:0.5px;background:#c6c6c8;"></div>
+        <div style="display:flex;height:44px;">
+            <button id="ios-modal-ok" onclick="document.getElementById('ios-modal-overlay').style.display='none'"
+                style="flex:1;background:none;border:0;outline:none;font-size:17px;color:#007aff;font-weight:600;cursor:pointer;">确定</button>
+        </div>
+    </div>
+</div>
+</body>
+</html>

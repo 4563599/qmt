@@ -1,0 +1,2635 @@
+{% set focus_mode = pz_page_mode|default('push_log') == 'pz1_focus' %}
+<!DOCTYPE html>
+<html lang="zh-CN" data-skip-global-assets="1">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ '重点关注' if focus_mode else '推送日志' }}</title>
+    <style>
+        * { box-sizing: border-box; }
+        html, body { margin: 0; min-height: 100%; background: #fff; color: #202124; }
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+            font-size: calc(13px * var(--focus-text-scale, 1));
+            letter-spacing: 0;
+        }
+        body.focus-mode { --focus-text-scale: .94; }
+        .page {
+            width: min(1180px, calc(100% - 32px));
+            margin: 22px auto 40px;
+        }
+        body.redis-page-mode .page {
+            width: calc(100% - 16px);
+            max-width: none;
+            margin-left: 8px;
+            margin-right: 8px;
+        }
+        .toolbar {
+            min-height: 42px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            border-bottom: 1px solid #b9b9b9;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+        }
+        .title-wrap { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+        body.focus-mode .title-wrap { flex-wrap: wrap; gap: 6px 12px; }
+        h1 { margin: 0; font-size: calc(19px * var(--focus-text-scale, 1)); font-weight: 600; line-height: 1.2; }
+        .summary { color: #666; white-space: nowrap; }
+        .controls { display: flex; align-items: center; gap: 8px; }
+        .controls label { color: #555; }
+        select, .nav-link {
+            height: 30px;
+            border: 1px solid #a9a9a9;
+            border-radius: 2px;
+            background: #fff;
+            color: #222;
+            font: inherit;
+        }
+        select { min-width: 128px; padding: 0 28px 0 9px; }
+        .nav-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 11px;
+            text-decoration: none;
+        }
+        .strategy-nav {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 7px 14px;
+            margin: 0 0 12px;
+            padding: 0 0 10px;
+            border-bottom: 1px solid #d2d2d2;
+        }
+        .strategy-nav a {
+            color: #343434;
+            font-size: calc(12px * var(--focus-text-scale, 1));
+            font-weight: 600;
+            line-height: 1.35;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+        .strategy-nav a:hover,
+        .strategy-nav a:focus-visible {
+            color: #000;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+        .page-tabs { display: inline-flex; max-width: 100%; margin-bottom: 12px; }
+        .page-tabs button {
+            min-width: 76px;
+            height: 32px;
+            padding: 0 14px;
+            border: 1px solid #999;
+            background: #fff;
+            color: #333;
+            font: inherit;
+            cursor: pointer;
+        }
+        .page-tabs button + button { border-left: 0; }
+        .page-tabs button[aria-selected="true"] { color: #fff; background: #333; font-weight: 600; }
+        .page-tabs button:focus-visible { outline: 2px solid #777; outline-offset: 2px; }
+        .status {
+            min-height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            color: #666;
+            font-size: calc(12px * var(--focus-text-scale, 1));
+        }
+        .error { color: #9b1c1c; }
+        body.focus-mode .status { flex-wrap: wrap; }
+        .status-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+        .focus-page-notes { margin: -4px 0 8px; color: #333; font-weight: 600; line-height: 1.4; }
+        .focus-page-notes[hidden], .focus-page-note[hidden] { display: none; }
+        .status-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .limit-up-filter {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 30px;
+            padding: 4px 9px;
+            margin-bottom: 4px;
+            border: 1px solid #a9a9a9;
+            border-radius: 2px;
+            color: #222;
+            background: #fff;
+            white-space: nowrap;
+            cursor: pointer;
+            font: inherit;
+        }
+        .limit-up-filter input { margin: 0; accent-color: #222; }
+        .limit-up-filter[hidden] { display: none; }
+        .limit-up-filter:has(input:checked) { border-color: #222; background: #ededed; font-weight: 600; }
+        .limit-up-filter[aria-pressed="true"] { border-color: #222; background: #ededed; font-weight: 600; }
+        .limit-up-filter:focus-within { outline: 2px solid #666; outline-offset: 2px; }
+        .limit-up-filter.purple-filter { border: 2px solid #9333ea; padding: 3px 8px; }
+        .limit-up-filter.purple-filter:has(input:checked) { border-color: #9333ea; }
+        .limit-up-filter.purple-filter:focus-within { outline-color: #9333ea; }
+        .focus-content-layout { width: 100%; }
+        .focus-page2-extra {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            align-items: start;
+            margin-bottom: 18px;
+        }
+        .focus-page2-extra[hidden] { display: none; }
+        .focus-page2-column { grid-column: span 2; min-width: 0; border: 1px solid #8f8f8f; }
+        .focus-page2-heading {
+            margin: 0;
+            padding: 12px 10px;
+            background: #f1f1f1;
+            border-bottom: 1px solid #bdbdbd;
+            font-size: calc(14px * var(--focus-text-scale, 1));
+            font-weight: 600;
+            text-align: left;
+        }
+        body.focus-mode .focus-page2-column .stock-cell { padding: 10px; border-bottom: 1px solid #d0d0d0; }
+        .focus-page2-column .stock-cell:last-child { border-bottom: 0; }
+        .focus-page2-column .stock-group-head { width: calc(100% + 20px); margin: -10px -10px 4px; font-size: calc(11px * var(--focus-text-scale, 1)); }
+        .focus-page2-heading .header-count { display: inline; margin-left: 6px; font-size: calc(11px * var(--focus-text-scale, 1)); }
+        .stock-card-body {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            align-items: start;
+            gap: 8px;
+            width: 100%;
+        }
+        .stock-card-details { min-width: 0; text-align: left; }
+        .stock-card-details .stock-main,
+        .stock-card-details .stock-meta { justify-content: flex-start; gap: 5px 10px; }
+        .stock-card-details .stock-meta { margin-top: 8px; }
+        .stock-shape-tags {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 5px;
+            min-width: 0;
+            color: #8b2cf5;
+            font-size: calc(12px * var(--focus-text-scale, 1));
+            font-weight: 700;
+            line-height: 1.5;
+            text-align: left;
+            overflow-wrap: anywhere;
+        }
+        .focus-page2-column .rank-badge { display: none; }
+        .focus-content-layout.is-first-page { display: block; }
+        .focus-content-layout.is-fifth-page {
+            display: grid;
+            grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+            align-items: start;
+        }
+        body.redis-page-mode .status-actions > .limit-up-filter,
+        body.redis-page-mode .status-actions > label.limit-up-filter { display: none !important; }
+        .sheet-wrap { width: 100%; overflow-x: hidden; border: 1px solid #8f8f8f; }
+        .focus-push-log-list .stock-cell {
+            height: auto;
+            min-height: 64px;
+            border-top: 1px solid #d0d0d0;
+        }
+        .focus-push-log-list .stock-cell:first-child { border-top: 0; }
+        .focus-push-log-empty {
+            min-height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 4px;
+            color: #aaa;
+            text-align: center;
+        }
+        .focus-page1-special {
+            display: grid;
+            grid-template-columns: 188px minmax(0, 1fr);
+            align-items: start;
+            width: 100%;
+            border: 1px solid #8f8f8f;
+            background: #fff;
+        }
+        .focus-page1-special[hidden],
+        .sheet-wrap[hidden] { display: none; }
+        .focus-page1-sidebar {
+            position: sticky;
+            top: 0;
+            max-height: 100vh;
+            overflow-y: auto;
+            background: #fafafa;
+            border-right: 1px solid #d0d0d0;
+            scrollbar-width: thin;
+        }
+        .focus-page1-sidebar-title {
+            padding: 10px 13px 7px;
+            color: #666;
+            font-size: calc(11px * var(--focus-text-scale, 1));
+        }
+        .focus-page1-sidebar-description {
+            padding: 0 12px 7px;
+            color: #777;
+            font-size: calc(10px * var(--focus-text-scale, 1));
+            line-height: 1.45;
+        }
+        .focus-page1-sidebar-section + .focus-page1-sidebar-section {
+            border-top: 1px solid #d0d0d0;
+            margin-top: 8px;
+            padding-top: 6px;
+        }
+        .focus-page1-group-button {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 9px;
+            align-items: center;
+            width: 100%;
+            min-height: 42px;
+            padding: 9px 12px 9px 10px;
+            border: 0;
+            border-left: 3px solid transparent;
+            background: transparent;
+            color: #444;
+            font: inherit;
+            text-align: left;
+            cursor: pointer;
+        }
+        .focus-page1-group-button:hover { background: #f1f1f1; }
+        .focus-page1-group-button.is-active {
+            border-left-color: #333;
+            background: #fff;
+            color: #202020;
+            font-weight: 700;
+        }
+        .focus-page1-group-count { color: #666; font-size: calc(11px * var(--focus-text-scale, 1)); white-space: nowrap; }
+        .focus-page6-group-meta {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 7px;
+            color: #666;
+            font-size: calc(11px * var(--focus-text-scale, 1));
+            white-space: nowrap;
+        }
+        .focus-page6-board-gain {
+            min-width: 56px;
+            color: #333;
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+        }
+        .focus-page1-main { min-width: 0; padding-left: 18px; }
+        .focus-page1-heading {
+            position: sticky;
+            top: 0;
+            z-index: 3;
+            display: flex;
+            align-items: baseline;
+            gap: 9px;
+            min-height: 40px;
+            padding: 10px 5px 8px;
+            background: rgba(255, 255, 255, 0.97);
+            border-bottom: 1px solid #d8d8d8;
+            font-size: calc(13px * var(--focus-text-scale, 1));
+        }
+        .focus-page1-heading strong { font-size: calc(14px * var(--focus-text-scale, 1)); }
+        .focus-page1-description {
+            margin: 7px 5px;
+            color: #666;
+            font-size: calc(11px * var(--focus-text-scale, 1));
+            line-height: 1.45;
+        }
+        .focus-page1-description[hidden] { display: none; }
+        .focus-page1-columns,
+        .focus-page1-stock-main {
+            display: grid;
+            grid-template-columns: minmax(150px, 1fr) 90px 100px;
+            gap: 10px;
+            align-items: center;
+            min-width: 0;
+        }
+        .focus-page1-columns {
+            padding: 8px 5px;
+            color: #666;
+            border-bottom: 1px solid #ddd;
+            font-size: calc(10px * var(--focus-text-scale, 1));
+        }
+        .focus-page1-columns span:last-child { text-align: right; }
+        #focusPage1Special .focus-page1-columns,
+        #focusPage1Special .focus-page1-stock-main {
+            grid-template-columns: minmax(140px, 1fr) 112px 80px 90px;
+            gap: 8px;
+        }
+        .focus-page1-below-heading,
+        .focus-page1-below-count { text-align: center; }
+        .focus-page1-below-heading { overflow-wrap: anywhere; }
+        .focus-page1-below-count { font-size: calc(14px * var(--focus-text-scale, 1)); font-variant-numeric: tabular-nums; }
+        .focus-page1-below-count.is-priority { color: #8b2cf5; font-weight: 800; }
+        .focus-page1-priority {
+            margin: 18px 5px 20px;
+            padding-top: 12px;
+            border-top: 2px solid #d9b8fa;
+            color: #8b2cf5;
+            font-weight: 800;
+        }
+        .focus-page1-priority-title { margin-bottom: 8px; font-size: calc(15px * var(--focus-text-scale, 1)); }
+        .focus-page1-priority-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: 4px 12px;
+            padding: 3px 0;
+            font-size: calc(14px * var(--focus-text-scale, 1));
+        }
+        .focus-page1-priority-row strong { color: #d93025; font-weight: 800; }
+        .focus-page1-stock-row {
+            padding: 10px 5px;
+            border-bottom: 1px solid #ddd;
+            cursor: pointer;
+        }
+        .focus-page1-stock-row:hover,
+        .focus-page1-stock-row:focus-visible,
+        .focus-page1-stock-row.is-kline-open {
+            background: #f3f3f3;
+            outline: 1px solid #888;
+            outline-offset: -1px;
+        }
+        .focus-page1-stock-main.stock-main { display: grid; justify-content: stretch; }
+        .focus-page1-stock-identity {
+            display: grid;
+            grid-template-columns: minmax(0, 6em) max-content;
+            align-items: center;
+            column-gap: 12px;
+            min-width: 0;
+            font-size: calc(14px * var(--focus-text-scale, 1));
+        }
+        .focus-page1-stock-name { color: #222; font-size: calc(14px * var(--focus-text-scale, 1)); font-weight: 600; overflow-wrap: anywhere; }
+        .focus-quanyang-tag { color: #9333ea; font-size: calc(12px * var(--focus-text-scale, 1)); font-weight: 800; white-space: nowrap; }
+        .focus-page1-stock-code { color: #707070; font: calc(11px * var(--focus-text-scale, 1)) Consolas, monospace; }
+        .focus-page1-stock-gain {
+            color: #333;
+            font-size: calc(15px * var(--focus-text-scale, 1));
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+            white-space: nowrap;
+        }
+        .focus-page6-special .focus-page1-columns,
+        .focus-page6-special .focus-page1-stock-main {
+            grid-template-columns: minmax(110px, .8fr) 64px 72px minmax(150px, 1.1fr);
+            gap: 4px;
+        }
+        .focus-page6-special {
+            grid-template-columns: 230px minmax(0, 1fr);
+            align-items: start;
+        }
+        .focus-page6-special .focus-page1-group-button > span:first-child {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .focus-page6-excellent {
+            min-height: 18px;
+            color: #222;
+            font-size: calc(11px * var(--focus-text-scale, 1));
+            font-weight: 600;
+            line-height: 1.45;
+            text-align: center;
+        }
+        .focus-page6-special .focus-page1-columns span:last-child { text-align: center; }
+        .focus-page6-excellent.is-purple { color: #8b2bd1; }
+        .focus-page6-excellent span { display: block; }
+        .focus-page6-excel {
+            min-width: 0;
+            border-left: 1px solid #8f8f8f;
+            background: #fff;
+        }
+        .focus-page6-excel-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            min-height: 42px;
+            padding: 6px 8px;
+            border-bottom: 1px solid #bdbdbd;
+            background: #f7f7f7;
+        }
+        .focus-page6-excel-title {
+            min-width: 0;
+            color: #333;
+            font-size: calc(13px * var(--focus-text-scale, 1));
+            font-weight: 700;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .focus-page6-excel-actions { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+        .focus-page6-excel-actions button,
+        .focus-page6-excel-sheet-tabs button {
+            border: 1px solid #a9a9a9;
+            border-radius: 2px;
+            background: #fff;
+            color: #333;
+            font: inherit;
+            cursor: pointer;
+        }
+        .focus-page6-excel-actions button { min-height: 26px; padding: 2px 8px; }
+        .focus-page6-excel-actions button:hover,
+        .focus-page6-excel-sheet-tabs button:hover { background: #ededed; }
+        .focus-page6-excel-actions button:disabled { cursor: wait; opacity: .6; }
+        .focus-page6-excel-sheet-tabs {
+            display: flex;
+            gap: 0;
+            padding: 6px 8px 0;
+            border-bottom: 1px solid #c8c8c8;
+            background: #fff;
+        }
+        .focus-page6-excel-sheet-tabs button {
+            min-height: 27px;
+            padding: 2px 10px;
+            border-bottom: 0;
+        }
+        .focus-page6-excel-sheet-tabs button + button { border-left: 0; }
+        .focus-page6-excel-sheet-tabs button[aria-selected="true"] {
+            background: #333;
+            color: #fff;
+            font-weight: 700;
+        }
+        .focus-page6-excel-status {
+            min-height: 22px;
+            padding: 4px 8px;
+            color: #666;
+            font-size: calc(11px * var(--focus-text-scale, 1));
+        }
+        .focus-page6-excel-status.is-error { color: #9b1c1c; }
+        .focus-page6-excel-wrap {
+            width: 100%;
+            min-width: 0;
+            max-height: none;
+            overflow-y: visible;
+            overflow-x: hidden;
+            border-top: 1px solid #d0d0d0;
+        }
+        .focus-page6-excel-table {
+            width: 100%;
+            min-width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+            font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+            font-size: calc(11px * var(--focus-text-scale, 1));
+        }
+        .focus-page6-excel-table td {
+            box-sizing: border-box;
+            min-width: 0;
+            max-width: none;
+            padding: 4px 8px;
+            border-right: 1px solid #d0d0d0;
+            border-bottom: 1px solid #d0d0d0;
+            height: auto;
+            text-align: left;
+            vertical-align: middle;
+            white-space: normal;
+            word-break: break-word;
+            overflow: hidden;
+            line-height: 1.5;
+            position: relative;
+        }
+        .focus-page6-excel-table td.focus-page6-excel-row-number {
+            width: auto;
+            min-width: 0;
+            max-width: none;
+            padding: 4px 6px;
+            position: sticky;
+            left: 0;
+            z-index: 3;
+            background: #f4f4f4;
+            color: #777;
+            text-align: center;
+            font-size: calc(10px * var(--focus-text-scale, 1));
+            user-select: none;
+        }
+        .focus-page6-excel-cell-content {
+            position: static;
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            text-align: inherit;
+        }
+        .focus-page6-excel-table td[data-stock-code] {
+            cursor: pointer;
+        }
+        .focus-page6-excel-table td[data-stock-code]:hover {
+            text-decoration: underline;
+            text-decoration-thickness: 1px;
+        }
+        .focus-page6-excel-table td:focus {
+            outline: 2px solid #2563eb;
+            outline-offset: -2px;
+            background: #eef5ff;
+        }
+        .focus-page6-excel-empty { padding: 28px 10px; color: #888; text-align: center; }
+        .focus-redis-page {
+            width: 100%;
+            min-width: 0;
+            border: 1px solid #8f8f8f;
+            background: #fff;
+            overflow-x: hidden;
+        }
+        .focus-redis-page[hidden] { display: none; }
+        .focus-redis-page .focus-page6-excel { border-left: 0; }
+        .focus-page1-empty { padding: 28px 10px; color: #888; text-align: center; }
+        table {
+            width: 100%;
+            min-width: 0;
+            table-layout: fixed;
+            border-collapse: collapse;
+            background: #fff;
+        }
+        th, td {
+            width: 12.5%;
+            border-right: 1px solid #bdbdbd;
+            border-bottom: 1px solid #d0d0d0;
+            text-align: center;
+            vertical-align: middle;
+        }
+        body.focus-mode th, body.focus-mode td { width: calc(100% / var(--focus-column-count, 7)); }
+        body.focus-mode .stock-main { flex-wrap: wrap; }
+        body.focus-mode .stock-cell { padding-right: 4px; }
+        body.focus-mode .stock-meta { flex-wrap: wrap; gap: 4px 10px; }
+        th:last-child, td:last-child { border-right: 0; }
+        tbody tr:last-child td { border-bottom: 0; }
+        th {
+            height: 46px;
+            padding: 5px 4px;
+            background: #f1f1f1;
+            color: #111;
+            font-size: calc(13px * var(--focus-text-scale, 1));
+            font-weight: 600;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+        .header-count { margin-left: 5px; color: #666; font-weight: 400; white-space: nowrap; }
+        td { height: 64px; padding: 0; }
+        tbody tr:nth-child(even) td { background: #fafafa; }
+        .stock-cell {
+            position: relative;
+            min-height: 63px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 22px 8px 4px;
+        }
+        .stock-group-head {
+            width: calc(100% + 8px);
+            box-sizing: border-box;
+            margin: -8px -4px 2px;
+            padding: 4px 5px;
+            background: #eeeaf8;
+            color: #4f2d82;
+            font-size: calc(11px * var(--focus-text-scale, 1));
+            font-weight: 700;
+            line-height: 1.2;
+            text-align: center;
+        }
+        .stock-group-head.is-zero-close-below { font-size: calc(13px * var(--focus-text-scale, 1)); }
+        .stock-cell.has-group-head { padding-top: 8px; }
+        .stock-cell[data-stock-code] {
+            cursor: pointer;
+            outline: 1px solid transparent;
+            outline-offset: -2px;
+        }
+        .stock-cell[data-stock-code]:hover,
+        .stock-cell[data-stock-code]:focus-visible,
+        .stock-cell[data-stock-code].is-kline-open {
+            background: #f3f3f3;
+            outline-color: #777;
+        }
+        .stock-main {
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+            gap: 4px;
+            max-width: 100%;
+            line-height: 1.2;
+        }
+        .stock-name { font-weight: 600; color: #111; overflow-wrap: anywhere; }
+        .stock-code { color: #707070; font-family: Consolas, monospace; white-space: nowrap; }
+        .stock-meta {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            color: #555;
+            font-size: calc(12px * var(--focus-text-scale, 1));
+            white-space: nowrap;
+        }
+        .gain { min-width: 54px; font-variant-numeric: tabular-nums; color: #222; }
+        body.focus-mode .gain,
+        body.focus-mode .focus-page1-stock-gain,
+        body.focus-mode .focus-page6-board-gain {
+            font-family: SimHei, "Microsoft YaHei", sans-serif;
+            font-weight: 700;
+        }
+        .push-time { font-variant-numeric: tabular-nums; }
+        .push-reasons {
+            width: 100%;
+            margin-top: 4px;
+            color: #444;
+            font-size: calc(11px * var(--focus-text-scale, 1));
+            line-height: 1.45;
+            text-align: left;
+        }
+        .rank-badge {
+            position: absolute;
+            top: 6px;
+            right: 7px;
+            width: 20px;
+            height: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: #222;
+            color: #fff;
+            font: 600 calc(11px * var(--focus-text-scale, 1))/1 Arial, sans-serif;
+        }
+        .empty-cell { color: #aaa; }
+        .count-group {
+            min-height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 5px 2px;
+            background: #eeeeee;
+            color: #111;
+            font-size: calc(11px * var(--focus-text-scale, 1));
+            font-weight: 700;
+            line-height: 1.25;
+            text-align: center;
+        }
+        .push-kline-tooltip {
+            position: fixed;
+            z-index: 1000;
+            width: min(680px, calc(100vw - 20px));
+            padding: 3px;
+            border: 1px solid #777;
+            background: #fff;
+            box-shadow: 0 5px 18px rgba(0, 0, 0, .16);
+        }
+        .push-kline-tooltip[hidden] { display: none; }
+        .push-kline-image {
+            display: block;
+            width: 100%;
+            height: auto;
+            min-height: 180px;
+            object-fit: contain;
+            background: #fff;
+        }
+        body.focus-mode .push-kline-image { min-height: 0; }
+        @media (max-width: 720px) {
+            .page { width: calc(100% - 16px); margin-top: 12px; }
+            .focus-page2-heading { padding: 10px 6px; font-size: calc(13px * var(--focus-text-scale, 1)); }
+            .focus-page2-column .stock-name { display: inline; font-size: calc(13px * var(--focus-text-scale, 1)); }
+            .focus-page2-column .stock-code { display: inline; font-size: calc(11px * var(--focus-text-scale, 1)); }
+            .focus-page2-column .stock-meta { display: flex; font-size: calc(12px * var(--focus-text-scale, 1)); }
+            .focus-page2-column .stock-main { display: flex; line-height: 1.4; }
+            .focus-page2-column .gain { display: inline; }
+            .focus-content-layout.is-fifth-page { display: block; }
+            .focus-page1-special { grid-template-columns: 116px minmax(0, 1fr); }
+            .focus-page1-sidebar-title { padding: 8px 7px 6px; font-size: calc(9px * var(--focus-text-scale, 1)); }
+            .focus-page1-sidebar-description { padding: 0 7px 6px; font-size: calc(9px * var(--focus-text-scale, 1)); }
+            .focus-page1-group-button { min-height: 38px; padding: 7px 5px; gap: 4px; }
+            .focus-page1-group-count { font-size: calc(9px * var(--focus-text-scale, 1)); }
+            .focus-page1-main { padding-left: 6px; }
+            .focus-page1-heading { min-height: 36px; padding: 7px 2px; font-size: calc(11px * var(--focus-text-scale, 1)); }
+            .focus-page1-heading strong { font-size: calc(12px * var(--focus-text-scale, 1)); }
+            .focus-page1-columns,
+            .focus-page1-stock-main {
+                grid-template-columns: minmax(72px, 1fr) 58px 68px;
+                gap: 3px;
+            }
+            #focusPage1Special .focus-page1-columns,
+            #focusPage1Special .focus-page1-stock-main {
+                grid-template-columns: minmax(42px, 1fr) 48px 34px 44px;
+                gap: 2px;
+            }
+            .focus-page6-special .focus-page1-columns,
+            .focus-page6-special .focus-page1-stock-main {
+                grid-template-columns: minmax(50px, .72fr) 38px 46px minmax(72px, 1.28fr);
+                gap: 0;
+            }
+            .focus-page6-special { grid-template-columns: 150px minmax(0, 1fr); }
+            .focus-page6-excel { grid-column: 1 / -1; border-left: 0; border-top: 1px solid #8f8f8f; }
+            .focus-page6-excel-wrap { max-height: 520px; }
+            .focus-page6-group-meta { gap: 3px; font-size: calc(8px * var(--focus-text-scale, 1)); }
+            .focus-page6-board-gain { min-width: 42px; }
+            .focus-page6-excellent { font-size: calc(8px * var(--focus-text-scale, 1)); line-height: 1.3; }
+            .focus-page1-columns { padding: 5px 2px; font-size: calc(8px * var(--focus-text-scale, 1)); }
+            .focus-page1-stock-row { padding: 8px 2px; }
+            .focus-page1-stock-identity { font-size: calc(11px * var(--focus-text-scale, 1)); column-gap: 8px; }
+            #focusPage1Special .focus-page1-stock-identity {
+                display: flex;
+                flex-wrap: wrap;
+                column-gap: 4px;
+                row-gap: 2px;
+            }
+            .focus-page1-stock-name { font-size: calc(11px * var(--focus-text-scale, 1)); }
+            .focus-quanyang-tag { font-size: calc(10px * var(--focus-text-scale, 1)); }
+            .focus-page1-below-count { font-size: calc(11px * var(--focus-text-scale, 1)); }
+            .focus-page1-priority-title { font-size: calc(13px * var(--focus-text-scale, 1)); }
+            .focus-page1-priority-row { font-size: calc(12px * var(--focus-text-scale, 1)); gap: 2px 8px; }
+            .focus-page1-stock-code { font-size: calc(8px * var(--focus-text-scale, 1)); }
+            .focus-page1-stock-gain { font-size: calc(11px * var(--focus-text-scale, 1)); }
+            body.focus-mode .page-tabs { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); width: 100%; }
+            body.focus-mode .page-tabs button { min-width: 0; padding: 0 3px; font-size: calc(11px * var(--focus-text-scale, 1)); }
+            .toolbar { align-items: flex-start; flex-direction: column; gap: 9px; }
+            .status-meta { align-items: flex-start; }
+            .controls { width: 100%; }
+            select { flex: 1; }
+            .strategy-nav { gap: 8px 12px; }
+            table { min-width: 0; }
+            th { height: 42px; padding: 3px 1px; font-size: calc(8px * var(--focus-text-scale, 1)); }
+            td { height: 50px; }
+            .header-count { display: block; margin-left: 0; font-size: calc(8px * var(--focus-text-scale, 1)); }
+            .stock-cell { min-height: 49px; gap: 2px; padding: 4px 1px; }
+            .stock-group-head {
+                width: calc(100% + 2px);
+                margin: -4px -1px 1px;
+                padding: 2px 1px;
+                font-size: calc(8px * var(--focus-text-scale, 1));
+            }
+            .stock-group-head.is-zero-close-below { font-size: calc(10px * var(--focus-text-scale, 1)); }
+            .stock-cell.has-group-head { min-height: 58px; }
+            .stock-main { display: block; line-height: 1.15; }
+            .stock-name { display: block; font-size: calc(9px * var(--focus-text-scale, 1)); }
+            .stock-code { display: block; font-size: calc(8px * var(--focus-text-scale, 1)); }
+            .stock-meta { display: block; font-size: calc(8px * var(--focus-text-scale, 1)); line-height: 1.2; white-space: normal; }
+            .gain { display: block; min-width: 0; }
+            .push-time { display: block; }
+            .rank-badge { top: 2px; right: 2px; width: 13px; height: 13px; font-size: calc(8px * var(--focus-text-scale, 1)); }
+            .count-group { min-height: 26px; padding: 3px 1px; font-size: calc(8px * var(--focus-text-scale, 1)); }
+            .push-kline-tooltip {
+                width: calc(100vw - 8px);
+                padding: 2px;
+            }
+            .push-kline-image { min-height: 0; }
+            body.focus-mode .push-kline-tooltip {
+                width: calc(100vw - 4px);
+                max-width: none;
+                box-sizing: border-box;
+                padding: 2px;
+            }
+            body.focus-mode .push-kline-image {
+                width: 100%;
+                height: auto;
+                min-height: 0;
+                object-fit: contain;
+            }
+        }
+        @media (max-width: 600px) {
+            body.focus-mode .focus-page2-column .stock-cell { padding: 6px; }
+            .focus-page2-column .stock-group-head { width: calc(100% + 12px); margin: -6px -6px 4px; }
+            .focus-page2-column .stock-card-body { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+            .focus-page2-column .stock-shape-tags { font-size: calc(11px * var(--focus-text-scale, 1)); }
+        }
+        @media (max-width: 340px) {
+            #focusPage1Special { grid-template-columns: 104px minmax(0, 1fr); }
+            #focusPage1Special .focus-page1-columns,
+            #focusPage1Special .focus-page1-stock-main { grid-template-columns: minmax(42px, 1fr) 48px 34px 44px; gap: 2px; }
+        }
+    </style>
+</head>
+<body{% if focus_mode %} class="focus-mode"{% endif %}>
+    <main class="page">
+        <header class="toolbar">
+            <div class="title-wrap">
+                <h1>{{ '重点关注' if focus_mode else '推送日志' }}</h1>
+                <span class="summary" id="summary">加载中</span>
+            </div>
+            <div class="controls">
+                <label for="dateSelect">日期</label>
+                <select id="dateSelect" aria-label="选择推送日期"></select>
+                <a class="nav-link" href="/性能">性能</a>
+                <a class="nav-link" href="{{ '/推送日志' if focus_mode else '/5拉升' }}">返回</a>
+            </div>
+        </header>
+
+        {% if focus_mode %}
+        <div class="page-tabs" role="tablist" aria-label="关注分页">
+            <button type="button" role="tab" data-focus-page="1" id="focusPage1" aria-selected="true" aria-controls="focusPage1Special">第一页</button>
+            <button type="button" role="tab" data-focus-page="2" id="focusPage2" aria-selected="false" aria-controls="focusSheetWrap" tabindex="-1">第二页</button>
+            <button type="button" role="tab" data-focus-page="3" id="focusPage3" aria-selected="false" aria-controls="focusSheetWrap" tabindex="-1">第三页</button>
+            <button type="button" role="tab" data-focus-page="4" id="focusPage4" aria-selected="false" aria-controls="focusSheetWrap" tabindex="-1">第四页</button>
+            <button type="button" role="tab" data-focus-page="5" id="focusPage5" aria-selected="false" aria-controls="focusSheetWrap" tabindex="-1">第五页</button>
+            <button type="button" role="tab" data-focus-page="6" id="focusPage6" aria-selected="false" aria-controls="focusPage6Special" tabindex="-1">同花顺</button>
+            <button type="button" role="tab" data-focus-page="7" id="focusPage7" aria-selected="false" aria-controls="focusRedisPage" tabindex="-1">复盘</button>
+            <button type="button" role="tab" data-focus-page="8" id="focusPage8" aria-selected="false" aria-controls="focusRedisPage" tabindex="-1">财联社涨停分析</button>
+        </div>
+        <div class="focus-page-notes" id="focusPageNotes">
+            <span class="focus-page-note" id="focusPage1Note">说明：1.读取pz1 2.20天阴线≤7且参考日阳线 3.可按阴线或阴线破5次数分组</span>
+            <span class="focus-page-note" id="focusPage2Note" hidden>说明：上方读取pz1，不要求参考日涨幅≥5%；下方读取pz，参考日涨幅≥5%</span>
+            <span class="focus-page-note" id="focusPage3Note" hidden>说明：1.不参考日涨幅 &gt;=5% 2.读取pz1</span>
+            <span class="focus-page-note" id="focusPage4Note" hidden>说明：1.参考日涨幅 &gt;=5% 2.阴线不碰或反包 3.全阳 4.读取qy1</span>
+            <span class="focus-page-note" id="focusPageNote" hidden>说明：1阴线不破或被吃 2全阳 3.读取qy2</span>
+            <span class="focus-page-note" id="focusReviewNote" hidden>说明：只读 Redis 当天复盘选股数据；网页文字修改单独保存，不修改原始数据</span>
+            <span class="focus-page-note" id="focusClsNote" hidden>说明：只读 Redis 当天财联社涨停分析数据；网页文字修改单独保存，不修改原始数据</span>
+        </div>
+        {% else %}
+        <nav class="strategy-nav" aria-label="PZ策略页面">
+            <a href="/重点关注">重点关注</a>
+            <a href="/5拉收盘大于10日">5拉收盘大于10日</a>
+            <a href="/5拉阴线都向上">5拉阴线都向上</a>
+            <a href="/5拉阴被吃">5拉阴被吃</a>
+            <a href="/5拉阴后拉或吃">5拉阴后拉或吃</a>
+            <a href="/5拉阴线都是十字星">5拉阴线都是十字星</a>
+            <a href="/5拉阴都不碰">5拉阴都不碰</a>
+        </nav>
+        {% endif %}
+
+        <div class="status" aria-live="polite">
+            {% if focus_mode %}
+            <div class="status-actions">
+                <button type="button" class="limit-up-filter" id="focusLimitUpOnly" aria-pressed="false">涨停</button>
+                <button type="button" class="limit-up-filter" id="focusNotLimitUpOnly" aria-pressed="false">未涨停</button>
+                <label class="limit-up-filter">
+                    <input type="checkbox" id="focusHighGainOnly">
+                    <span>是否拉升</span>
+                </label>
+                <label class="limit-up-filter">
+                    <input type="checkbox" id="focusBareFootHighGainOnly">
+                    <span>光脚拉升</span>
+                </label>
+                <label class="limit-up-filter purple-filter">
+                    <input type="checkbox" id="focusLimitUpBareFootHighGainOnly">
+                    <span>涨停光脚拉升</span>
+                </label>
+                <label class="limit-up-filter" id="focusQuanyangFilterLabel" hidden>
+                    <input type="checkbox" id="focusQuanyangOnly">
+                    <span>全阳</span>
+                </label>
+                <label class="limit-up-filter" id="focusNewHighFilterLabel" hidden>
+                    <input type="checkbox" id="focusNewHighOnly">
+                    <span>新高</span>
+                </label>
+                <span id="statusText">正在读取重点关注...</span>
+            </div>
+            {% else %}
+            <span id="statusText">正在读取{{ '重点关注' if focus_mode else '推送记录' }}...</span>
+            {% endif %}
+            {% if focus_mode %}
+            <div class="status-meta">
+                <span id="updatedAt"></span>
+            </div>
+            {% else %}
+            <span id="updatedAt"></span>
+            {% endif %}
+        </div>
+
+        <div class="focus-content-layout" id="focusContentLayout">
+            {% if focus_mode %}
+            <div class="focus-page1-special" id="focusPage1Special" role="tabpanel" aria-labelledby="focusPage1" hidden>
+                <nav class="focus-page1-sidebar" aria-label="股票分组">
+                    <div class="focus-page1-sidebar-section">
+                        <div class="focus-page1-sidebar-title">阴线次数分组</div>
+                        <div id="focusPage1Groups"></div>
+                    </div>
+                    <div class="focus-page1-sidebar-section">
+                        <div class="focus-page1-sidebar-title">阴线跌破5日线分组</div>
+                        <div id="focusPage1BelowGroups"></div>
+                    </div>
+                    <div id="focusPage1MetricGroups"></div>
+                </nav>
+                <section class="focus-page1-main">
+                    <div class="focus-page1-heading">
+                        <strong id="focusPage1Heading">20日阴线次数</strong>
+                        <span class="header-count" id="focusPage1Count">0只</span>
+                    </div>
+                    <div class="focus-page1-description" id="focusPage1Description" hidden></div>
+                    <div class="focus-page1-columns"><span>股票</span><span class="focus-page1-below-heading" id="focusPage1ValueHeading">20天阴线破5次数</span><span>代码</span><span>涨跌幅</span></div>
+                    <div id="focusPage1Rows"></div>
+                </section>
+            </div>
+            <div class="focus-page1-special focus-page6-special" id="focusPage6Special" role="tabpanel" aria-labelledby="focusPage6" hidden>
+                <nav class="focus-page1-sidebar" aria-label="板块排行">
+                    <div class="focus-page1-sidebar-title">板块排行</div>
+                    <div id="focusPage6Groups"></div>
+                </nav>
+                <section class="focus-page1-main">
+                    <div class="focus-page1-heading">
+                        <strong id="focusPage6Heading">特别板块</strong>
+                        <span class="focus-page6-board-gain" id="focusPage6BoardGain">--</span>
+                        <span class="header-count" id="focusPage6Count">0只</span>
+                    </div>
+                    <div class="focus-page1-columns"><span>股票</span><span>代码</span><span>涨跌幅</span><span>极品</span></div>
+                    <div id="focusPage6Rows"></div>
+                </section>
+            </div>
+            <section class="focus-redis-page" id="focusRedisPage" role="tabpanel" aria-labelledby="focusPage7" hidden>
+                <div class="focus-page6-excel-toolbar">
+                    <strong class="focus-page6-excel-title" id="focusPage6ExcelTitle">复盘选股数据</strong>
+                    <div class="focus-page6-excel-actions">
+                        <button type="button" id="focusPage6ExcelSave">保存</button>
+                    </div>
+                </div>
+                <div class="focus-page6-excel-status" id="focusPage6ExcelStatus">正在读取当天 Redis 数据...</div>
+                <div class="focus-page6-excel-wrap">
+                    <table class="focus-page6-excel-table" id="focusPage6ExcelTable" aria-label="Redis复盘内容">
+                        <tbody><tr><td class="focus-page6-excel-empty">选择复盘页后加载</td></tr></tbody>
+                    </table>
+                </div>
+            </section>
+            {% endif %}
+            {% if focus_mode %}
+            <section class="focus-page2-extra" id="focusPage2Extra" aria-label="5拉新形态" hidden></section>
+            {% endif %}
+            <div class="sheet-wrap" id="focusSheetWrap"{% if focus_mode %} role="tabpanel" aria-labelledby="focusPage1"{% endif %}>
+                <table aria-label="{{ 'PZ1重点关注' if focus_mode else 'PZ钉钉推送日志' }}">
+                    <thead>
+                        <tr id="columnHeaders">
+                            {% if focus_mode %}
+                            <th>20天阴线次数 <span class="header-count" id="focusPzAllCount">0只</span></th>
+                            {% else %}
+                            <th>全部推送 <span class="header-count" id="allCount">0只</span></th>
+                            <th>20天阴线≤7 <span class="header-count" id="condition2Count">0只</span></th>
+                            <th>5拉收盘大于10日 <span class="header-count" id="condition3Count">0只</span></th>
+                            <th>5拉阴线都向上 <span class="header-count" id="yinUpCount">0只</span></th>
+                            <th>5拉阴被吃 <span class="header-count" id="yinEatenCount">0只</span></th>
+                            <th>5拉阴后拉或吃 <span class="header-count" id="yinNextCount">0只</span></th>
+                            <th>5拉阴线都是十字星 <span class="header-count" id="yinCrossCount">0只</span></th>
+                            <th>5拉阴都不碰 <span class="header-count" id="yinNoTouchCount">0只</span></th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody id="pushRows">
+                        <tr><td colspan="{{ 1 if focus_mode else 8 }}" class="empty-cell">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+    <div id="pushKlineTooltip" class="push-kline-tooltip" hidden role="region" aria-label="股票日K线图">
+        <img id="pushKlineImage" class="push-kline-image" alt="股票日K线图">
+    </div>
+
+    <script>
+        const FOCUS_MODE = {{ 'true' if focus_mode else 'false' }};
+        const API_BASE = {{ ('/api/pz1/focus' if focus_mode else '/api/pz/push-log')|tojson }};
+        const PAGE_LABEL = FOCUS_MODE ? '重点关注' : '推送日志';
+        const REFRESH_MS = 3000;
+        const FOCUS_PAGE2_EXTRA_COLUMNS = [
+            { key: 'yi_yin_yi_yang', title: '5拉一阴一阳' },
+            { key: 'qiangchi', title: '5拉强吃' }
+        ];
+        const FOCUS_SHAPE_TAGS = [
+            { field: 'is_quanyang_10d', label: '没有阴线' },
+            { field: 'five_pull_all_yin_no_touch', label: '5拉阴都不碰' },
+            { field: 'five_pull_all_yin_up', label: '5拉阴线都向上' },
+            { field: 'five_pull_all_yin_cross_star', label: '5拉阴线都是十字星' }
+        ];
+        const FOCUS_COLUMNS = {
+            1: [
+                { key: 'pz_all', title: '20天阴线次数', id: 'focusPzAllCount', field: 'yin_count_20', label: '20天阴线' }
+            ],
+            2: [
+                { key: 'condition_3_met', title: '5拉收盘大于10日', id: 'focusCondition3Count' },
+                { key: 'five_pull_all_yin_up', title: '5拉阴线都向上', id: 'focusYinUpCount' },
+                { key: 'five_pull_all_yin_eaten_next', title: '5拉阴被吃', id: 'focusYinEatenCount' },
+                { key: 'five_pull_yin_pull_next_or_eaten', title: '5拉阴后拉或吃', id: 'focusNextOrEatenCount' },
+                { key: 'five_pull_all_yin_cross_star', title: '5拉阴线都是十字星', id: 'focusYinCrossCount' },
+                { key: 'five_pull_all_yin_no_touch', title: '5拉阴都不碰', id: 'focusYinNoTouchCount' }
+            ].map(column => ({ ...column, field: 'yin_count_10d', label: '10天阴线' })),
+            3: [
+                { key: 'five_pull_yin_pull_next_or_eaten', title: '5拉阴后拉或吃', id: 'focusNearlyYinNextCount', field: 'nearly_bare_foot_count_10d', label: '10天几乎光脚' },
+                { key: 'condition_3_met', title: '5拉收盘大于10日', id: 'focusNearlyCondition3Count', field: 'nearly_bare_foot_count_10d', label: '10天几乎光脚' },
+                { key: 'qy1_all', title: '全阳', id: 'focusQy1Count', customGrouping: 'qy1' },
+                { key: 'high_gain_prev3_short_shadow', title: '拉升前稳定', id: 'focusStableBeforeRiseCount', field: 'prev3_yang_count', label: '前3天阳线' }
+            ],
+            4: [
+                { key: 'all_yin_up', title: '阴线都向上', id: 'focusQy1YinUpCount' },
+                { key: 'all_yin_no_touch', title: '阴线都不碰', id: 'focusQy1YinNoTouchCount' },
+                { key: 'all_yin_cross_star', title: '阴线都是十字星', id: 'focusQy1YinCrossCount' }
+            ],
+            5: [
+                { key: 'low_above_ma5_10d', title: '10日低不碰次数', id: 'focusQy2LowAboveCount', field: 'close_below_ma5_count_10d', label: '跌破5日线' },
+                { key: 'low_above_ma5_10d_gte_5', title: '10日低不碰≥5', id: 'focusQy2LowAbove5Count', field: 'close_below_ma5_count_10d', label: '跌破5日线' },
+                { key: 'high_gain_10d_gte_5', title: '10日拉升≥5', id: 'focusQy2HighGain5Count', field: 'close_below_ma5_count_10d', label: '跌破5日线' }
+            ],
+            6: [
+                { key: 'ths_boards', title: '特别板块', id: 'focusThsBoardCount' }
+            ],
+            7: [
+                { key: 'redis_review', title: '复盘选股数据', id: 'focusReviewCount' }
+            ],
+            8: [
+                { key: 'redis_cls', title: '财联社涨停分析', id: 'focusClsCount' }
+            ]
+        };
+        const FOCUS_PAGE_STORAGE_KEY = 'pz1-focus-page';
+        const FOCUS_EXCEL_DEFAULT_SHEET = '复盘选股数据';
+        const INITIAL_QUERY = new URLSearchParams(window.location.search);
+
+        function readStoredFocusPage() {
+            if (!FOCUS_MODE) return 1;
+            const queryPage = Number(INITIAL_QUERY.get('page'));
+            if ([1, 2, 3, 4, 5, 6, 7, 8].includes(queryPage)) return queryPage;
+            try {
+                const page = Number(window.localStorage.getItem(FOCUS_PAGE_STORAGE_KEY));
+                return [1, 2, 3, 4, 5, 6, 7, 8].includes(page) ? page : 1;
+            } catch (error) {
+                return 1;
+            }
+        }
+
+        function persistFocusPage(page) {
+            if (!FOCUS_MODE) return;
+            try {
+                window.localStorage.setItem(FOCUS_PAGE_STORAGE_KEY, String(page));
+            } catch (error) {
+                // Storage can be unavailable in privacy-restricted browsers.
+            }
+        }
+
+        const state = {
+            date: FOCUS_MODE ? String(INITIAL_QUERY.get('date') || '') : '',
+            workbookDatePinned: INITIAL_QUERY.has('date'),
+            loading: false, openKlineCode: '', openKlineAnchor: null,
+            openKlineRegion: '',
+            limitUpOnly: false, notLimitUpOnly: false, highGainOnly: false, bareFootHighGainOnly: false,
+            limitUpBareFootHighGainOnly: false, quanyangOnly: false, newHighOnly: false,
+            focusPayload: null, focusPage: readStoredFocusPage(),
+            page1GroupMode: 'yin', page1YinGroup: '', page1BelowGroup: '',
+            page6Board: '',
+            focusExcelSheet: FOCUS_EXCEL_DEFAULT_SHEET,
+            focusExcelPayload: null, focusExcelChanges: new Map(),
+            focusExcelCacheKey: '', focusExcelRequestId: 0,
+            focusRedisLoadedKey: '',
+            requestId: 0, requestController: null, datesRequestId: 0,
+            mobileKlineAdjusting: false
+        };
+
+        const dateSelect = document.getElementById('dateSelect');
+        const rowsElement = document.getElementById('pushRows');
+        const statusText = document.getElementById('statusText');
+        const limitUpFilter = document.getElementById('focusLimitUpOnly');
+        const notLimitUpFilter = document.getElementById('focusNotLimitUpOnly');
+        const highGainFilter = document.getElementById('focusHighGainOnly');
+        const bareFootHighGainFilter = document.getElementById('focusBareFootHighGainOnly');
+        const limitUpBareFootHighGainFilter = document.getElementById('focusLimitUpBareFootHighGainOnly');
+        const quanyangFilter = document.getElementById('focusQuanyangOnly');
+        const quanyangFilterLabel = document.getElementById('focusQuanyangFilterLabel');
+        const newHighFilter = document.getElementById('focusNewHighOnly');
+        const newHighFilterLabel = document.getElementById('focusNewHighFilterLabel');
+        const pageTabs = document.querySelectorAll('[data-focus-page]');
+        const focusContentLayout = document.getElementById('focusContentLayout');
+        const focusPage1Special = document.getElementById('focusPage1Special');
+        const focusPage1Groups = document.getElementById('focusPage1Groups');
+        const focusPage1BelowGroups = document.getElementById('focusPage1BelowGroups');
+        const focusPage1MetricGroups = document.getElementById('focusPage1MetricGroups');
+        const focusPage1Heading = document.getElementById('focusPage1Heading');
+        const focusPage1Count = document.getElementById('focusPage1Count');
+        const focusPage1Description = document.getElementById('focusPage1Description');
+        const focusPage1ValueHeading = document.getElementById('focusPage1ValueHeading');
+        const focusPage1Rows = document.getElementById('focusPage1Rows');
+        const focusPage6Special = document.getElementById('focusPage6Special');
+        const focusRedisPage = document.getElementById('focusRedisPage');
+        const focusPage6Groups = document.getElementById('focusPage6Groups');
+        const focusPage6Heading = document.getElementById('focusPage6Heading');
+        const focusPage6BoardGain = document.getElementById('focusPage6BoardGain');
+        const focusPage6Count = document.getElementById('focusPage6Count');
+        const focusPage6Rows = document.getElementById('focusPage6Rows');
+        const focusPage6ExcelPanel = document.getElementById('focusPage6ExcelPanel');
+        const focusPage6ExcelTitle = document.getElementById('focusPage6ExcelTitle');
+        const focusPage6ExcelOpen = document.getElementById('focusPage6ExcelOpen');
+        const focusPage6ExcelSave = document.getElementById('focusPage6ExcelSave');
+        const focusPage6ExcelStatus = document.getElementById('focusPage6ExcelStatus');
+        const focusPage6ExcelTable = document.getElementById('focusPage6ExcelTable');
+        const focusPage6ExcelTabs = document.querySelectorAll('[data-focus-excel-sheet]');
+        const focusSheetWrap = document.getElementById('focusSheetWrap');
+        const focusPage2Extra = document.getElementById('focusPage2Extra');
+        const focusPageNotes = document.getElementById('focusPageNotes');
+        const focusPage1Note = document.getElementById('focusPage1Note');
+        const focusPage2Note = document.getElementById('focusPage2Note');
+        const focusPage3Note = document.getElementById('focusPage3Note');
+        const focusPage4Note = document.getElementById('focusPage4Note');
+        const focusPageNote = document.getElementById('focusPageNote');
+        const focusReviewNote = document.getElementById('focusReviewNote');
+        const focusClsNote = document.getElementById('focusClsNote');
+        const updatedAt = document.getElementById('updatedAt');
+        const klineTooltip = document.getElementById('pushKlineTooltip');
+        const klineImage = document.getElementById('pushKlineImage');
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
+
+        function shortTime(value) {
+            const text = String(value || '').trim();
+            return text.length >= 19 ? text.slice(11, 19) : text || '-';
+        }
+
+        function stockCell(stock, groupLabel = '', showShapeTags = false) {
+            if (!stock) return '<div class="stock-cell empty-cell">-</div>';
+            const zeroCloseBelowClass = (
+                FOCUS_MODE && state.focusPage === 5 && groupLabel === '跌破5日线=0'
+            ) ? ' is-zero-close-below' : '';
+            const groupHead = groupLabel
+                ? `<div class="stock-group-head${zeroCloseBelowClass}">${escapeHtml(groupLabel)}</div>`
+                : '';
+            const rank = Number(stock.global_rank || 0);
+            const badge = rank >= 1 && rank <= 3
+                ? `<span class="rank-badge" aria-label="全局最新第${rank}只">${rank}</span>`
+                : '';
+            const gain = Number(stock.ref_gain || 0);
+            const reasons = Array.isArray(stock.push_reasons)
+                ? stock.push_reasons.filter(Boolean)
+                : [];
+            const reasonHtml = reasons.length
+                ? `<div class="push-reasons">${reasons.map(reason =>
+                    `<div>${escapeHtml(reason)}</div>`
+                ).join('')}</div>`
+                : '';
+            const timeValue = FOCUS_MODE
+                ? (stock.dingtalk_sent_at || stock.updated_at || stock.snapshot_at)
+                : stock.dingtalk_sent_at;
+            const isFifthFocusPage = FOCUS_MODE && state.focusPage === 5;
+            const closeBelowSum = Number(stock.close_below_ma5_abs_pct_sum_10d);
+            const secondaryMeta = isFifthFocusPage
+                ? `<span class="push-time">累计跌破 ${Number.isFinite(closeBelowSum) ? closeBelowSum.toFixed(2) + '%' : '-'}</span>`
+                : `<span class="push-time">${escapeHtml(shortTime(timeValue))}</span>`;
+            const details = `
+                <div class="stock-main">
+                    <span class="stock-name">${escapeHtml(stock.name || stock.code)}</span>
+                    <span class="stock-code">${escapeHtml(stock.code)}</span>
+                </div>
+                <div class="stock-meta">
+                    <span class="gain">${gain.toFixed(2)}%</span>
+                    ${secondaryMeta}
+                </div>
+                ${reasonHtml}`;
+            const tags = showShapeTags ? FOCUS_SHAPE_TAGS.filter(tag =>
+                ['1', 'true', 'yes', 'y'].includes(String(stock[tag.field] ?? '').trim().toLowerCase())
+            ).map(tag => `<span>${escapeHtml(tag.label)}</span>`).join('') : '';
+            return `
+                <div class="stock-cell${groupLabel ? ' has-group-head' : ''}" data-stock-code="${escapeHtml(stock.code)}" role="button" tabindex="0" aria-label="查看${escapeHtml(stock.name || stock.code)}K线图">
+                    ${badge}
+                    ${groupHead}
+                    ${showShapeTags
+                        ? `<div class="stock-card-body"><div class="stock-card-details">${details}</div><div class="stock-shape-tags">${tags}</div></div>`
+                        : details}
+                </div>`;
+        }
+
+        function eastmoneyKlineUrl(value) {
+            const match = String(value || '').match(/\d{6}/);
+            if (!match) return '';
+            const code = match[0];
+            const prefix = code.startsWith('6') ? '1' : '0';
+            return `https://webquoteklinepic.eastmoney.com/GetPic.aspx?nid=${prefix}.${code}&imageType=KXL&token=44c9d251add88e27b65ed86506f6e5da&at=1`;
+        }
+
+        function closeKline() {
+            if (state.openKlineAnchor) state.openKlineAnchor.classList.remove('is-kline-open');
+            state.openKlineCode = '';
+            state.openKlineAnchor = null;
+            state.openKlineRegion = '';
+            state.mobileKlineAdjusting = false;
+            klineTooltip.hidden = true;
+            klineImage.removeAttribute('src');
+        }
+
+        function adjacentStockRow(currentRow, columnIndex, direction) {
+            let row = direction < 0
+                ? currentRow.previousElementSibling
+                : currentRow.nextElementSibling;
+            while (row) {
+                const cell = row.cells?.[columnIndex];
+                if (cell?.querySelector('.stock-cell[data-stock-code]')) return row;
+                row = direction < 0 ? row.previousElementSibling : row.nextElementSibling;
+            }
+            return null;
+        }
+
+        function positionMobileFocusKline(allowScroll = true) {
+            if (state.mobileKlineAdjusting || !state.openKlineAnchor) return;
+            const cell = state.openKlineAnchor.closest('td');
+            const currentRow = state.openKlineAnchor.closest('tr');
+            const margin = 2;
+            const gap = 4;
+            let currentRect;
+            let previousBoundary;
+            let nextBoundary;
+            if (cell && currentRow) {
+                const previousRow = adjacentStockRow(currentRow, cell.cellIndex, -1);
+                const nextRow = adjacentStockRow(currentRow, cell.cellIndex, 1);
+                currentRect = currentRow.getBoundingClientRect();
+                previousBoundary = (
+                    previousRow ? previousRow.getBoundingClientRect().top : currentRect.top
+                ) - gap;
+                nextBoundary = (
+                    nextRow ? nextRow.getBoundingClientRect().bottom : currentRect.bottom
+                ) + gap;
+            } else if (
+                focusPage1Rows?.contains(state.openKlineAnchor)
+                || focusPage6Rows?.contains(state.openKlineAnchor)
+            ) {
+                const currentItem = state.openKlineAnchor.closest('.focus-page1-stock-row');
+                if (!currentItem) return;
+                const previousItem = currentItem.previousElementSibling;
+                const nextItem = currentItem.nextElementSibling;
+                currentRect = currentItem.getBoundingClientRect();
+                previousBoundary = (
+                    previousItem ? previousItem.getBoundingClientRect().top : currentRect.top
+                ) - gap;
+                nextBoundary = (
+                    nextItem ? nextItem.getBoundingClientRect().bottom : currentRect.bottom
+                ) + gap;
+            } else {
+                const currentItem = state.openKlineAnchor.closest('.stock-cell');
+                if (!currentItem || !focusPage2Extra?.contains(currentItem)) return;
+                const previousItem = currentItem.previousElementSibling;
+                const nextItem = currentItem.nextElementSibling;
+                currentRect = currentItem.getBoundingClientRect();
+                previousBoundary = (
+                    previousItem ? previousItem.getBoundingClientRect().top : currentRect.top
+                ) - gap;
+                nextBoundary = (
+                    nextItem ? nextItem.getBoundingClientRect().bottom : currentRect.bottom
+                ) + gap;
+            }
+
+            klineTooltip.style.width = 'calc(100vw - 4px)';
+            klineTooltip.style.left = `${margin}px`;
+            const panelHeight = klineTooltip.getBoundingClientRect().height;
+            const viewportHeight = window.innerHeight;
+            const topPosition = margin;
+            const bottomPosition = Math.max(margin, viewportHeight - panelHeight - margin);
+            const fitsAbove = topPosition + panelHeight <= previousBoundary;
+            const fitsBelow = bottomPosition >= nextBoundary;
+            let placeBelow;
+
+            if (fitsAbove && fitsBelow) {
+                placeBelow = currentRect.top + currentRect.height / 2 < viewportHeight / 2;
+            } else if (fitsBelow) {
+                placeBelow = true;
+            } else if (fitsAbove) {
+                placeBelow = false;
+            } else {
+                const aboveSpace = Math.max(0, previousBoundary - margin);
+                const belowSpace = Math.max(0, viewportHeight - margin - nextBoundary);
+                placeBelow = belowSpace >= aboveSpace;
+                const available = placeBelow ? belowSpace : aboveSpace;
+                const deficit = Math.max(0, panelHeight - available);
+                if (allowScroll && deficit > 0) {
+                    state.mobileKlineAdjusting = true;
+                    window.scrollBy({
+                        top: placeBelow ? deficit + gap : -(deficit + gap),
+                        behavior: 'auto'
+                    });
+                    window.requestAnimationFrame(() => {
+                        state.mobileKlineAdjusting = false;
+                        positionMobileFocusKline(false);
+                    });
+                    return;
+                }
+            }
+
+            klineTooltip.style.top = `${Math.round(placeBelow ? bottomPosition : topPosition)}px`;
+        }
+
+        function positionKline() {
+            if (klineTooltip.hidden || !state.openKlineAnchor || !document.body.contains(state.openKlineAnchor)) return;
+            if (window.innerWidth <= 720 && FOCUS_MODE) {
+                positionMobileFocusKline();
+                return;
+            }
+            const anchor = state.openKlineAnchor.getBoundingClientRect();
+            if (FOCUS_MODE) {
+                const columnElement = state.openKlineAnchor.closest('td')
+                    || state.openKlineAnchor.closest('.focus-page2-column')
+                    || state.openKlineAnchor.closest('.focus-page1-main');
+                if (!columnElement) return;
+                const column = columnElement.getBoundingClientRect();
+                const margin = window.innerWidth <= 720 ? 4 : 10;
+                const gap = window.innerWidth <= 720 ? 6 : 10;
+                const leftSpace = Math.max(0, column.left - gap - margin);
+                const rightSpace = Math.max(0, window.innerWidth - column.right - gap - margin);
+                const ratio = klineImage.naturalWidth && klineImage.naturalHeight
+                    ? klineImage.naturalWidth / klineImage.naturalHeight : 1.4;
+                const frame = window.innerWidth <= 720 ? 6 : 8;
+                const maxWidth = Math.min(680, (window.innerHeight - 2 * margin - frame) * ratio + frame);
+                const useRight = rightSpace >= maxWidth || (leftSpace < maxWidth && rightSpace >= leftSpace);
+                const available = useRight ? rightSpace : leftSpace;
+                klineTooltip.style.width = `${Math.floor(Math.min(maxWidth, available))}px`;
+                const panel = klineTooltip.getBoundingClientRect();
+                const left = useRight ? column.right + gap : column.left - gap - panel.width;
+                const nameElement = state.openKlineAnchor.querySelector('.stock-main') || state.openKlineAnchor;
+                const name = nameElement.getBoundingClientRect();
+                const top = Math.max(margin, Math.min(
+                    name.top + (name.height - panel.height) / 2,
+                    window.innerHeight - panel.height - margin
+                ));
+                klineTooltip.style.left = `${Math.round(left)}px`;
+                klineTooltip.style.top = `${Math.round(top)}px`;
+                return;
+            }
+            const panel = klineTooltip.getBoundingClientRect();
+            const margin = window.innerWidth <= 720 ? 4 : 10;
+            const gap = window.innerWidth <= 720 ? 6 : 10;
+            const below = anchor.bottom + gap;
+            const above = anchor.top - panel.height - gap;
+            const fitsBelow = below + panel.height <= window.innerHeight - margin;
+            const fitsAbove = above >= margin;
+            const fitsRight = anchor.right + gap + panel.width <= window.innerWidth - margin;
+            const fitsLeft = anchor.left - gap - panel.width >= margin;
+            let left;
+            let top;
+            if (fitsBelow || fitsAbove) {
+                left = anchor.left + (anchor.width - panel.width) / 2;
+                top = fitsBelow ? below : above;
+            } else if (fitsRight || fitsLeft) {
+                left = fitsRight ? anchor.right + gap : anchor.left - panel.width - gap;
+                top = anchor.top + (anchor.height - panel.height) / 2;
+            } else {
+                left = anchor.left + (anchor.width - panel.width) / 2;
+                top = (window.innerHeight - anchor.bottom) >= anchor.top ? below : above;
+            }
+            left = Math.max(margin, Math.min(left, window.innerWidth - panel.width - margin));
+            if (fitsBelow || fitsAbove || fitsRight || fitsLeft) {
+                top = Math.max(margin, Math.min(top, window.innerHeight - panel.height - margin));
+            }
+            klineTooltip.style.left = `${Math.round(left)}px`;
+            klineTooltip.style.top = `${Math.round(top)}px`;
+        }
+
+        function showKline(code, anchor) {
+            const url = eastmoneyKlineUrl(code);
+            if (!url) return;
+            if (state.openKlineAnchor) state.openKlineAnchor.classList.remove('is-kline-open');
+            state.openKlineCode = code;
+            state.openKlineAnchor = anchor;
+            state.openKlineRegion = focusPage1Rows?.contains(anchor)
+                ? 'page1'
+                : focusPage6Rows?.contains(anchor) ? 'page6'
+                : focusPage2Extra?.contains(anchor) ? 'page2-extra'
+                : 'table';
+            anchor.classList.add('is-kline-open');
+            klineImage.src = url;
+            klineTooltip.hidden = false;
+            positionKline();
+        }
+
+        function toggleKline(cell) {
+            const code = String(cell && cell.dataset.stockCode || '');
+            if (!code) return;
+            if (state.openKlineCode === code) {
+                closeKline();
+                return;
+            }
+            showKline(code, cell);
+        }
+
+        function groupedColumnEntries(stocks, countField, label, inlineHeader = FOCUS_MODE) {
+            const entries = [];
+            let previousCount = null;
+            (stocks || []).forEach(stock => {
+                const value = stock[countField];
+                const count = value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value))
+                    ? Math.trunc(Number(value)) : null;
+                const startsGroup = !entries.length || count !== previousCount;
+                const groupLabel = count === null ? `${label}：未统计` : `${label}=${count}`;
+                if (startsGroup && !inlineHeader) {
+                    entries.push({ type: 'group', label: groupLabel });
+                }
+                entries.push({ type: 'stock', stock, groupLabel: startsGroup && inlineHeader ? groupLabel : '' });
+                previousCount = count;
+            });
+            return entries;
+        }
+
+        function groupedQy1Entries(stocks) {
+            const entries = [];
+            const isNoYin = stock => ['1', 'true', 'yes', 'y'].includes(
+                String(stock.is_quanyang_10d ?? 0).trim().toLowerCase()
+            );
+            const noYin = (stocks || []).filter(isNoYin);
+            const others = (stocks || []).filter(stock => !isNoYin(stock));
+            if (noYin.length) {
+                noYin.forEach((stock, index) => entries.push({
+                    type: 'stock',
+                    stock,
+                    groupLabel: index === 0 ? '没有阴线' : ''
+                }));
+            }
+            groupedColumnEntries(others, 'low_above_ma5_count_10d', '10日低不碰')
+                .forEach(entry => entries.push(entry));
+            return entries;
+        }
+
+        function columnCell(entry) {
+            if (!entry) return '<div class="stock-cell empty-cell">-</div>';
+            if (entry.type === 'group') {
+                return `<div class="count-group">${escapeHtml(entry.label)}</div>`;
+            }
+            return stockCell(entry.stock, entry.groupLabel);
+        }
+
+        function syncFocusPageLayout() {
+            const firstPage = FOCUS_MODE && state.focusPage === 1;
+            const sixthPage = FOCUS_MODE && state.focusPage === 6;
+            const redisPage = FOCUS_MODE && (state.focusPage === 7 || state.focusPage === 8);
+            document.body.classList.toggle('redis-page-mode', redisPage);
+            if (focusContentLayout) focusContentLayout.classList.toggle('is-first-page', firstPage);
+            if (focusContentLayout) focusContentLayout.classList.toggle('is-fifth-page', FOCUS_MODE && state.focusPage === 5);
+            if (focusPage1Special) focusPage1Special.hidden = !firstPage;
+            if (quanyangFilterLabel) quanyangFilterLabel.hidden = !firstPage;
+            if (newHighFilterLabel) newHighFilterLabel.hidden = !firstPage;
+            if (focusPage6Special) focusPage6Special.hidden = !sixthPage;
+            if (focusRedisPage) focusRedisPage.hidden = !redisPage;
+            if (focusSheetWrap) focusSheetWrap.hidden = firstPage || sixthPage || redisPage;
+            if (focusPage2Extra) focusPage2Extra.hidden = !(FOCUS_MODE && state.focusPage === 2);
+            if (focusPageNotes) focusPageNotes.hidden = sixthPage;
+            if (focusPage1Note) focusPage1Note.hidden = !firstPage;
+            if (focusPage2Note) focusPage2Note.hidden = !(FOCUS_MODE && state.focusPage === 2);
+            if (focusPage3Note) focusPage3Note.hidden = !(FOCUS_MODE && state.focusPage === 3);
+            if (focusPage4Note) focusPage4Note.hidden = !(FOCUS_MODE && state.focusPage === 4);
+            if (focusPageNote) focusPageNote.hidden = !(FOCUS_MODE && state.focusPage === 5);
+            if (focusReviewNote) focusReviewNote.hidden = !(FOCUS_MODE && state.focusPage === 7);
+            if (focusClsNote) focusClsNote.hidden = !(FOCUS_MODE && state.focusPage === 8);
+            [limitUpFilter, notLimitUpFilter, highGainFilter, bareFootHighGainFilter,
+                limitUpBareFootHighGainFilter].forEach(element => {
+                if (element) element.hidden = redisPage;
+            });
+            document.querySelectorAll('.status-actions > .limit-up-filter').forEach(element => {
+                element.style.display = redisPage ? 'none' : '';
+            });
+        }
+
+        function focusStockGain(stock) {
+            const value = stock.today_change ?? stock.ref_gain ?? 0;
+            const gain = Number(value);
+            return Number.isFinite(gain) ? gain : 0;
+        }
+
+        function isPz1Quanyang(stock) {
+            return ['1', 'true', 'yes', 'y'].includes(
+                String(stock.pz1_yin7_yang_no_touch_or_eaten_10d ?? 0).trim().toLowerCase()
+            );
+        }
+
+        function closeBelowMa5Count20d(stock) {
+            const raw = stock.close_below_ma5_count_20d;
+            if (raw === null || raw === undefined || raw === '') return null;
+            const count = Number(raw);
+            return Number.isInteger(count) && count >= 0 && count <= 20 ? count : null;
+        }
+
+        const PAGE1_METRICS = [
+            {
+                field: 'yin_close_below_ma5_max_abs_pct_20d',
+                title: '20天收盘价破5最大百分比',
+                description: '20天阴线的收盘价距离 MA5 最大的百分比'
+            },
+            {
+                field: 'yin_close_below_ma5_drop_pct_sum_20d',
+                title: '20天收盘价破5累计跌幅',
+                description: '20天跌破 MA5 的阴线累计跌幅'
+            },
+            {
+                field: 'yin_close_below_ma5_body_pct_sum_20d',
+                title: '20天收盘价破5累计实体',
+                description: '20天跌破 MA5 的阴线累计实体大小'
+            }
+        ];
+
+        function page1MetricValue(stock, field) {
+            const raw = stock[field];
+            if (raw === null || raw === undefined || raw === '') return null;
+            const value = Number(raw);
+            return Number.isFinite(value) && value >= 0 ? value : null;
+        }
+
+        function renderFocusPage1(stocks) {
+            if (!focusPage1Groups || !focusPage1BelowGroups || !focusPage1MetricGroups
+                || !focusPage1Rows || !focusPage1Heading || !focusPage1Count) return [];
+            const groupedByYin = new Map();
+            const groupedByBelow = new Map();
+            (stocks || []).forEach(stock => {
+                const value = Number(stock.yin_count_20);
+                const key = Number.isFinite(value) ? String(Math.trunc(value)) : 'unknown';
+                if (!groupedByYin.has(key)) groupedByYin.set(key, []);
+                groupedByYin.get(key).push(stock);
+                const belowCount = closeBelowMa5Count20d(stock);
+                if (belowCount !== null && belowCount <= 3) {
+                    const belowKey = String(belowCount);
+                    if (!groupedByBelow.has(belowKey)) groupedByBelow.set(belowKey, []);
+                    groupedByBelow.get(belowKey).push(stock);
+                }
+            });
+            const sortedKeys = grouped => [...grouped.keys()].sort((left, right) => {
+                if (left === 'unknown') return 1;
+                if (right === 'unknown') return -1;
+                return Number(left) - Number(right);
+            });
+            const yinKeys = sortedKeys(groupedByYin);
+            const belowKeys = sortedKeys(groupedByBelow);
+            [groupedByYin, groupedByBelow].forEach(groups => groups.forEach(group =>
+                group.sort((left, right) =>
+                    focusStockGain(right) - focusStockGain(left)
+                    || String(left.code || '').localeCompare(String(right.code || ''))
+                )
+            ));
+
+            if (!yinKeys.includes(state.page1YinGroup)) state.page1YinGroup = yinKeys[0] || '';
+            if (!belowKeys.includes(state.page1BelowGroup)) state.page1BelowGroup = belowKeys[0] || '';
+            focusPage1Groups.innerHTML = yinKeys.length
+                ? yinKeys.map(key => {
+                    const label = key === 'unknown' ? '阴线未统计' : `阴线 ${key} 次`;
+                    const selected = state.page1GroupMode === 'yin' && key === state.page1YinGroup;
+                    return `<button type="button" class="focus-page1-group-button${selected ? ' is-active' : ''}" data-yin-count="${escapeHtml(key)}" aria-pressed="${String(selected)}"><span>${escapeHtml(label)}</span><span class="focus-page1-group-count">${groupedByYin.get(key).length}只</span></button>`;
+                }).join('')
+                : '<div class="focus-page1-empty">暂无分组</div>';
+            focusPage1BelowGroups.innerHTML = belowKeys.length
+                ? belowKeys.map(key => {
+                    const label = key === 'unknown' ? '跌破未统计' : `跌破 ${key} 次`;
+                    const selected = state.page1GroupMode === 'below' && key === state.page1BelowGroup;
+                    return `<button type="button" class="focus-page1-group-button${selected ? ' is-active' : ''}" data-below-count="${escapeHtml(key)}" aria-pressed="${String(selected)}"><span>${escapeHtml(label)}</span><span class="focus-page1-group-count">${groupedByBelow.get(key).length}只</span></button>`;
+                }).join('')
+                : '<div class="focus-page1-empty">暂无分组</div>';
+
+            focusPage1MetricGroups.innerHTML = PAGE1_METRICS.map(metric => {
+                const count = (stocks || []).filter(stock => page1MetricValue(stock, metric.field) !== null).length;
+                const selected = state.page1GroupMode === metric.field;
+                return `<div class="focus-page1-sidebar-section"><div class="focus-page1-sidebar-title">${escapeHtml(metric.title)}</div><div class="focus-page1-sidebar-description">${escapeHtml(metric.description)}。</div><button type="button" class="focus-page1-group-button${selected ? ' is-active' : ''}" data-page1-metric="${metric.field}" aria-pressed="${String(selected)}"><span>从小到大</span><span class="focus-page1-group-count">${count}只</span></button></div>`;
+            }).join('');
+
+            const metric = PAGE1_METRICS.find(item => item.field === state.page1GroupMode);
+            const belowMode = state.page1GroupMode === 'below';
+            const selectedKey = belowMode ? state.page1BelowGroup : state.page1YinGroup;
+            const selectedGroup = belowMode ? groupedByBelow : groupedByYin;
+            const selectedStocks = metric
+                ? (stocks || []).filter(stock => page1MetricValue(stock, metric.field) !== null)
+                    .sort((left, right) =>
+                        page1MetricValue(left, metric.field) - page1MetricValue(right, metric.field)
+                        || focusStockGain(right) - focusStockGain(left)
+                        || String(left.code || '').localeCompare(String(right.code || ''))
+                    )
+                : selectedKey ? (selectedGroup.get(selectedKey) || []) : [];
+            focusPage1Heading.textContent = metric ? metric.title : belowMode
+                ? (selectedKey === 'unknown' ? '20日阴线破5次数未统计'
+                    : selectedKey ? `20日阴线破5次数 = ${selectedKey}` : '20日阴线破5次数')
+                : (selectedKey === 'unknown' ? '20日阴线次数未统计'
+                    : selectedKey ? `20日阴线次数 = ${selectedKey}` : '20日阴线次数');
+            focusPage1Count.textContent = `${selectedStocks.length}只`;
+            if (focusPage1Description) {
+                focusPage1Description.hidden = !metric;
+                focusPage1Description.textContent = metric ? `${metric.description}；由小到大排序。` : '';
+            }
+            if (focusPage1ValueHeading) {
+                focusPage1ValueHeading.textContent = metric ? '指标值' : '20天阴线破5次数';
+            }
+            const selectedWithCounts = selectedStocks.map(stock => ({
+                stock, belowCount: closeBelowMa5Count20d(stock)
+            }));
+            const priorityRows = (metric ? [] : selectedWithCounts)
+                .filter(({ belowCount }) => belowCount !== null && belowCount <= 1)
+                .map(({ stock, belowCount }) => `<div class="focus-page1-priority-row"><strong>${escapeHtml(stock.name || stock.code)}</strong><span>次数${belowCount}</span><span>特别关注</span></div>`)
+                .join('');
+            const prioritySection = priorityRows
+                ? `<div class="focus-page1-priority"><div class="focus-page1-priority-title">特别注意20天阴线跌破5日线次数&lt;=1</div>${priorityRows}</div>`
+                : '';
+            focusPage1Rows.innerHTML = selectedWithCounts.length
+                ? selectedWithCounts.map(({ stock, belowCount }) => {
+                    const gain = focusStockGain(stock);
+                    const quanyangTag = isPz1Quanyang(stock)
+                        ? '<span class="focus-quanyang-tag">全阳</span>' : '';
+                    const belowClass = !metric && belowCount !== null && belowCount <= 1 ? ' is-priority' : '';
+                    const valueText = metric
+                        ? `${page1MetricValue(stock, metric.field).toFixed(3)}%`
+                        : belowCount === null ? '--' : belowCount;
+                    return `<article class="focus-page1-stock-row" data-stock-code="${escapeHtml(stock.code)}" role="button" tabindex="0" aria-label="查看${escapeHtml(stock.name || stock.code)}K线图"><div class="focus-page1-stock-main stock-main"><span class="focus-page1-stock-identity"><span class="focus-page1-stock-name">${escapeHtml(stock.name || stock.code)}</span>${quanyangTag}</span><span class="focus-page1-below-count${belowClass}">${valueText}</span><span class="focus-page1-stock-code">${escapeHtml(stock.code)}</span><span class="focus-page1-stock-gain">${gain.toFixed(2)}%</span></div></article>`;
+                }).join('') + prioritySection
+                : `<div class="focus-page1-empty">${metric ? '当前日期暂无该指标数据' : '暂无重点关注股票'}</div>`;
+            return selectedStocks;
+        }
+
+        const BOARD_REASON_LABELS = {
+            high_gain5_and_yin_pull: '5拉阴前后拉',
+            bare_foot_high_gain_low_above_ma5: '光脚拉升不碰',
+            all_yin_up: '阴线都向上',
+            all_yin_cross_star: '阴线都是十字星',
+            is_quanyang_10d: '最近10日全阳',
+            yin_count_20_lte_4: '20天阴线次数≤4',
+            low_above_ma5_count_20d_gte_7: '20日低不碰次数≥7',
+            high_gain_10d_gte_5: '最近10日5拉升',
+            all_yin_close_above_ma5: '阴线收盘都大于MA5',
+            low_above_ma5_count_gte_4: '10日低不碰次数≥4',
+            lower_shadow_high_gain_low_above_ma5: '光脚拉升不碰'
+        };
+
+        function formatBoardGain(value) {
+            const gain = Number(value);
+            return Number.isFinite(gain) ? `${gain.toFixed(2)}%` : '--';
+        }
+
+        function boardExcellentDetails(stock) {
+            const fields = stock && stock.stock && typeof stock.stock === 'object' ? stock.stock : (stock || {});
+            const groupColor = String(fields.group_color || '').toLowerCase();
+            const purple = groupColor === 'purple' || Number(fields.purple_match || 0) === 1;
+            const reasons = purple
+                ? (Array.isArray(fields.purple_reasons) ? fields.purple_reasons : [])
+                : (Array.isArray(fields.red_reasons) ? fields.red_reasons : []);
+            const labels = [];
+            reasons.forEach(reason => {
+                const label = BOARD_REASON_LABELS[String(reason || '')] || String(reason || '');
+                if (label && !labels.includes(label)) labels.push(label);
+            });
+            if (purple && !labels.length) labels.push('20天阴线次数≤4');
+            return { purple, labels };
+        }
+
+        function renderFocusPage6(boards, filterStock) {
+            if (!focusPage6Groups || !focusPage6Rows || !focusPage6Heading
+                || !focusPage6BoardGain || !focusPage6Count) return [];
+            const normalized = (Array.isArray(boards) ? boards : []).map(board => {
+                const stocks = (Array.isArray(board.stocks) ? board.stocks : [])
+                    .filter(filterStock)
+                    .sort((left, right) => focusStockGain(right) - focusStockGain(left)
+                        || String(left.code || '').localeCompare(String(right.code || '')));
+                return { ...board, stocks };
+            });
+            const filtering = state.limitUpOnly || state.highGainOnly
+                || state.bareFootHighGainOnly || state.limitUpBareFootHighGainOnly || state.notLimitUpOnly;
+            const visibleBoards = (filtering
+                ? normalized.filter(board => board.stocks.length)
+                : normalized
+            ).sort((left, right) => {
+                const leftGain = Number(left.board_change_percent);
+                const rightGain = Number(right.board_change_percent);
+                if (Number.isFinite(leftGain) && Number.isFinite(rightGain) && leftGain !== rightGain) {
+                    return rightGain - leftGain;
+                }
+                if (Number.isFinite(leftGain) !== Number.isFinite(rightGain)) return Number.isFinite(leftGain) ? -1 : 1;
+                return String(left.board_name || '').localeCompare(String(right.board_name || ''), 'zh-CN');
+            });
+            const boardNames = visibleBoards.map(board => String(board.board_name || '未分类'));
+            if (!boardNames.includes(state.page6Board)) state.page6Board = boardNames[0] || '';
+            focusPage6Groups.innerHTML = visibleBoards.length
+                ? visibleBoards.map(board => {
+                    const name = String(board.board_name || '未分类');
+                    const selected = name === state.page6Board;
+                    return `<button type="button" class="focus-page1-group-button${selected ? ' is-active' : ''}" data-board-name="${escapeHtml(name)}" aria-pressed="${String(selected)}"><span>${escapeHtml(name)}</span><span class="focus-page6-group-meta"><span class="focus-page6-board-gain">${escapeHtml(formatBoardGain(board.board_change_percent))}</span><span>${board.stocks.length}只</span></span></button>`;
+                }).join('')
+                : '<div class="focus-page1-empty">暂无板块</div>';
+
+            const selectedBoard = visibleBoards.find(board => String(board.board_name || '未分类') === state.page6Board);
+            const selectedStocks = selectedBoard ? selectedBoard.stocks : [];
+            focusPage6Heading.textContent = selectedBoard ? String(selectedBoard.board_name || '未分类') : '特别板块';
+            focusPage6BoardGain.textContent = selectedBoard
+                ? formatBoardGain(selectedBoard.board_change_percent) : '--';
+            const limitUpCount = selectedBoard && selectedBoard.limit_up_count !== null
+                && selectedBoard.limit_up_count !== undefined ? ` · 涨停${selectedBoard.limit_up_count}` : '';
+            focusPage6Count.textContent = `${selectedStocks.length}只${limitUpCount}`;
+            focusPage6Rows.innerHTML = selectedStocks.length
+                ? selectedStocks.map(stock => {
+                    const gain = focusStockGain(stock);
+                    const details = boardExcellentDetails(stock);
+                    const labels = details.labels.length
+                        ? details.labels.map(label => `<span>${escapeHtml(label)}</span>`).join('') : '';
+                    return `<article class="focus-page1-stock-row" data-stock-code="${escapeHtml(stock.code)}" role="button" tabindex="0" aria-label="查看${escapeHtml(stock.name || stock.code)}K线图"><div class="focus-page1-stock-main stock-main"><span class="focus-page1-stock-name">${escapeHtml(stock.name || stock.code)}</span><span class="focus-page1-stock-code">${escapeHtml(stock.code)}</span><span class="focus-page1-stock-gain">${gain.toFixed(2)}%</span><span class="focus-page6-excellent${details.purple ? ' is-purple' : ''}">${labels}</span></div></article>`;
+                }).join('')
+                : '<div class="focus-page1-empty">当前板块暂无股票</div>';
+            return visibleBoards;
+        }
+
+        function setFocusExcelStatus(message, isError = false) {
+            if (!focusPage6ExcelStatus) return;
+            focusPage6ExcelStatus.textContent = String(message || '');
+            focusPage6ExcelStatus.classList.toggle('is-error', Boolean(isError));
+        }
+
+        function focusExcelHasUnsavedChanges() {
+            return state.focusExcelChanges.size > 0;
+        }
+
+        function confirmFocusExcelReload() {
+            if (!focusExcelHasUnsavedChanges()) return true;
+            return window.confirm('当前表格有未保存修改，继续操作会丢失这些修改。是否继续？');
+        }
+
+        function focusExcelCellText(value) {
+            return value === null || value === undefined ? '' : String(value).trim();
+        }
+
+        function focusExcelSemanticStyle(payload, source, rowIndex, columnIndex, cellStyle) {
+            // The server supplies styles from the same fixed template used by
+            // the daily workbook.  Do not infer them from cell text here.
+            return { ...cellStyle };
+        }
+
+        function renderFocusExcel(payload) {
+            if (!focusPage6ExcelTable) return;
+            state.focusExcelPayload = payload;
+            if (FOCUS_MODE && [7, 8].includes(state.focusPage)) {
+                document.getElementById('summary').textContent = `${payload.date || state.date} · ${state.focusPage === 8 ? '财联社涨停分析' : '复盘选股数据'}`;
+                statusText.textContent = '';
+                statusText.className = '';
+                document.querySelectorAll('.status-actions > .limit-up-filter').forEach(element => {
+                    element.hidden = true;
+                    element.style.display = 'none';
+                });
+            }
+            focusPage6ExcelTitle.textContent = payload.sheet_label || state.focusExcelSheet;
+            focusPage6ExcelTabs.forEach(tab => {
+                tab.setAttribute('aria-selected', String(
+                    String(tab.dataset.focusExcelSheet || '') === String(payload.sheet_label || '')
+                ));
+            });
+            const values = Array.isArray(payload.values) ? payload.values : [];
+            const rows = Number(payload.rows) || values.length;
+            const columns = Math.max(1, Number(payload.columns) || 1);
+            const columnWidths = Array.isArray(payload.column_widths_px)
+                ? payload.column_widths_px : [];
+            const rowHeights = Array.isArray(payload.row_heights_px)
+                ? payload.row_heights_px : [];
+            const rowNumberWidth = 48;
+            const colgroup = document.createElement('colgroup');
+            const excelColumnWidths = Array.from({ length: columns }, (_, index) => {
+                const value = Number(columnWidths[index]);
+                return Number.isFinite(value) && value > 0 ? value : 184;
+            });
+            const dataWidth = excelColumnWidths.reduce((sum, value) => sum + value, 0);
+            const totalWidth = dataWidth + rowNumberWidth;
+            focusPage6ExcelTable.style.width = '100%';
+            focusPage6ExcelTable.style.minWidth = '100%';
+            const redisPage = focusPage6ExcelTable.closest('.focus-redis-page');
+            if (redisPage) {
+                redisPage.style.width = '100%';
+                redisPage.style.minWidth = '0';
+            }
+            const rowNumberCol = document.createElement('col');
+            rowNumberCol.style.width = `${(rowNumberWidth / totalWidth * 100).toFixed(4)}%`;
+            colgroup.appendChild(rowNumberCol);
+            for (let columnIndex = 0; columnIndex < columns; columnIndex += 1) {
+                const col = document.createElement('col');
+                col.style.width = `${(excelColumnWidths[columnIndex] / totalWidth * 100).toFixed(4)}%`;
+                colgroup.appendChild(col);
+            }
+            const tbody = document.createElement('tbody');
+            if (!rows) {
+                const tr = document.createElement('tr');
+                const td = document.createElement('td');
+                td.colSpan = columns + 1;
+                td.className = 'focus-page6-excel-empty';
+                td.textContent = '当天工作表暂无内容';
+                tr.appendChild(td);
+                tbody.appendChild(tr);
+            } else {
+                for (let rowIndex = 0; rowIndex < rows; rowIndex += 1) {
+                    const tr = document.createElement('tr');
+                    const rowHeight = Number(rowHeights[rowIndex]);
+                    if (Number.isFinite(rowHeight) && rowHeight > 0) {
+                        tr.style.height = `${Math.round(rowHeight)}px`;
+                    }
+                    const rowNumber = document.createElement('td');
+                    rowNumber.className = 'focus-page6-excel-row-number';
+                    rowNumber.style.width = `${(rowNumberWidth / totalWidth * 100).toFixed(4)}%`;
+                    rowNumber.style.minWidth = '0';
+                    rowNumber.style.maxWidth = 'none';
+                    rowNumber.textContent = String(rowIndex + 1);
+                    rowNumber.setAttribute('aria-label', `第${rowIndex + 1}行`);
+                    tr.appendChild(rowNumber);
+                    const source = Array.isArray(values[rowIndex]) ? values[rowIndex] : [];
+                    for (let columnIndex = 0; columnIndex < columns; columnIndex += 1) {
+                        const td = document.createElement('td');
+                        td.contentEditable = 'true';
+                        td.spellcheck = false;
+                        td.dataset.row = String(rowIndex + 1);
+                        td.dataset.column = String(columnIndex + 1);
+                        td.style.width = `${(excelColumnWidths[columnIndex] / totalWidth * 100).toFixed(4)}%`;
+                        td.style.minWidth = '0';
+                        td.style.maxWidth = 'none';
+                        const stockCode = String(payload.stock_codes?.[rowIndex]?.[columnIndex] || '').trim();
+                        if (stockCode) td.dataset.stockCode = stockCode;
+                        const rawCellStyle = payload.style_cells?.[rowIndex]?.[columnIndex] || {};
+                        const cellStyle = focusExcelSemanticStyle(payload, source, rowIndex, columnIndex, rawCellStyle);
+                        if (cellStyle.color) td.style.color = String(cellStyle.color);
+                        if (cellStyle.background) td.style.backgroundColor = String(cellStyle.background);
+                        if (cellStyle.bold !== undefined) td.style.fontWeight = cellStyle.bold ? '700' : '400';
+                        if (cellStyle.italic !== undefined) td.style.fontStyle = cellStyle.italic ? 'italic' : 'normal';
+                        if (cellStyle.underline !== undefined) td.style.textDecoration = cellStyle.underline ? 'underline' : 'none';
+                        if (Number.isFinite(Number(cellStyle.fontSize))) td.style.fontSize = `${Number(cellStyle.fontSize)}px`;
+                        if (cellStyle.align) td.style.textAlign = String(cellStyle.align);
+                        if (cellStyle.verticalAlign) td.style.verticalAlign = String(cellStyle.verticalAlign);
+                        if (cellStyle.fontFamily) td.style.fontFamily = String(cellStyle.fontFamily);
+                        const cellContent = document.createElement('div');
+                        cellContent.className = 'focus-page6-excel-cell-content';
+                        const richSegments = Array.isArray(payload.rich_cells?.[rowIndex]?.[columnIndex])
+                            ? payload.rich_cells[rowIndex][columnIndex] : [];
+                        if (richSegments.length) {
+                            richSegments.forEach(segment => {
+                                const span = document.createElement('span');
+                                span.textContent = String(segment.text || '');
+                                if (segment.color) span.style.color = String(segment.color);
+                                if (segment.bold !== undefined) span.style.fontWeight = segment.bold ? '700' : '400';
+                                if (segment.italic !== undefined) span.style.fontStyle = segment.italic ? 'italic' : 'normal';
+                                if (segment.underline !== undefined) span.style.textDecoration = segment.underline ? 'underline' : 'none';
+                                if (Number.isFinite(Number(segment.fontSize))) {
+                                    span.style.fontSize = `${Number(segment.fontSize)}px`;
+                                }
+                                cellContent.appendChild(span);
+                            });
+                        } else {
+                            cellContent.textContent = source[columnIndex] === null || source[columnIndex] === undefined
+                                ? '' : String(source[columnIndex]);
+                        }
+                        td.appendChild(cellContent);
+                        td.addEventListener('input', () => {
+                            const key = `${td.dataset.row}:${td.dataset.column}`;
+                            state.focusExcelChanges.set(key, {
+                                row: Number(td.dataset.row),
+                                column: Number(td.dataset.column),
+                                value: td.textContent
+                            });
+                            setFocusExcelStatus(`有 ${state.focusExcelChanges.size} 项未保存修改`);
+                        });
+                        tr.appendChild(td);
+                    }
+                    const clsRow = String(payload.sheet_label || '') === '财联社涨停分析';
+                    const firstValue = focusExcelCellText(source[0]);
+                    const nonEmptyValues = source.filter(value => focusExcelCellText(value) !== '').length;
+                    const isClsHeader = source.slice(0, 6).map(focusExcelCellText).join('|')
+                        === '股票名称|代码|板数|涨跌幅|涨停时间|上涨逻辑';
+                    const isClsMergedRow = clsRow && (rowIndex === 0
+                        || (nonEmptyValues === 1 && firstValue !== '' && !isClsHeader));
+                    if (isClsMergedRow) {
+                        const cells = [...tr.querySelectorAll('td')];
+                        const firstDataCell = cells[1];
+                        if (firstDataCell) {
+                            firstDataCell.colSpan = columns;
+                            firstDataCell.style.width = '100%';
+                            for (let cellIndex = 2; cellIndex < cells.length; cellIndex += 1) {
+                                cells[cellIndex].style.display = 'none';
+                            }
+                        }
+                    }
+                    tbody.appendChild(tr);
+                }
+            }
+            focusPage6ExcelTable.replaceChildren(colgroup, tbody);
+            setFocusExcelStatus(`${payload.date || state.date} · ${payload.sheet_label || state.focusExcelSheet} · ${rows}行 × ${columns}列 · 原始 Redis 只读`);
+        }
+
+        async function loadFocusExcel(force = false) {
+            if (!FOCUS_MODE || ![7, 8].includes(state.focusPage) || !state.date || !focusPage6ExcelTable) return false;
+            if (force && !confirmFocusExcelReload()) return false;
+            const sheet = state.focusPage === 8 ? '财联社涨停分析' : '复盘选股数据';
+            state.focusExcelSheet = sheet;
+            const cacheKey = `${state.date}|${sheet}`;
+            if (!force && state.focusExcelCacheKey === cacheKey && state.focusExcelPayload) return true;
+            const requestId = ++state.focusExcelRequestId;
+            state.focusExcelChanges.clear();
+            state.focusExcelPayload = null;
+            state.focusExcelCacheKey = '';
+            focusPage6ExcelTable.innerHTML = '<tbody><tr><td class="focus-page6-excel-empty">读取 Redis 数据...</td></tr></tbody>';
+            setFocusExcelStatus('正在读取当天 Redis 数据...');
+            if (focusPage6ExcelSave) focusPage6ExcelSave.disabled = true;
+            try {
+                const url = `/api/pz1/focus/redis?date=${encodeURIComponent(state.date)}&sheet=${encodeURIComponent(sheet)}`;
+                const response = await fetch(url, { cache: 'no-store' });
+                const payload = await response.json();
+                if (requestId !== state.focusExcelRequestId) return false;
+                if (!response.ok || !payload.success) throw new Error(payload.error || 'Redis 数据读取失败');
+                state.focusExcelCacheKey = cacheKey;
+                renderFocusExcel(payload);
+                return true;
+            } catch (error) {
+                if (requestId !== state.focusExcelRequestId) return false;
+                focusPage6ExcelTable.innerHTML = `<tbody><tr><td class="focus-page6-excel-empty">${escapeHtml(error.message || 'Redis 数据读取失败')}</td></tr></tbody>`;
+                setFocusExcelStatus(error.message || 'Redis 数据读取失败', true);
+                return false;
+            } finally {
+                if (requestId === state.focusExcelRequestId && focusPage6ExcelSave) {
+                    focusPage6ExcelSave.disabled = false;
+                }
+            }
+        }
+
+        async function saveFocusExcel() {
+            if (!state.focusExcelPayload || !state.focusExcelChanges.size) {
+                setFocusExcelStatus('没有需要保存的修改');
+                return;
+            }
+            const changes = [...state.focusExcelChanges.values()];
+            if (focusPage6ExcelSave) focusPage6ExcelSave.disabled = true;
+            setFocusExcelStatus(`正在保存 ${changes.length} 项修改...`);
+            try {
+                const response = await fetch('/api/pz1/focus/redis', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        date: state.date,
+                        sheet: state.focusExcelSheet,
+                        changes
+                    })
+                });
+                const payload = await response.json();
+                if (!response.ok || !payload.success) throw new Error(payload.error || 'Redis 数据保存失败');
+                state.focusExcelChanges.clear();
+                state.focusExcelCacheKey = '';
+                setFocusExcelStatus(`已单独保存 ${payload.saved_cells || changes.length} 项网页修改，原始 Redis 未修改`);
+                await loadFocusExcel(true);
+                setFocusExcelStatus(`已单独保存 ${payload.saved_cells || changes.length} 项网页修改，原始 Redis 未修改 · ${state.date}`);
+            } catch (error) {
+                setFocusExcelStatus(error.message || 'Redis 数据保存失败', true);
+            } finally {
+                if (focusPage6ExcelSave) focusPage6ExcelSave.disabled = false;
+            }
+        }
+
+        if (focusPage6ExcelOpen) {
+            focusPage6ExcelOpen.addEventListener('click', () => {
+                const url = state.focusExcelPayload?.workbook_url;
+                if (url) window.open(url, '_blank', 'noopener');
+            });
+        }
+        if (focusPage6ExcelSave) focusPage6ExcelSave.addEventListener('click', saveFocusExcel);
+        focusPage6ExcelTabs.forEach(tab => {
+            tab.addEventListener('click', async () => {
+                const sheet = String(tab.dataset.focusExcelSheet || '');
+                if (!sheet || sheet === state.focusExcelSheet) return;
+                if (!confirmFocusExcelReload()) return;
+                state.focusExcelSheet = sheet;
+                await loadFocusExcel(true);
+            });
+        });
+
+        function renderFocusHeaders(stocksByColumn = []) {
+            syncFocusPageLayout();
+            document.body.style.setProperty('--focus-column-count', columnCount());
+            document.getElementById('columnHeaders').innerHTML = FOCUS_COLUMNS[state.focusPage]
+                .map((column, index) => `<th>${escapeHtml(column.title)} <span class="header-count" id="${column.id}">${stocksByColumn[index]?.length || 0}只</span></th>`).join('');
+        }
+
+        function renderFocusPage2Extra(groups, filterStock, pushLogStocks = []) {
+            if (!focusPage2Extra || state.focusPage !== 2) return [];
+            const allStocks = [];
+            const columns = FOCUS_PAGE2_EXTRA_COLUMNS.map(column => {
+                const stocks = (Array.isArray(groups[column.key]) ? groups[column.key] : []).filter(filterStock);
+                allStocks.push(...stocks);
+                const entries = groupedColumnEntries(stocks, 'yin_count_10d', '10天阴线');
+                const content = entries.length
+                    ? entries.map(entry => stockCell(entry.stock, entry.groupLabel, true)).join('')
+                    : '<div class="focus-push-log-empty">暂无满足条件的股票</div>';
+                return `<section class="focus-page2-column" data-focus-extra-group="${column.key}"><h2 class="focus-page2-heading">${column.title}<span class="header-count">${stocks.length}只</span></h2><div>${content}</div></section>`;
+            });
+            allStocks.push(...pushLogStocks);
+            columns.push(`<section class="focus-page2-column focus-page2-push-log-column" data-focus-extra-group="push_log"><h2 class="focus-page2-heading">推送日志<span class="header-count">${pushLogStocks.length}只</span></h2><div class="focus-push-log-list">${pushLogStocks.length
+                ? pushLogStocks.map(stock => stockCell(stock)).join('')
+                : '<div class="focus-push-log-empty">暂无推送记录</div>'}</div></section>`);
+            focusPage2Extra.innerHTML = columns.join('');
+            return allStocks;
+        }
+
+        function columnCount() {
+            return FOCUS_MODE ? FOCUS_COLUMNS[state.focusPage].length : 8;
+        }
+
+        function isReferenceHighGain(stock) {
+            const value = stock.ref_high_gain_ok ?? stock.is_high_gain;
+            if (value !== undefined && value !== null && value !== '') {
+                return ['1', 'true', 'yes', 'y'].includes(String(value).trim().toLowerCase());
+            }
+            const gain = Number(stock.max_gain);
+            return Number.isFinite(gain) && gain >= 6.5;
+        }
+
+        function renderFocus(payload) {
+            state.focusPayload = payload;
+            const groups = payload.groups || {};
+            const limitUpOnly = state.limitUpOnly || state.limitUpBareFootHighGainOnly;
+            const bareFootHighGainOnly = state.bareFootHighGainOnly || state.limitUpBareFootHighGainOnly;
+            const filterStock = stock => {
+                if (state.focusPage === 1 && state.quanyangOnly && !isPz1Quanyang(stock)) return false;
+                if (state.focusPage === 1 && state.newHighOnly && !['1', 'true', 'yes', 'y'].includes(
+                    String(stock.is_ref_price_20d_high ?? '').trim().toLowerCase()
+                )) return false;
+                if (limitUpOnly) {
+                    const value = stock.ref_is_limit_up ?? stock.is_limit_up;
+                    if (!['1', 'true', 'yes', 'y'].includes(String(value).trim().toLowerCase())) return false;
+                }
+                if (state.notLimitUpOnly && ['1', 'true', 'yes', 'y'].includes(
+                    String(stock.ref_is_limit_up ?? stock.is_limit_up ?? 0).trim().toLowerCase()
+                )) return false;
+                if (bareFootHighGainOnly && !['1', 'true', 'yes', 'y'].includes(
+                    String(stock.is_bare_foot).trim().toLowerCase()
+                )) return false;
+                return !(state.highGainOnly || bareFootHighGainOnly) || isReferenceHighGain(stock);
+            };
+            const groupStocks = key => {
+                const stocks = Array.isArray(groups[key]) ? groups[key] : [];
+                return stocks.filter(filterStock);
+            };
+            const openCode = state.openKlineCode;
+            const openRegion = state.openKlineRegion;
+
+            if (state.focusPage === 6) {
+                syncFocusPageLayout();
+                const visibleBoards = renderFocusPage6(payload.boards, filterStock);
+                const visibleStocks = new Set();
+                visibleBoards.forEach(board => (board.stocks || []).forEach(stock => {
+                    if (stock.code) visibleStocks.add(String(stock.code));
+                }));
+                const filterLabel = [
+                    limitUpOnly ? '涨停' : state.notLimitUpOnly ? '未涨停' : '',
+                    bareFootHighGainOnly ? '光脚拉升' : state.highGainOnly ? '拉升' : ''
+                ].filter(Boolean).join('且');
+                const countText = filterLabel
+                    ? `${filterLabel}${visibleStocks.size}只`
+                    : `${visibleBoards.length}个板块 · ${visibleStocks.size}只`;
+                document.getElementById('summary').textContent = `${payload.date || state.date} · ${countText}`;
+                const boardUpdatedAt = payload.kline_updated_at
+                    || payload.updated_at
+                    || payload.meta?.updated_at
+                    || payload.meta?.scan_finished_at
+                    || '';
+                updatedAt.textContent = boardUpdatedAt ? `数据更新 ${boardUpdatedAt}` : '';
+                statusText.textContent = '';
+                statusText.className = '';
+                if (openCode) {
+                    const reopened = focusPage6Rows?.querySelector(`[data-stock-code="${openCode}"]`);
+                    if (openRegion === 'page6' && reopened) showKline(openCode, reopened);
+                    else closeKline();
+                }
+                loadFocusExcel(false);
+                return visibleBoards;
+            }
+
+            if (state.focusPage === 7 || state.focusPage === 8) {
+                syncFocusPageLayout();
+                renderFocusHeaders([]);
+                loadFocusExcel(false);
+                document.getElementById('summary').textContent = `${payload.date || state.date} · ${state.focusPage === 8 ? '财联社涨停分析' : '复盘选股数据'}`;
+                return [];
+            }
+
+            if (state.focusPage === 1) {
+                syncFocusPageLayout();
+                const allStocks = groupStocks('pz_all');
+                const selectedStocks = renderFocusPage1(allStocks);
+                const filterLabel = [
+                    limitUpOnly ? '涨停' : state.notLimitUpOnly ? '未涨停' : '',
+                    bareFootHighGainOnly ? '光脚拉升' : state.highGainOnly ? '拉升' : '',
+                    state.quanyangOnly ? '全阳' : '',
+                    state.newHighOnly ? '新高' : ''
+                ].filter(Boolean).join('且');
+                const countText = filterLabel ? `${filterLabel}${allStocks.length}只` : `共${allStocks.length}只`;
+                document.getElementById('summary').textContent = `${payload.date || state.date} · ${countText}`;
+                updatedAt.textContent = payload.updated_at ? `数据更新 ${payload.updated_at}` : '';
+                statusText.textContent = '';
+                statusText.className = '';
+                if (openCode) {
+                    const reopened = focusPage1Rows?.querySelector(`[data-stock-code="${openCode}"]`);
+                    if (openRegion === 'page1' && reopened) showKline(openCode, reopened);
+                    else closeKline();
+                }
+                return selectedStocks;
+            }
+            const config = FOCUS_COLUMNS[state.focusPage];
+            const openExtraGroup = state.openKlineAnchor?.closest('[data-focus-extra-group]')?.dataset.focusExtraGroup;
+            const rawPushLog = Array.isArray(groups.push_log) ? groups.push_log : [];
+            const page2PushLogStocks = state.focusPage === 2 ? rawPushLog.filter(filterStock) : [];
+            const extraStocks = renderFocusPage2Extra(groups, filterStock, page2PushLogStocks);
+            const stocksByColumn = config.map(column => groupStocks(column.key));
+            const columns = config.map((column, index) => {
+                if (column.customGrouping === 'qy1') {
+                    return groupedQy1Entries(stocksByColumn[index]);
+                }
+                return column.field
+                    ? groupedColumnEntries(stocksByColumn[index], column.field, column.label)
+                    : stocksByColumn[index].map(stock => ({ type: 'stock', stock }));
+            });
+            const rowCount = Math.max(...columns.map(column => column.length));
+            const openColumn = state.openKlineAnchor?.closest('td')?.cellIndex ?? 0;
+
+            renderFocusHeaders(stocksByColumn);
+            const visibleCount = new Set(
+                stocksByColumn.flat().concat(extraStocks).map(stock => stock.code)
+            ).size;
+            const filterLabel = [
+                limitUpOnly ? '涨停' : state.notLimitUpOnly ? '未涨停' : '',
+                bareFootHighGainOnly ? '光脚拉升' : state.highGainOnly ? '拉升' : ''
+            ].filter(Boolean).join('且');
+            const countText = filterLabel ? `${filterLabel}${visibleCount}只` : `共${Number(payload.count || 0)}只`;
+            document.getElementById('summary').textContent = `${payload.date || state.date} · ${countText}`;
+            updatedAt.textContent = payload.updated_at ? `数据更新 ${payload.updated_at}` : '';
+            statusText.textContent = '';
+            statusText.className = '';
+
+            if (!rowCount) {
+                const emptyText = bareFootHighGainOnly
+                    ? (limitUpOnly ? '暂无同时满足涨停和光脚拉升的股票' : '暂无光脚拉升股票')
+                    : limitUpOnly && state.highGainOnly
+                    ? '暂无同时满足涨停和拉升的股票'
+                    : state.highGainOnly ? '暂无拉升股票'
+                    : limitUpOnly ? '暂无涨停股票' : state.notLimitUpOnly ? '暂无未涨停股票' : '暂无重点关注股票';
+                rowsElement.innerHTML = `<tr><td colspan="${columnCount()}" class="empty-cell">${emptyText}</td></tr>`;
+            } else {
+                const html = [];
+                for (let index = 0; index < rowCount; index += 1) {
+                    html.push(`<tr>${columns.map(column => `<td>${columnCell(column[index])}</td>`).join('')}</tr>`);
+                }
+                rowsElement.innerHTML = html.join('');
+            }
+
+            if (openCode) {
+                const reopened = openRegion === 'page2-extra'
+                    ? focusPage2Extra?.querySelector(`[data-focus-extra-group="${openExtraGroup}"] [data-stock-code="${openCode}"]`)
+                    : rowsElement.querySelector(`td:nth-child(${openColumn + 1}) [data-stock-code="${openCode}"]`);
+                if (reopened) showKline(openCode, reopened);
+                else closeKline();
+            }
+        }
+
+        function render(payload) {
+            if (FOCUS_MODE) {
+                renderFocus(payload);
+                return;
+            }
+            const groups = payload.groups || {};
+            const all = Array.isArray(groups.all) ? groups.all : [];
+            const condition2 = Array.isArray(groups.condition_2) ? groups.condition_2 : [];
+            const condition3 = Array.isArray(groups.condition_3) ? groups.condition_3 : [];
+            const yinUp = Array.isArray(groups.five_pull_all_yin_up) ? groups.five_pull_all_yin_up : [];
+            const yinEaten = Array.isArray(groups.five_pull_all_yin_eaten_next) ? groups.five_pull_all_yin_eaten_next : [];
+            const yinNext = Array.isArray(groups.five_pull_yin_pull_next) ? groups.five_pull_yin_pull_next : [];
+            const yinCross = Array.isArray(groups.five_pull_all_yin_cross_star) ? groups.five_pull_all_yin_cross_star : [];
+            const yinNoTouch = Array.isArray(groups.five_pull_all_yin_no_touch) ? groups.five_pull_all_yin_no_touch : [];
+            const columns = [
+                all.map(stock => ({ type: 'stock', stock })),
+                groupedColumnEntries(condition2, 'yin_count_20', '20天阴线'),
+                groupedColumnEntries(condition3, 'yin_count_10d', '10天阴线'),
+                groupedColumnEntries(yinUp, 'yin_count_10d', '10天阴线'),
+                groupedColumnEntries(yinEaten, 'yin_count_10d', '10天阴线'),
+                groupedColumnEntries(yinNext, 'yin_count_10d', '10天阴线'),
+                groupedColumnEntries(yinCross, 'yin_count_10d', '10天阴线'),
+                groupedColumnEntries(yinNoTouch, 'yin_count_10d', '10天阴线')
+            ];
+            const rowCount = Math.max(...columns.map(column => column.length));
+
+            document.getElementById('allCount').textContent = `${all.length}只`;
+            document.getElementById('condition2Count').textContent = `${condition2.length}只`;
+            document.getElementById('condition3Count').textContent = `${condition3.length}只`;
+            document.getElementById('yinUpCount').textContent = `${yinUp.length}只`;
+            document.getElementById('yinEatenCount').textContent = `${yinEaten.length}只`;
+            document.getElementById('yinNextCount').textContent = `${yinNext.length}只`;
+            document.getElementById('yinCrossCount').textContent = `${yinCross.length}只`;
+            document.getElementById('yinNoTouchCount').textContent = `${yinNoTouch.length}只`;
+            document.getElementById('summary').textContent = `${payload.date || state.date} · 共${all.length}只`;
+            updatedAt.textContent = payload.updated_at ? `页面更新 ${payload.updated_at}` : '';
+            statusText.textContent = rowCount ? '按钉钉发送时间由新到旧排列' : '当前日期暂无成功推送记录';
+            statusText.className = '';
+
+            if (!rowCount) {
+                closeKline();
+                rowsElement.innerHTML = '<tr><td colspan="8" class="empty-cell">暂无推送记录</td></tr>';
+                return;
+            }
+
+            const html = [];
+            for (let index = 0; index < rowCount; index += 1) {
+                html.push(`<tr>
+                    <td>${columnCell(columns[0][index])}</td>
+                    <td>${columnCell(columns[1][index])}</td>
+                    <td>${columnCell(columns[2][index])}</td>
+                    <td>${columnCell(columns[3][index])}</td>
+                    <td>${columnCell(columns[4][index])}</td>
+                    <td>${columnCell(columns[5][index])}</td>
+                    <td>${columnCell(columns[6][index])}</td>
+                    <td>${columnCell(columns[7][index])}</td>
+                </tr>`);
+            }
+            rowsElement.innerHTML = html.join('');
+            if (state.openKlineCode) {
+                const reopened = rowsElement.querySelector(`[data-stock-code="${state.openKlineCode}"]`);
+                if (reopened) showKline(state.openKlineCode, reopened);
+                else closeKline();
+            }
+        }
+
+        async function loadDates(followLatest = false) {
+            const requestedPage = state.focusPage;
+            const requestId = ++state.datesRequestId;
+            const dateUrl = FOCUS_MODE && (requestedPage === 6)
+                ? '/api/ths/dates'
+                : FOCUS_MODE && (requestedPage === 7 || requestedPage === 8)
+                ? '/api/pz1/focus/redis/dates'
+                : FOCUS_MODE ? `${API_BASE}/dates?page=${requestedPage}` : `${API_BASE}/dates`;
+            const response = await fetch(dateUrl, { cache: 'no-store' });
+            const payload = await response.json();
+            if (requestId !== state.datesRequestId || requestedPage !== state.focusPage) return false;
+            if (!response.ok || !payload.success || !Array.isArray(payload.dates) || !payload.dates.length) {
+                throw new Error(payload.error || `没有可用的${PAGE_LABEL}日期`);
+            }
+            const previous = state.date;
+            dateSelect.innerHTML = payload.dates
+                .map(date => `<option value="${escapeHtml(date)}">${escapeHtml(date)}</option>`)
+                .join('');
+            state.date = !followLatest && payload.dates.includes(previous)
+                ? previous : payload.dates[0];
+            dateSelect.value = state.date;
+            return true;
+        }
+
+        async function loadRecords(force = false) {
+            if ((state.loading && !force) || !state.date) return;
+            if (force) state.requestController?.abort();
+            const requestId = ++state.requestId;
+            const date = state.date;
+            const page = state.focusPage;
+            if (FOCUS_MODE && (page === 7 || page === 8)) {
+                state.loading = true;
+                syncFocusPageLayout();
+                const redisPageKey = `${date}|${page}`;
+                if (!force && state.focusRedisLoadedKey === redisPageKey) {
+                    state.loading = false;
+                    return;
+                }
+                if (force) {
+                    state.focusExcelCacheKey = '';
+                    state.focusExcelPayload = null;
+                    state.focusRedisLoadedKey = '';
+                }
+                statusText.textContent = `正在读取${page === 8 ? '财联社涨停分析' : '复盘选股数据'}...`;
+                statusText.className = '';
+                updatedAt.textContent = '';
+                document.getElementById('summary').textContent = `${date} · 加载中`;
+                try {
+                    const loaded = await loadFocusExcel(false);
+                    if (loaded && state.focusExcelPayload) {
+                        const payload = state.focusExcelPayload;
+                        state.focusRedisLoadedKey = redisPageKey;
+                        document.getElementById('summary').textContent = `${date} · ${page === 8 ? '财联社涨停分析' : '复盘选股数据'}`;
+                        updatedAt.textContent = payload.updated_at ? `数据更新 ${payload.updated_at} · 原始 Redis 只读` : '数据源 Redis · 原始数据只读';
+                    }
+                    statusText.textContent = '';
+                } finally {
+                    state.loading = false;
+                }
+                return;
+            }
+            const controller = new AbortController();
+            state.requestController = controller;
+            state.loading = true;
+            if (FOCUS_MODE && force) {
+                state.focusPayload = null;
+                closeKline();
+                renderFocusHeaders();
+                if (focusPage1Rows && state.focusPage === 1) {
+                    focusPage1Rows.innerHTML = '<div class="focus-page1-empty">加载中...</div>';
+                }
+                if (focusPage6Rows && state.focusPage === 6) {
+                    focusPage6Rows.innerHTML = '<div class="focus-page1-empty">加载中...</div>';
+                }
+                updatedAt.textContent = '';
+                statusText.textContent = '正在读取重点关注...';
+                statusText.className = '';
+                document.getElementById('summary').textContent = `${date} · 加载中`;
+                rowsElement.innerHTML = `<tr><td colspan="${columnCount()}" class="empty-cell">加载中...</td></tr>`;
+            }
+            try {
+                const pageQuery = FOCUS_MODE ? `&page=${page}` : '';
+                const recordsUrl = FOCUS_MODE && page === 6
+                    ? `/api/ths/klines/plain?date=${encodeURIComponent(date)}&days=60`
+                    : `${API_BASE}?date=${encodeURIComponent(date)}${pageQuery}`;
+                const response = await fetch(recordsUrl, {
+                    cache: 'no-store', signal: controller.signal
+                });
+                const payload = await response.json();
+                if (requestId !== state.requestId) return;
+                if (FOCUS_MODE && response.status === 404) {
+                    renderFocus(page === 6
+                        ? { date, count: 0, boards: [] }
+                        : { date, count: 0, groups: {} });
+                    statusText.textContent = `当前日期暂无第${page}页数据`;
+                    return;
+                }
+                if (!response.ok || !payload.success) throw new Error(payload.error || `${PAGE_LABEL}加载失败`);
+                render(payload);
+            } catch (error) {
+                if (requestId !== state.requestId || error.name === 'AbortError') return;
+                statusText.textContent = error.message || `${PAGE_LABEL}加载失败`;
+                statusText.className = 'error';
+                if (FOCUS_MODE && !state.focusPayload) {
+                    rowsElement.innerHTML = `<tr><td colspan="${columnCount()}" class="empty-cell">加载失败，正在等待重试</td></tr>`;
+                }
+            } finally {
+                if (requestId === state.requestId) state.loading = false;
+            }
+        }
+
+        async function refreshRedisWorkbookPages() {
+            if (!FOCUS_MODE || ![7, 8].includes(state.focusPage)
+                || state.loading || focusExcelHasUnsavedChanges()) return;
+            try {
+                if (!await loadDates(!state.workbookDatePinned)
+                    || ![7, 8].includes(state.focusPage)
+                    || focusExcelHasUnsavedChanges()) return;
+                await loadRecords(true);
+            } catch (error) {
+                // Background refresh must not disturb a usable table.
+                console.debug('Redis复盘页后台刷新失败', error);
+            }
+        }
+
+        dateSelect.addEventListener('change', () => {
+            if (FOCUS_MODE && [6, 7, 8].includes(state.focusPage) && !confirmFocusExcelReload()) {
+                dateSelect.value = state.date;
+                return;
+            }
+            closeKline();
+            state.focusPayload = null;
+            state.date = dateSelect.value;
+            state.workbookDatePinned = true;
+            loadRecords(true);
+        });
+
+        function syncFocusPageTabs() {
+            if (!FOCUS_MODE) return;
+            pageTabs.forEach(tab => {
+                const selected = Number(tab.dataset.focusPage) === state.focusPage;
+                tab.setAttribute('aria-selected', String(selected));
+                tab.tabIndex = selected ? 0 : -1;
+            });
+            if (focusSheetWrap) focusSheetWrap.setAttribute('aria-labelledby', `focusPage${state.focusPage}`);
+            if (focusPage1Special) focusPage1Special.setAttribute('aria-labelledby', 'focusPage1');
+            if (focusPage6Special) focusPage6Special.setAttribute('aria-labelledby', 'focusPage6');
+            if (focusRedisPage) focusRedisPage.setAttribute('aria-labelledby', `focusPage${state.focusPage}`);
+        }
+
+        async function selectFocusPage(page) {
+            if (!FOCUS_COLUMNS[page] || state.focusPage === page) return;
+            if (FOCUS_MODE && [7, 8].includes(state.focusPage) && !confirmFocusExcelReload()) return;
+            state.requestController?.abort();
+            state.requestId += 1;
+            state.loading = false;
+            state.focusPayload = null;
+            state.focusExcelRequestId += 1;
+            closeKline();
+            state.focusPage = page;
+            persistFocusPage(page);
+            syncFocusPageTabs();
+            renderFocusHeaders();
+            try {
+                if (!await loadDates() || state.focusPage !== page) return;
+                await loadRecords(true);
+            } catch (error) {
+                if (state.focusPage !== page) return;
+                state.date = '';
+                dateSelect.innerHTML = '';
+                updatedAt.textContent = '';
+                statusText.textContent = error.message || '日期加载失败';
+                statusText.className = 'error';
+                document.getElementById('summary').textContent = '暂无可用日期';
+                rowsElement.innerHTML = `<tr><td colspan="${columnCount()}" class="empty-cell">没有可用数据</td></tr>`;
+            }
+        }
+
+        pageTabs.forEach(tab => {
+            tab.addEventListener('click', () => selectFocusPage(Number(tab.dataset.focusPage)));
+            tab.addEventListener('keydown', event => {
+                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                event.preventDefault();
+                const pages = [...pageTabs].map(item => Number(item.dataset.focusPage));
+                const currentIndex = pages.indexOf(state.focusPage);
+                const page = event.key === 'Home' ? pages[0]
+                    : event.key === 'End' ? pages[pages.length - 1]
+                    : event.key === 'ArrowRight' ? pages[(currentIndex + 1) % pages.length]
+                    : pages[(currentIndex - 1 + pages.length) % pages.length];
+                selectFocusPage(page);
+                document.getElementById(`focusPage${page}`).focus();
+            });
+        });
+
+        function syncLimitUpButtons() {
+            limitUpFilter?.setAttribute('aria-pressed', String(state.limitUpOnly));
+            notLimitUpFilter?.setAttribute('aria-pressed', String(state.notLimitUpOnly));
+        }
+
+        if (limitUpFilter) {
+            limitUpFilter.addEventListener('click', () => {
+                state.limitUpOnly = !state.limitUpOnly;
+                state.notLimitUpOnly = false;
+                syncLimitUpButtons();
+                if (state.focusPayload) renderFocus(state.focusPayload);
+            });
+        }
+        if (notLimitUpFilter) {
+            notLimitUpFilter.addEventListener('click', () => {
+                state.notLimitUpOnly = !state.notLimitUpOnly;
+                state.limitUpOnly = false;
+                if (state.notLimitUpOnly) {
+                    state.limitUpBareFootHighGainOnly = false;
+                    limitUpBareFootHighGainFilter.checked = false;
+                }
+                syncLimitUpButtons();
+                if (state.focusPayload) renderFocus(state.focusPayload);
+            });
+        }
+        if (highGainFilter) {
+            highGainFilter.addEventListener('change', () => {
+                state.highGainOnly = highGainFilter.checked;
+                if (state.focusPayload) renderFocus(state.focusPayload);
+            });
+        }
+        if (bareFootHighGainFilter) {
+            bareFootHighGainFilter.addEventListener('change', () => {
+                state.bareFootHighGainOnly = bareFootHighGainFilter.checked;
+                if (state.focusPayload) renderFocus(state.focusPayload);
+            });
+        }
+        if (limitUpBareFootHighGainFilter) {
+            limitUpBareFootHighGainFilter.addEventListener('change', () => {
+                state.limitUpBareFootHighGainOnly = limitUpBareFootHighGainFilter.checked;
+                if (state.limitUpBareFootHighGainOnly) {
+                    state.notLimitUpOnly = false;
+                    syncLimitUpButtons();
+                }
+                if (state.focusPayload) renderFocus(state.focusPayload);
+            });
+        }
+        if (quanyangFilter) {
+            quanyangFilter.addEventListener('change', () => {
+                state.quanyangOnly = quanyangFilter.checked;
+                if (state.focusPayload) renderFocus(state.focusPayload);
+            });
+        }
+        if (newHighFilter) {
+            newHighFilter.addEventListener('change', () => {
+                state.newHighOnly = newHighFilter.checked;
+                if (state.focusPayload) renderFocus(state.focusPayload);
+            });
+        }
+
+        if (focusPage1Groups) {
+            focusPage1Groups.addEventListener('click', event => {
+                const button = event.target.closest('[data-yin-count]');
+                if (!button || !focusPage1Groups.contains(button)) return;
+                state.page1GroupMode = 'yin';
+                state.page1YinGroup = String(button.dataset.yinCount || '');
+                closeKline();
+                if (state.focusPayload) renderFocus(state.focusPayload);
+            });
+        }
+
+        if (focusPage1BelowGroups) {
+            focusPage1BelowGroups.addEventListener('click', event => {
+                const button = event.target.closest('[data-below-count]');
+                if (!button || !focusPage1BelowGroups.contains(button)) return;
+                state.page1GroupMode = 'below';
+                state.page1BelowGroup = String(button.dataset.belowCount || '');
+                closeKline();
+                if (state.focusPayload) renderFocus(state.focusPayload);
+            });
+        }
+
+        if (focusPage1MetricGroups) {
+            focusPage1MetricGroups.addEventListener('click', event => {
+                const button = event.target.closest('[data-page1-metric]');
+                if (!button || !focusPage1MetricGroups.contains(button)) return;
+                const field = String(button.dataset.page1Metric || '');
+                if (!PAGE1_METRICS.some(metric => metric.field === field)) return;
+                state.page1GroupMode = field;
+                closeKline();
+                if (state.focusPayload) renderFocus(state.focusPayload);
+            });
+        }
+
+        if (focusPage6Groups) {
+            focusPage6Groups.addEventListener('click', event => {
+                const button = event.target.closest('[data-board-name]');
+                if (!button || !focusPage6Groups.contains(button)) return;
+                state.page6Board = String(button.dataset.boardName || '');
+                closeKline();
+                if (state.focusPayload) renderFocus(state.focusPayload);
+            });
+        }
+
+        function copyStockName(name) {
+            if (!name) return;
+            const copyWithSelection = () => {
+                const input = document.createElement('textarea');
+                input.value = name;
+                input.setAttribute('readonly', '');
+                input.style.position = 'fixed';
+                input.style.top = '0';
+                input.style.left = '0';
+                input.style.opacity = '0';
+                document.body.appendChild(input);
+                input.select();
+                try {
+                    document.execCommand('copy');
+                } catch (error) {
+                    // Clipboard permissions vary on HTTP and mobile browsers.
+                } finally {
+                    input.remove();
+                }
+            };
+            if (navigator.clipboard?.writeText) {
+                navigator.clipboard.writeText(name).catch(copyWithSelection);
+            } else {
+                copyWithSelection();
+            }
+        }
+
+        function bindStockInteractions(container) {
+            if (!container) return;
+            container.addEventListener('click', event => {
+                const cell = event.target.closest('[data-stock-code]');
+                if (!cell || !container.contains(cell)) return;
+                event.stopPropagation();
+                if (FOCUS_MODE) {
+                    const name = event.target.closest('.stock-name, .focus-page1-stock-name');
+                    if (name && cell.contains(name)) copyStockName(name.textContent.trim());
+                }
+                toggleKline(cell);
+            });
+            container.addEventListener('keydown', event => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                const cell = event.target.closest('[data-stock-code]');
+                if (!cell || !container.contains(cell)) return;
+                event.preventDefault();
+                toggleKline(cell);
+            });
+        }
+
+        function bindExcelKlineHover(table) {
+            if (!table) return;
+            table.addEventListener('mouseover', event => {
+                const cell = event.target.closest('td[data-stock-code]');
+                if (!cell || !table.contains(cell)) return;
+                if (state.openKlineAnchor === cell && !klineTooltip.hidden) return;
+                showKline(cell.dataset.stockCode, cell);
+            });
+            table.addEventListener('mouseout', event => {
+                const related = event.relatedTarget;
+                if (related && table.contains(related)) return;
+                if (state.openKlineAnchor && table.contains(state.openKlineAnchor)) closeKline();
+            });
+        }
+
+        bindStockInteractions(rowsElement);
+        bindStockInteractions(focusPage1Rows);
+        bindStockInteractions(focusPage6Rows);
+        bindStockInteractions(focusPage2Extra);
+        bindStockInteractions(focusPage6ExcelTable);
+        bindExcelKlineHover(focusPage6ExcelTable);
+
+        document.addEventListener('click', event => {
+            if (event.target.closest('#pushKlineTooltip') || event.target.closest('[data-stock-code]')) return;
+            closeKline();
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape') closeKline();
+            if (FOCUS_MODE && [7, 8].includes(state.focusPage)
+                && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+                event.preventDefault();
+                saveFocusExcel();
+            }
+        });
+        window.addEventListener('resize', positionKline);
+        window.addEventListener('scroll', positionKline, { passive: true });
+        klineImage.addEventListener('load', positionKline);
+
+        async function initialize() {
+            if (FOCUS_MODE) {
+                syncFocusPageTabs();
+                renderFocusHeaders();
+            }
+            window.setInterval(() => {
+                if (!FOCUS_MODE || state.focusPage <= 6) loadRecords();
+            }, REFRESH_MS);
+            // Retry even when the first request has no data or fails.
+            if (FOCUS_MODE) window.setInterval(refreshRedisWorkbookPages, 60000);
+            try {
+                await loadDates();
+                await loadRecords();
+            } catch (error) {
+                statusText.textContent = error.message || `${PAGE_LABEL}初始化失败`;
+                statusText.className = 'error';
+                rowsElement.innerHTML = `<tr><td colspan="${columnCount()}" class="empty-cell">没有可用数据</td></tr>`;
+            }
+        }
+
+        initialize();
+    </script>
+</body>
+</html>

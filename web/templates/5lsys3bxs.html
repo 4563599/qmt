@@ -1,0 +1,1810 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="page-version" content="2026-02-24-v2">
+    <title>5拉升阴少3不下杀</title>
+    <!-- Flatpickr CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: #ffffff;
+            min-height: 100vh;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        .header h1 {
+            color: #1d1d1f;
+            font-size: 28px;
+            margin-bottom: 10px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .header .info {
+            color: #86868b;
+            font-size: 14px;
+            font-weight: 400;
+        }
+
+        .back-btn {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            transition: all 0.3s;
+            font-size: 15px;
+            font-weight: 500;
+            margin-right: 8px;
+            letter-spacing: 0.2px;
+        }
+
+        .back-btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+
+        .switch-btn {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #4caf50;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            transition: all 0.3s;
+            font-size: 15px;
+            font-weight: 500;
+            letter-spacing: 0.2px;
+        }
+
+        .switch-btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .nav-buttons {
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .nav-left {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .nav-right {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+            flex-wrap: wrap;
+            overflow-x: auto;
+            justify-content: flex-start;
+        }
+
+        /* 日期选择器样式 */
+        .date-selector {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: white;
+            padding: 4px 8px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .date-nav-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 5px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+            font-weight: 500;
+            min-width: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .date-nav-btn:hover {
+            background: #5568d3;
+            transform: scale(1.05);
+        }
+
+        #datePicker {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.2px;
+            text-align: center;
+            min-width: 95px;
+            max-width: 105px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+        }
+
+        #datePicker:hover {
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .date-nav-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: scale(1);
+        }
+
+        #datePicker {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.2px;
+            text-align: center;
+            width: auto;
+            min-width: 95px;
+            max-width: 105px;
+        }
+
+        #datePicker:hover {
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        /* Flatpickr 自定义样式 */
+        .flatpickr-calendar {
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3) !important;
+            border-radius: 12px !important;
+            border: none !important;
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', sans-serif !important;
+        }
+
+        .flatpickr-day.selected {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            border-color: #667eea !important;
+        }
+
+        .flatpickr-day.selected:hover {
+            background: linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%) !important;
+        }
+
+        .flatpickr-day:hover {
+            background: rgba(102, 126, 234, 0.1) !important;
+            border-color: rgba(102, 126, 234, 0.3) !important;
+        }
+
+        .flatpickr-months .flatpickr-month {
+            background: #667eea !important;
+            color: white !important;
+        }
+
+        .flatpickr-current-month .flatpickr-monthDropdown-months {
+            background: #667eea !important;
+            color: white !important;
+        }
+
+        .flatpickr-weekdays {
+            background: #f2f2f7 !important;
+        }
+
+        span.flatpickr-weekday {
+            color: #8e8e93 !important;
+            font-weight: 600 !important;
+        }
+
+        .nav-btn {
+            display: inline-block;
+            padding: 5px 9px;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.3s;
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+            flex-shrink: 0;
+            letter-spacing: 0.2px;
+        }
+
+        .nav-btn-home {
+            background: #667eea;
+        }
+
+        .nav-btn-home:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-5lsys3 {
+            background: #ec4899;
+        }
+
+        .nav-btn-5lsys3:hover {
+            background: #db2777;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-doji {
+            background: #f59e0b;
+        }
+
+        .nav-btn-doji:hover {
+            background: #d97706;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-up {
+            background: #0ea5e9;
+        }
+
+        .nav-btn-up:hover {
+            background: #0284c7;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-5ls {
+            background: #8b5cf6;
+        }
+
+        .nav-btn-5ls:hover {
+            background: #7c3aed;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-yx205 {
+            background: #06b6d4;
+        }
+
+        .nav-btn-yx205:hover {
+            background: #0891b2;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-lszty {
+            background: #e11d48;
+        }
+
+        .nav-btn-lszty:hover {
+            background: #be123c;
+            transform: translateY(-2px);
+        }
+        .nav-btn-sbzt { background: #f43f5e; }
+        .nav-btn-sbzt:hover { background: #e11d48; transform: translateY(-2px); }
+        .nav-btn-ztorgj  { background: #d946ef; }
+        .nav-btn-ztorgj:hover  { background: #c026d3; transform: translateY(-2px); }
+
+        .nav-btn-ztqq { background: #7c3aed; }
+        .nav-btn-ztqq:hover { background: #6d28d9; transform: translateY(-2px); }
+
+        .nav-btn-yqhq {
+            background: #ec4899;
+            display: none; /* 暂时隐藏 */
+        }
+
+        .nav-btn-yqhq:hover {
+            background: #db2777;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-jpgz {
+            background: #f59e0b;
+        }
+
+        .nav-btn-jpgz:hover {
+            background: #d97706;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-yhy {
+            background: #e11d48;
+        }
+
+        .nav-btn-yhy:hover {
+            background: #be123c;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-5las3gj {
+            background: #f97316;
+        }
+
+        .nav-btn-5las3gj:hover {
+            background: #ea6c0a;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-5lsy2 {
+            background: #ef4444;
+        }
+
+        .nav-btn-5lsy2:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+        }
+
+        /* 提示栏样式 */
+        .tips-panel {
+            position: fixed;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+            width: 240px;
+            z-index: 1000;
+        }
+
+        .tips-panel .tips-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            text-align: center;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+            padding-bottom: 10px;
+        }
+
+        .tips-panel .tips-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .tips-panel .tips-list li {
+            padding: 8px 0;
+            font-size: 13px;
+            line-height: 1.6;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .tips-panel .tips-list li::before {
+            content: "●";
+            margin-right: 8px;
+            color: #ffd700;
+            flex-shrink: 0;
+        }
+
+        /* 移动端隐藏提示栏 */
+        @media (max-width: 768px) {
+            .tips-panel {
+                display: none;
+            }
+        }
+
+        .stats {
+            display: flex;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .stat-item {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 6px;
+            flex: 1;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 11px;
+            margin-bottom: 3px;
+        }
+
+        .stat-value {
+            color: #333;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .table-container {
+            background: white;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #e3f2fd;
+            color: #333;
+        }
+
+        th {
+            padding: 10px 12px;
+            text-align: center;
+            font-weight: 600;
+            white-space: nowrap;
+            font-size: 15px;
+            letter-spacing: 0.3px;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid #eee;
+            transition: all 0.3s;
+        }
+
+        tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        td {
+            padding: 10px 12px;
+            color: #1d1d1f;
+            font-size: 15px;
+            font-weight: 500;
+            letter-spacing: 0.2px;
+            text-align: center;
+        }
+
+        .positive {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .negative {
+            color: #27ae60;
+            font-weight: bold;
+        }
+
+        .neutral {
+            color: #95a5a6;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 30px;
+            color: #999;
+            font-size: 13px;
+        }
+
+        .update-time {
+            color: #666;
+            font-size: 10px;
+            margin-top: 8px;
+            text-align: right;
+        }
+
+        .strategies {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+            justify-content: center;
+        }
+
+        .strategy-tag {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        /* K线图提示框样式 */
+        .stock-tooltip {
+            position: fixed;
+            display: none;
+            background: #fff;
+            border: 1px solid #e1e1e1;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            z-index: 10000;
+            pointer-events: none;
+        }
+
+        
+            /* body移动端适配 */
+            body {
+                padding: 10px;
+            }
+            
+            /* 标题移动端适配 */
+            h1, .header h1 {
+                font-size: 20px !important;
+                padding: 10px !important;
+            }
+            
+            .info, .header .info {
+                font-size: 11px !important;
+                padding: 0 10px 10px !important;
+            }
+            
+            /* 返回按钮移动端适配 */
+            .back-btn {
+                font-size: 13px !important;
+                padding: 6px 12px !important;
+            }
+.stock-tooltip img {
+            display: block;
+            width: 800px;
+            height: 450px;
+            background: #f5f5f7;
+        }
+
+        .stock-tooltip .tooltip-header {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+
+        .stock-cell {
+            cursor: pointer;
+        }
+
+        .stock-cell:hover {
+            color: #667eea;
+        }
+
+        /* 最新股票标记样式 */
+        .stock-name {
+            position: relative;
+            display: inline-block;
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .stock-code {
+            font-weight: 600;
+        }
+
+        .new-badge {
+            position: absolute;
+            top: -6px;
+            right: -10px;
+            background: linear-gradient(135deg, #af52de, #bf6ee0);
+            color: white;
+            font-size: 8px;
+            font-weight: 700;
+            padding: 1px 4px;
+            border-radius: 6px;
+        }
+
+        /* 筛选说明样式 */
+        .filter-description {
+            background: #fff9e6;
+            border: 2px solid #ffd700;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 30px;
+            line-height: 1.8;
+        }
+
+        .filter-description .title {
+            color: #e74c3c;
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 15px;
+        }
+
+        .filter-description .section {
+            margin-bottom: 15px;
+        }
+
+        .filter-description .section-title {
+            font-weight: 700;
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .filter-description ul {
+            margin-left: 20px;
+            color: #555;
+            font-size: 13px;
+        }
+
+        .filter-description li {
+            margin-bottom: 5px;
+        }
+
+        .filter-description .highlight {
+            background: #f0f8ff;
+            padding: 10px;
+            border-left: 4px solid #667eea;
+            margin: 10px 0;
+        }
+
+        .filter-description .formula {
+            color: #666;
+            font-style: italic;
+            margin-left: 10px;
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            .stock-tooltip {
+                max-width: 95vw;
+            }
+            .stock-tooltip img {
+                width: 100%;
+                max-width: 600px;
+                height: auto;
+            }
+            .new-badge {
+                font-size: 8px;
+                padding: 1px 4px;
+                top: -6px;
+                right: -10px;
+            }
+            
+            /* 移动端导航按钮适配 */
+            .nav-container {
+                flex-direction: column;
+                gap: 12px;
+                padding: 12px;
+            }
+            
+            .nav-left, .nav-right {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .nav-right {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            
+            .nav-btn {
+                flex: 1 1 calc(50% - 4px);
+                min-width: 0;
+                padding: 8px 6px;
+                font-size: 12px;
+                white-space: normal;
+                word-break: keep-all;
+                line-height: 1.3;
+                text-align: center;
+            }
+            
+            /* 日期选择器移动端优化 */
+            .date-selector {
+                width: 100%;
+                justify-content: center;
+                padding: 6px 10px;
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+            
+            .date-nav-btn {
+                min-width: 36px;
+                padding: 8px 10px;
+                font-size: 14px;
+                touch-action: manipulation;
+            }
+            
+            #datePicker {
+                min-width: 120px;
+                max-width: 150px;
+                padding: 8px 12px;
+                font-size: 14px;
+                touch-action: manipulation;
+            }
+            
+            /* 表格移动端适配 */
+            .stock-table {
+                font-size: 12px;
+            }
+            
+            .stock-table th,
+            .stock-table td {
+                padding: 8px 4px;
+                font-size: 12px;
+            }
+            
+            .stock-table th:first-child,
+            .stock-table td:first-child {
+                padding-left: 8px;
+            }
+            
+            .stock-table th:last-child,
+            .stock-table td:last-child {
+                padding-right: 8px;
+            }
+            
+            /* 标题移动端适配 */
+            h1 {
+                font-size: 22px;
+                padding: 12px;
+            }
+            
+            .info {
+                font-size: 12px;
+                padding: 0 12px 12px;
+            }
+            
+            /* 容器移动端适配 */
+            .container {
+                padding: 8px;
+            }
+            
+            .table-container {
+                margin-bottom: 15px;
+            }
+            
+            .group-header {
+                font-size: 14px;
+            }
+            
+            .group-header .group-name {
+                font-size: 16px;
+            }
+        }
+        .page-title {
+            background: white;
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .page-title h1 { font-size: 22px; font-weight: 700; color: #1d1d1f; letter-spacing: 0.3px; margin: 0; }
+        .page-title .badge { color: white; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+        .page-title .desc { color: #6b7280; font-size: 13px; }
+            /* mobile no-scroll baseline */
+        @media (max-width: 768px) {
+            body {
+                overflow-x: hidden;
+            }
+            .container,
+            .content,
+            .table-container,
+            .group-table-container,
+            .table-wrap {
+                max-width: 100%;
+                overflow-x: hidden !important;
+            }
+            table,
+            .stock-table {
+                width: 100%;
+                table-layout: fixed;
+            }
+            th,
+            td,
+            .stock-table th,
+            .stock-table td,
+            .stock-name,
+            .s-name,
+            .strategy-tag,
+            .nav-btn,
+            .group-title,
+            .group-name {
+                white-space: normal !important;
+                word-break: break-all;
+                overflow-wrap: anywhere;
+            }
+            #datePicker,
+            .date-display {
+                min-width: 0 !important;
+                width: 100%;
+                max-width: 100%;
+            }
+        }
+</style>
+</head>
+<body>
+    <!-- K线图提示框 -->
+    <div class="stock-tooltip" id="klineTooltip">
+        <div class="tooltip-header"></div>
+        <img id="klineImage" src="" alt="K线图">
+    </div>
+
+    <!-- 左侧提示栏 -->
+    <div class="tips-panel">
+        <div class="tips-title">强势K横盘结构</div>
+        <ul class="tips-list">
+            <li>光脚</li>
+            <li>十字星</li>
+            <li>几乎光脚</li>
+            <li>最高涨幅大于7</li>
+            <li>有上影线的下引线很短</li>
+            <li>有下引线的上引线很短</li>
+        </ul>
+    </div>
+
+    <!-- 日期选择器弹窗 -->
+    <div class="container">
+        <div class="nav-buttons">
+            <div class="nav-left">
+                <!-- 日期选择器 - Flatpickr -->
+                <div class="date-selector">
+                    <button class="date-nav-btn" id="prevDateBtn" onclick="prevDate()">◀</button>
+                    <input type="text" id="datePicker" placeholder="选择日期" readonly>
+                    <button class="date-nav-btn" id="nextDateBtn" onclick="nextDate()">▶</button>
+                </div>
+            </div>
+            <div class="nav-right">
+                <a href="/" class="nav-btn nav-btn-home">首页</a>
+                <a href="/涨停前横盘" class="nav-btn" style="background:#2563eb;">涨停前横盘</a>
+                <a href="/阴后强" class="nav-btn nav-btn-yhy">阴后强</a>
+                <a href="/5拉升" class="nav-btn" style="background:#2563eb;">5拉升</a>
+                <a href="/20阴少跌少横盘" class="nav-btn nav-btn-yx205">20阴少跌少横盘</a>
+                <a href="/阴线跌破5日次数" class="nav-btn" style="background:#ca8a04;">阴线跌破5日次数</a>
+                <a href="/10天大5日线" class="nav-btn" style="background:#0f766e;">10天大5日线</a>
+                <a href="/涨停或光脚" class="nav-btn nav-btn-ztorgj">涨停或光脚</a>
+                <a href="/连续5不碰" class="nav-btn" style="background:#f43f5e;">连续5不碰</a>
+                <a href="/连续涨停" class="nav-btn nav-btn-lszty">连续涨停</a>
+                <a href="/连续4天拉升" class="nav-btn nav-btn-intraday4up" style="background:#f97316;">连续4天拉升</a>
+
+                <a href="/5拉升阴前后强" class="nav-btn nav-btn-yqhq">5拉升阴前后强</a>
+            </div>
+            <a href="/极品关注" class="nav-btn" style="background:#f59e0b;">极品关注</a>
+            <a href="/同花顺板块" class="nav-btn" style="background:#2563eb;">同花顺板块</a>
+        </div>
+        <div class="page-title">
+            <h1>5拉升阴少3不下杀</h1>
+            <span class="badge" style="background: linear-gradient(135deg, #ec4899, #db2777);">不下杀分组</span>
+            <span class="desc">10天拉升5次 · 阴线少 · 3天不下杀结构</span>
+        </div>
+        <div class="table-container">
+            <div id="loading" class="loading">正在加载数据...</div>
+            <div id="noData" class="no-data" style="display: none;">暂无数据</div>
+            <table id="stockTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th>股票代码</th>
+                        <th>股票名称</th>
+                        <th>涨跌幅(%)</th>
+                        <th>不下杀次数</th>
+                        <th>拉升次数</th>
+                        <th>市值(亿)</th>
+                        <th>策略名称</th>
+                        <th>预警时间</th>
+                    </tr>
+                </thead>
+                <tbody id="stockTableBody">
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 参考日光脚阳线 独立表格 -->
+        <div id="bareYangSection" class="table-container" style="display: none; margin-top: 15px;">
+            <div class="extra-group-title" style="background: #F3F4F6; color: #a855f7; padding: 12px; font-weight: 600; font-size: 15px; border-bottom: 2px solid #E5E7EB; border-radius: 6px 6px 0 0;">
+                参考日光脚阳线 (<span id="bareYangCount">0</span>只)
+            </div>
+            <table id="bareYangTable">
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th>股票代码</th>
+                        <th>股票名称</th>
+                        <th>涨跌幅(%)</th>
+                        <th>不下杀次数</th>
+                        <th>拉升次数</th>
+                        <th>市值(亿)</th>
+                        <th>策略名称</th>
+                        <th>预警时间</th>
+                    </tr>
+                </thead>
+                <tbody id="bareYangTableBody">
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 参考日几乎无下引线阳线 独立表格 -->
+        <div id="nearlyBareYangSection" class="table-container" style="display: none; margin-top: 15px;">
+            <div class="extra-group-title" style="background: #F3F4F6; color: #8b5cf6; padding: 12px; font-weight: 600; font-size: 15px; border-bottom: 2px solid #E5E7EB; border-radius: 6px 6px 0 0;">
+                参考日几乎无下引线阳线 (<span id="nearlyBareYangCount">0</span>只)
+            </div>
+            <table id="nearlyBareYangTable">
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th>股票代码</th>
+                        <th>股票名称</th>
+                        <th>涨跌幅(%)</th>
+                        <th>不下杀次数</th>
+                        <th>拉升次数</th>
+                        <th>市值(亿)</th>
+                        <th>策略名称</th>
+                        <th>预警时间</th>
+                    </tr>
+                </thead>
+                <tbody id="nearlyBareYangTableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // ===== 页面版本：2026-02-24-v2 (带分组显示+光脚阳线分组) =====
+        console.log('🎯 5拉升阴少3不下杀页面版本: 2026-02-24-v2 (带分组显示+光脚阳线分组)');
+        
+        let stocksData = [];
+        let lastTimestamp = null;  // 记录上次的时间戳
+        let currentDate = null;
+        let availableDates = [];
+        let currentDateIndex = 0;
+        let marketCapCache = {};
+        let fetchingMarketCap = {};
+
+        // 最近交易日（非交易日时默认显示最近交易日数据）
+        let latestTradeDate = new Date().toISOString().split('T')[0];
+        async function fetchLatestTradeDate() {
+            const todayKey = 'latestTradeDate_' + new Date().toISOString().split('T')[0];
+            const cached = localStorage.getItem(todayKey);
+            if (cached) { latestTradeDate = cached; return; }
+            try {
+                const resp = await fetch('/api/latest_trade_date');
+                const result = await resp.json();
+                if (result.success && result.date) {
+                    latestTradeDate = result.date;
+                    localStorage.setItem(todayKey, result.date);
+                }
+            } catch(e) {}
+        }
+
+        // 从localStorage加载今天的市值缓存
+        function loadTodayMarketCapCache() {
+            const today = new Date().toISOString().split('T')[0];
+            const cacheKey = `marketCap_${today}`;
+            const cached = localStorage.getItem(cacheKey);
+            
+            if (cached) {
+                try {
+                    marketCapCache = JSON.parse(cached);
+                    console.log(`📦 从缓存加载了 ${Object.keys(marketCapCache).length} 个市值数据`);
+                } catch (e) {
+                    console.error('解析市值缓存失败:', e);
+                    marketCapCache = {};
+                }
+            }
+            
+            // 清理旧的缓存（保留最近3天）
+            const keysToDelete = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('marketCap_')) {
+                    const cacheDate = key.replace('marketCap_', '');
+                    const daysDiff = Math.floor((new Date() - new Date(cacheDate)) / (1000 * 60 * 60 * 24));
+                    if (daysDiff > 3) {
+                        keysToDelete.push(key);
+                    }
+                }
+            }
+            keysToDelete.forEach(key => localStorage.removeItem(key));
+        }
+
+        // 保存市值缓存到localStorage
+        function saveTodayMarketCapCache() {
+            const today = new Date().toISOString().split('T')[0];
+            const cacheKey = `marketCap_${today}`;
+            try {
+                localStorage.setItem(cacheKey, JSON.stringify(marketCapCache));
+            } catch (e) {
+                console.error('保存市值缓存失败:', e);
+            }
+        }
+
+        // 获取可用日期列表
+        async function fetchDates() {
+            loadTodayMarketCapCache();
+            await fetchLatestTradeDate();
+            try {
+                const response = await fetch('/api/5lsys/dates');
+                const result = await response.json();
+                
+                const today = latestTradeDate;
+                currentDate = today;
+                
+                if (result.success && result.dates && result.dates.length > 0) {
+                    availableDates = result.dates;
+                    // 检查今天是否在可用日期列表中
+                    currentDateIndex = availableDates.indexOf(today);
+                    if (currentDateIndex === -1) {
+                        // 今天不在列表中，设置为-1表示今天没有数据
+                        currentDateIndex = -1;
+                    }
+                } else {
+                    availableDates = [];
+                    currentDateIndex = -1;
+                }
+                
+                initFlatpickr(); // 初始化 Flatpickr
+                await loadStocks(today);
+            } catch (error) {
+                console.error('获取日期列表失败:', error);
+                const today = latestTradeDate;
+                currentDate = today;
+                availableDates = [];
+                currentDateIndex = -1;
+                initFlatpickr(); // 初始化 Flatpickr
+                await loadStocks(today);
+            }
+        }
+
+        // 更新日期显示
+        function updateDateDisplay() {
+            const displayElem = document.getElementById('datePicker');
+            if (displayElem) {
+                displayElem.value = currentDate || '今天';
+            }
+            // 更新 Flatpickr 选中的日期
+            if (fp) {
+                fp.setDate(currentDate, false); // false 表示不触发 onChange 事件
+            }
+        }
+
+        // 上一个日期
+        function prevDate() {
+            if (currentDateIndex < availableDates.length - 1) {
+                currentDateIndex++;
+                currentDate = availableDates[currentDateIndex];
+                updateDateDisplay();
+                loadStocks(currentDate);
+            }
+        }
+
+        // 下一个日期
+        function nextDate() {
+            if (currentDateIndex > 0) {
+                currentDateIndex--;
+                currentDate = availableDates[currentDateIndex];
+                updateDateDisplay();
+                loadStocks(currentDate);
+            }
+        }
+
+        // 打开日期选择器
+        // Flatpickr 实例
+        let fp;
+
+        // 初始化 Flatpickr
+        function initFlatpickr() {
+            fp = flatpickr("#datePicker", {
+                locale: "zh",
+                dateFormat: "Y-m-d",
+                defaultDate: currentDate,
+                enable: availableDates, // 只允许选择有数据的日期
+                inline: false, // 显示为下拉
+                appendTo: document.body, // 附加到 body，避免裁剪问题
+                disableMobile: true, // 在移动端也使用桌面版选择器
+                onChange: function(selectedDates, dateStr, instance) {
+                    console.log('📅 [Flatpickr] 日期选择变化');
+                    console.log('📅 [Flatpickr] 选中的日期:', dateStr);
+                    console.log('📅 [Flatpickr] 当前currentDate:', currentDate);
+                    
+                    if (selectedDates.length > 0) {
+                        const newDate = dateStr;
+                        if (newDate !== currentDate) {
+                            console.log('📅 [Flatpickr] 日期已变更，从', currentDate, '到', newDate);
+                            currentDate = newDate;
+                            currentDateIndex = availableDates.indexOf(currentDate);
+                            console.log('📅 [Flatpickr] 新的currentDateIndex:', currentDateIndex);
+                            updateDateDisplay();
+                            console.log('📅 [Flatpickr] 调用loadStocks(' + currentDate + ')');
+                            loadStocks(currentDate);
+                        } else {
+                            console.log('📅 [Flatpickr] 日期未变更，跳过加载');
+                        }
+                    }
+                },
+                onOpen: function(selectedDates, dateStr, instance) {
+                    // 打开时滚动到活动日期
+                    const activeDateElement = instance.calendarContainer.querySelector('.flatpickr-day.selected');
+                    if (activeDateElement) {
+                        activeDateElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }
+            });
+            updateDateDisplay(); // 初始显示更新
+        }
+
+        // 加载股票列表
+        async function loadStocks(dateToLoad = null) {
+            try {
+                console.log('🔍 [loadStocks] 开始加载数据');
+                console.log('🔍 [loadStocks] dateToLoad参数:', dateToLoad);
+                console.log('🔍 [loadStocks] currentDate变量:', currentDate);
+                console.log('🔍 [loadStocks] currentDateIndex变量:', currentDateIndex);
+                
+                const startTime = performance.now();
+                const url = dateToLoad ? `/api/5lsys/stocks?date=${dateToLoad}` : '/api/5lsys/stocks';
+                console.log('🔍 [loadStocks] 请求URL:', url);
+                
+                const response = await fetch(url);
+                const result = await response.json();
+                
+                console.log('🔍 [loadStocks] API返回结果:', result);
+                console.log('🔍 [loadStocks] 返回的股票数量:', result.data ? result.data.length : 0);
+                if (result.data && result.data.length > 0) {
+                    console.log('🔍 [loadStocks] 第一只股票示例:', result.data[0]);
+                }
+                
+                // 更新刷新间隔
+                if (result.refresh_interval) {
+                    updateRefreshInterval(result.refresh_interval);
+                }
+                
+                // 显示性能指标
+                if (result.performance) {
+                    const loadTime = performance.now() - startTime;
+                    console.log('📊 性能指标:');
+                    console.log(`  - 后端总耗时: ${result.performance.total_time}`);
+                    console.log(`  - 网络延迟: ${result.performance.network_latency}`);
+                    console.log(`  - SCAN耗时: ${result.performance.scan_time}`);
+                    console.log(`  - 解析耗时: ${result.performance.parse_time}`);
+                    console.log(`  - 前端耗时: ${loadTime.toFixed(2)}ms`);
+                    console.log(`  - 股票数量: ${result.performance.count}`);
+                }
+                
+                if (result.success && result.data && result.data.length > 0) {
+                    stocksData = result.data;
+                    console.log('✅ [loadStocks] 设置stocksData，数量:', stocksData.length);
+                    
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('noData').style.display = 'none';
+                    document.getElementById('stockTable').style.display = 'table';
+                    
+                    console.log('🎨 [loadStocks] 准备调用renderTable()');
+                    // 立即渲染表格（先显示基础数据）
+                    renderTable();
+                    console.log('✅ [loadStocks] renderTable()调用完成');
+                    
+                    // 获取市值为0的股票的市值
+                    fetchMarketCapForZeroStocks();
+                    
+                    // 只有查看最近交易日数据时才刷新实时行情
+                    const today = latestTradeDate;
+                    if (currentDate === today) {
+                        console.log('📡 [loadStocks] 准备刷新实时行情（今天数据）');
+                        await refreshRealtime();
+                        console.log('✅ [loadStocks] 实时行情刷新完成');
+                    } else {
+                        console.log('📅 [loadStocks] 查看历史数据，跳过实时行情刷新');
+                    }
+                } else {
+                    console.log('⚠️ [loadStocks] 没有数据或返回失败');
+                    stocksData = [];
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('noData').style.display = 'block';
+                    document.getElementById('stockTable').style.display = 'none';
+                    renderTable(); // 清空表格
+                }
+            } catch (error) {
+                console.error('❌ [loadStocks] 加载股票列表失败:', error);
+                document.getElementById('loading').textContent = '加载失败，请刷新页面重试';
+            }
+        }
+
+        // 获取市值为0的股票的市值数据
+        async function fetchMarketCapForZeroStocks() {
+            const zeroMarketCapStocks = stocksData.filter(s => !s.market_cap || s.market_cap === 0);
+            
+            if (zeroMarketCapStocks.length === 0) {
+                console.log('所有股票都有市值数据');
+                return;
+            }
+            
+            console.log(`发现 ${zeroMarketCapStocks.length} 个股票需要获取市值`);
+            
+            // 逐个获取市值（避免同时请求太多）
+            for (const stock of zeroMarketCapStocks) {
+                const code = stock.code;
+                
+                // 检查缓存
+                if (marketCapCache[code]) {
+                    stock.market_cap = marketCapCache[code];
+                    continue;
+                }
+                
+                // 避免重复获取
+                if (fetchingMarketCap[code]) {
+                    continue;
+                }
+                
+                fetchingMarketCap[code] = true;
+                
+                try {
+                    const response = await fetch(`/api/5lsys/market_cap/${code}`);
+                    const result = await response.json();
+                    
+                    if (result.success && result.market_cap) {
+                        stock.market_cap = result.market_cap;
+                        marketCapCache[code] = result.market_cap;
+                        saveTodayMarketCapCache(); // 保存到localStorage
+                        console.log(`✓ 获取市值: ${stock.name} (${code}) = ${result.market_cap}亿`);
+                        
+                        // 重新渲染表格以显示最新市值
+                        renderTable();
+                    }
+                } catch (error) {
+                    console.error(`获取市值失败 ${code}:`, error);
+                } finally {
+                    delete fetchingMarketCap[code];
+                }
+                
+                // 延迟200ms避免请求过快
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+        }
+
+        // 刷新实时行情
+        async function refreshRealtime() {
+            // 如果查看历史数据，不刷新实时行情
+            if (currentDateIndex !== 0) {
+                console.log('📅 [refreshRealtime] 当前查看历史数据，跳过实时行情刷新');
+                return;
+            }
+            
+            if (stocksData.length === 0) return;
+            
+            try {
+                const codes = stocksData.map(s => s.code);
+                const response = await fetch('/api/5lsys/realtime', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ codes: codes })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.data) {
+                    // 检查是否有数据变化
+                    let hasChange = false;
+                    stocksData.forEach(stock => {
+                        if (result.data[stock.code]) {
+                            const newChange = result.data[stock.code].change;
+                            if (stock.today_change !== newChange) {
+                                stock.today_change = newChange;
+                                hasChange = true;
+                            }
+                        }
+                    });
+                    
+                    // 只有在数据变化时才重新排序和渲染
+                    if (hasChange) {
+                        // 按涨跌幅从高到低排序
+                        stocksData.sort((a, b) => (b.today_change || 0) - (a.today_change || 0));
+                        
+                        // 渲染表格
+                        renderTable();
+                    }
+                }
+                    
+            } catch (error) {
+                console.error('刷新实时行情失败:', error);
+            }
+        }
+
+        // 渲染表格（带分组）
+        function renderTable() {
+            console.log('🎨 [renderTable-v2] 开始渲染表格（分组版本）');
+            console.log('🎨 [renderTable-v2] stocksData数量:', stocksData.length);
+            if (stocksData.length > 0) {
+                console.log('🎨 [renderTable-v2] 第一只股票:', stocksData[0]);
+                console.log('🎨 [renderTable-v2] 第一只股票的group:', stocksData[0].group);
+            }
+            
+            const tbody = document.getElementById('stockTableBody');
+            tbody.innerHTML = '';
+            console.log('🎨 [renderTable] 已清空tbody');
+            
+            // 按预警时间排序，找出最新的5个股票
+            const sortedByTime = [...stocksData].sort((a, b) => {
+                const timeA = a.warning_time || '0';
+                const timeB = b.warning_time || '0';
+                return timeB.localeCompare(timeA);
+            });
+            
+            // 按分组分类
+            const groups = {};
+            stocksData.forEach(stock => {
+                const groupKey = stock.group || '未分组';
+                if (!groups[groupKey]) {
+                    groups[groupKey] = [];
+                }
+                groups[groupKey].push(stock);
+            });
+            
+            console.log('📊 [renderTable-v2] 分组结果:', Object.keys(groups));
+            console.log('📊 [renderTable-v2] 各分组数量:', Object.entries(groups).map(([k, v]) => `${k}: ${v.length}只`).join(', '));
+            
+            // 定义分组顺序（按1-4排列）
+            const groupOrder = [
+                '分组1',
+                '分组2',
+                '分组3',
+                '分组4'
+            ];
+            
+            // 分组名称映射
+            const groupNames = {
+                '分组1': '不下杀10次',
+                '分组2': '不下杀9次',
+                '分组3': '不下杀8次',
+                '分组4': '不下杀≤7次'
+            };
+            
+            let globalIndex = 0; // 全局序号
+            
+            // 按指定顺序渲染分组
+            groupOrder.forEach(groupKey => {
+                if (!groups[groupKey] || groups[groupKey].length === 0) {
+                    return;
+                }
+                
+                const groupData = groups[groupKey];
+                console.log(`✨ 渲染分组 ${groupKey}, 股票数量: ${groupData.length}`);
+                
+                // 按涨跌幅排序
+                groupData.sort((a, b) => (b.today_change || 0) - (a.today_change || 0));
+                
+                // 添加分组标题行
+                const headerRow = document.createElement('tr');
+                headerRow.className = 'group-header-row';
+                headerRow.innerHTML = `
+                    <td colspan="9" style="background: #F3F4F6; color: #374151; padding: 12px; font-weight: 600; font-size: 14px; text-align: left; border-bottom: 2px solid #E5E7EB;">
+                        ${groupKey} - ${groupNames[groupKey] || groupKey} (${groupData.length}只)
+                    </td>
+                `;
+                tbody.appendChild(headerRow);
+                
+                // 渲染该分组的股票
+                groupData.forEach((stock, index) => {
+                    globalIndex++;
+                    const row = document.createElement('tr');
+                    
+                    // 添加鼠标悬停事件
+                    row.addEventListener('mouseenter', (e) => showKline(e, stock.code, stock.name));
+                    row.addEventListener('mouseleave', hideKline);
+                    row.addEventListener('mousemove', moveTooltip);
+                    
+                    const change = stock.today_change || 0;
+                    let changeClass = 'neutral';
+                    if (change > 0) {
+                        changeClass = 'positive';
+                    } else if (change < 0) {
+                        changeClass = 'negative';
+                    }
+                    
+                    // 判断是否为最新5个股票
+                    const newIndex = sortedByTime.findIndex(s => s.code === stock.code);
+                    const isNew = newIndex < 5;
+                    const badge = isNew ? `<span class="new-badge">${newIndex + 1}</span>` : '';
+                    
+                    const strategies = Array.isArray(stock.strategies) ? stock.strategies : [];
+                    const strategiesHtml = strategies.map(s => 
+                        `<span class="strategy-tag">${s}</span>`
+                    ).join('');
+                    
+                    row.innerHTML = `
+                        <td>${globalIndex}</td>
+                        <td>${stock.code}</td>
+                        <td class="stock-cell"><span class="stock-name">${stock.name}${badge}</span></td>
+                        <td class="${changeClass}">${change > 0 ? '+' : ''}${change.toFixed(2)}%</td>
+                        <td>${stock.no_xs_num || 0}</td>
+                        <td>${stock.ls_num || 0}</td>
+                        <td><span data-market-cap-code="${stock.code}" data-market-cap-decimals="2" data-market-cap-unit="">${(stock.market_cap || 0).toFixed(2)}</span></td>
+                        <td><div class="strategies">${strategiesHtml || '-'}</div></td>
+                        <td>${stock.warning_time || '-'}</td>
+                    `;
+                    
+                    tbody.appendChild(row);
+                });
+            });
+            
+            // 渲染带子分组的大组（按不下杀次数分组）
+            function renderGroupWithSubgroups(stocks, sectionId, tbodyId, countId, sortedByTime) {
+                const section = document.getElementById(sectionId);
+                const tbody = document.getElementById(tbodyId);
+                tbody.innerHTML = '';
+                
+                if (stocks.length === 0) {
+                    section.style.display = 'none';
+                    return;
+                }
+                
+                document.getElementById(countId).textContent = stocks.length;
+                
+                // 按不下杀次数分组
+                const subGroups = {
+                    '10次': [],
+                    '9次': [],
+                    '8次': [],
+                    '≤7次': []
+                };
+                
+                stocks.forEach(stock => {
+                    const noXsNum = stock.no_xs_num || 0;
+                    if (noXsNum === 10) {
+                        subGroups['10次'].push(stock);
+                    } else if (noXsNum === 9) {
+                        subGroups['9次'].push(stock);
+                    } else if (noXsNum === 8) {
+                        subGroups['8次'].push(stock);
+                    } else {
+                        subGroups['≤7次'].push(stock);
+                    }
+                });
+                
+                // 按顺序渲染子分组
+                let globalIndex = 0;
+                ['10次', '9次', '8次', '≤7次'].forEach(subGroupKey => {
+                    const subGroupStocks = subGroups[subGroupKey];
+                    if (subGroupStocks.length === 0) return;
+                    
+                    // 按涨跌幅排序
+                    subGroupStocks.sort((a, b) => (b.today_change || 0) - (a.today_change || 0));
+                    
+                    // 添加子分组标题行
+                    const subHeaderRow = document.createElement('tr');
+                    subHeaderRow.className = 'group-header-row';
+                    subHeaderRow.innerHTML = `
+                        <td colspan="9" style="background: #E5E7EB; color: #374151; padding: 10px 12px; font-weight: 600; font-size: 13px; text-align: left; border-bottom: 1px solid #D1D5DB;">
+                            不下杀${subGroupKey} (${subGroupStocks.length}只)
+                        </td>
+                    `;
+                    tbody.appendChild(subHeaderRow);
+                    
+                    // 渲染该子分组的股票
+                    subGroupStocks.forEach(stock => {
+                        globalIndex++;
+                        const row = document.createElement('tr');
+                        
+                        row.addEventListener('mouseenter', (e) => showKline(e, stock.code, stock.name));
+                        row.addEventListener('mouseleave', hideKline);
+                        row.addEventListener('mousemove', moveTooltip);
+                        
+                        const change = stock.today_change || 0;
+                        let changeClass = 'neutral';
+                        if (change > 0) {
+                            changeClass = 'positive';
+                        } else if (change < 0) {
+                            changeClass = 'negative';
+                        }
+                        
+                        const newIndex = sortedByTime.findIndex(s => s.code === stock.code);
+                        const isNew = newIndex < 5;
+                        const badge = isNew ? `<span class="new-badge">${newIndex + 1}</span>` : '';
+                        
+                        const strategies = Array.isArray(stock.strategies) ? stock.strategies : [];
+                        const strategiesHtml = strategies.map(s => 
+                            `<span class="strategy-tag">${s}</span>`
+                        ).join('');
+                        
+                        row.innerHTML = `
+                            <td>${globalIndex}</td>
+                            <td>${stock.code}</td>
+                            <td class="stock-cell"><span class="stock-name">${stock.name}${badge}</span></td>
+                            <td class="${changeClass}">${change > 0 ? '+' : ''}${change.toFixed(2)}%</td>
+                            <td>${stock.no_xs_num || 0}</td>
+                            <td>${stock.ls_num || 0}</td>
+                            <td><span data-market-cap-code="${stock.code}" data-market-cap-decimals="2" data-market-cap-unit="">${(stock.market_cap || 0).toFixed(2)}</span></td>
+                            <td><div class="strategies">${strategiesHtml || '-'}</div></td>
+                            <td>${stock.warning_time || '-'}</td>
+                        `;
+                        
+                        tbody.appendChild(row);
+                    });
+                });
+                
+                section.style.display = 'block';
+            }
+            
+            // 渲染独立表格：参考日光脚阳线（带子分组）
+            const bareYangStocks = stocksData.filter(s => s.is_bare_yang === true);
+            renderGroupWithSubgroups(bareYangStocks, 'bareYangSection', 'bareYangTableBody', 'bareYangCount', sortedByTime);
+            
+            // 渲染独立表格：参考日几乎无下引线阳线（带子分组）
+            const nearlyBareYangStocks = stocksData.filter(s => s.is_nearly_bare_yang === true);
+            renderGroupWithSubgroups(nearlyBareYangStocks, 'nearlyBareYangSection', 'nearlyBareYangTableBody', 'nearlyBareYangCount', sortedByTime);
+            
+            console.log('🎨 [renderTable] 渲染完成');
+            if (bareYangStocks.length > 0) console.log(`📊 参考日光脚阳线: ${bareYangStocks.length}只`);
+            if (nearlyBareYangStocks.length > 0) console.log(`📊 参考日几乎无下引线阳线: ${nearlyBareYangStocks.length}只`);
+        }
+
+        // 动态刷新间隔（毫秒）
+        let checkUpdateInterval = 3000; // Redis检查间隔，默认3秒
+        let realtimeRefreshInterval = 3000; // 涨跌幅刷新间隔，固定3秒
+        let checkUpdateTimer = null;
+        let refreshRealtimeTimer = null;
+
+        // 更新Redis检查间隔
+        function updateRefreshInterval(newInterval) {
+            if (newInterval && checkUpdateInterval !== newInterval * 1000) {
+                const oldInterval = checkUpdateInterval / 1000;
+                checkUpdateInterval = newInterval * 1000;
+                const realtimeSeconds = realtimeRefreshInterval / 1000;
+                
+                // 控制台日志
+                console.log(`⏱️ Redis检查间隔变更: ${oldInterval}秒 → ${newInterval}秒`);
+                console.log(`📊 当前设置: Redis检查=${newInterval}秒, 涨跌幅刷新=${realtimeSeconds}秒`);
+                
+                // 重启Redis检查定时器
+                restartCheckUpdateTimer();
+            }
+        }
+
+        // 重启Redis检查定时器
+        function restartCheckUpdateTimer() {
+            if (checkUpdateTimer) clearInterval(checkUpdateTimer);
+            checkUpdateTimer = setInterval(checkUpdate, checkUpdateInterval);
+            console.log(`✅ Redis检查定时器已重启，间隔: ${checkUpdateInterval/1000}秒`);
+        }
+
+        // 启动涨跌幅刷新定时器（固定3秒）
+        function startRealtimeRefreshTimer() {
+            if (refreshRealtimeTimer) clearInterval(refreshRealtimeTimer);
+            refreshRealtimeTimer = setInterval(refreshRealtime, realtimeRefreshInterval);
+            console.log(`✅ 涨跌幅刷新定时器已启动，间隔: ${realtimeRefreshInterval/1000}秒`);
+        }
+
+        // 检查Redis更新（基于时间戳）
+        async function checkUpdate() {
+            console.log('🔄 [checkUpdate] 开始检查更新');
+            console.log('🔄 [checkUpdate] currentDateIndex:', currentDateIndex);
+            console.log('🔄 [checkUpdate] currentDate:', currentDate);
+            
+            // 如果当前查看的不是最新日期，跳过自动更新检查
+            if (currentDateIndex !== 0) {
+                console.log('📅 [checkUpdate] 当前查看历史数据，跳过自动更新检查');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/5lsys/check_update');
+                const result = await response.json();
+                console.log('🔄 [checkUpdate] 检查更新结果:', result);
+                
+                // 更新刷新间隔
+                if (result.refresh_interval) {
+                    updateRefreshInterval(result.refresh_interval);
+                }
+                
+                if (result.success && result.updated) {
+                    const newTimestamp = result.timestamp;
+                    const newCount = result.count || 0;
+                    
+                    // 如果是第一次获取时间戳，直接记录
+                    if (lastTimestamp === null) {
+                        lastTimestamp = newTimestamp;
+                        console.log('初始时间戳:', newTimestamp);
+                        console.log('初始股票数量:', newCount);
+                    } 
+                    // 如果时间戳变化了，说明数据更新了
+                    else if (newTimestamp !== lastTimestamp) {
+                        console.log('检测到数据更新!');
+                        console.log('旧时间戳:', lastTimestamp);
+                        console.log('新时间戳:', newTimestamp);
+                        console.log('股票数量:', newCount);
+                        
+                        lastTimestamp = newTimestamp;
+                        
+                        // 重新加载当前日期的数据
+                        await loadStocks(currentDate);
+                    }
+                    // 如果时间戳相同，但股票数量为0，也要刷新页面
+                    else if (newCount === 0 && stocksData.length > 0) {
+                        console.log('⚠️ 检测到数据被清空!');
+                        lastTimestamp = newTimestamp;
+                        await loadStocks(currentDate);
+                    }
+                } else if (result.success && !result.updated) {
+                    // 如果没有数据（返回updated=false且timestamp为null）
+                    // 只有在当前有数据的情况下才清空，避免重复清空
+                    if (result.timestamp === null && stocksData.length > 0 && lastTimestamp !== null) {
+                        console.log('⚠️ Redis中没有今天的数据，清空页面显示');
+                        lastTimestamp = null;
+                        stocksData = [];
+                        renderTable();
+                    }
+                }
+            } catch (error) {
+                console.error('检查更新失败:', error);
+            }
+        }
+
+        // 初始化
+        fetchDates();
+
+        // 启动定时器
+        checkUpdateTimer = setInterval(checkUpdate, checkUpdateInterval);
+        refreshRealtimeTimer = setInterval(refreshRealtime, realtimeRefreshInterval);
+        
+        console.log('🚀 5拉升阴少3不下杀页面初始化完成');
+        console.log(`📊 Redis检查间隔: ${checkUpdateInterval/1000}秒`);
+        console.log(`📊 涨跌幅刷新间隔: ${realtimeRefreshInterval/1000}秒`);
+        
+        // ========== 导航按钮诊断代码 ==========
+        setTimeout(() => {
+            console.log('🔍 ========== 开始诊断导航按钮 ==========');
+            const navButtons = document.querySelectorAll('.nav-btn');
+            console.log('🔍 找到导航按钮数量:', navButtons.length);
+            
+            navButtons.forEach((btn, index) => {
+                const text = btn.textContent || btn.innerText || '';
+                const href = btn.getAttribute('href') || '';
+                const classList = btn.className || '';
+                
+                console.log(`🔍 按钮 ${index + 1}:`);
+                console.log(`  - href: ${href}`);
+                console.log(`  - class: ${classList}`);
+                console.log(`  - 文本: "${text}"`);
+                console.log(`  - 文本长度: ${text.length}`);
+                console.log(`  - 文本为空: ${text.trim() === ''}`);
+                
+                if (text.trim() === '') {
+                    console.error(`❌ 按钮 ${index + 1} 文本为空！innerHTML:`, btn.innerHTML);
+                }
+            });
+            
+            // 检查HTML源码
+            const navRight = document.querySelector('.nav-right');
+            if (navRight) {
+                console.log('🔍 导航容器存在');
+                console.log('🔍 导航容器innerHTML长度:', navRight.innerHTML.length);
+                console.log('🔍 导航容器HTML片段:', navRight.innerHTML.substring(0, 300));
+            } else {
+                console.error('❌ 找不到 .nav-right 容器！');
+            }
+            
+            console.log('🔍 ========== 诊断完成 ==========');
+        }, 1000);
+
+        // K线图相关功能
+        const tooltip = document.getElementById('klineTooltip');
+        const klineImg = document.getElementById('klineImage');
+
+        // 获取东方财富前缀
+        function getEastMoneyPrefix(code) {
+            return code.startsWith('6') ? '1' : '0';
+        }
+
+        // 显示K线图
+        function showKline(e, code, name) {
+            const emPrefix = getEastMoneyPrefix(code);
+            klineImg.src = `https://webquoteklinepic.eastmoney.com/GetPic.aspx?nid=${emPrefix}.${code}&imageType=KXL&token=44c9d251add88e27b65ed86506f6e5da&at=1`;
+            tooltip.querySelector('.tooltip-header').innerText = `${name} (${code}) - 日K线`;
+            moveTooltip(e);
+            tooltip.style.display = 'block';
+        }
+
+        // 隐藏K线图
+        function hideKline() {
+            tooltip.style.display = 'none';
+            klineImg.src = '';
+        }
+
+        // 移动提示框
+        function moveTooltip(e) {
+            const isMobile = window.innerWidth <= 768;
+            const tooltipWidth = isMobile ? Math.min(400, window.innerWidth * 0.95) : 565;
+            const tooltipHeight = isMobile ? 250 : 330;
+            let left = e.clientX + 15;
+            let top = e.clientY + 15;
+
+            if (left + tooltipWidth > window.innerWidth) {
+                left = e.clientX - tooltipWidth - 15;
+            }
+            if (top + tooltipHeight > window.innerHeight) {
+                top = e.clientY - tooltipHeight - 15;
+            }
+            if (left < 0) left = 10;
+            if (top < 0) top = 10;
+
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+        }
+    </script>
+    <!-- Flatpickr JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh.js"></script>
+
+<!-- iOS风格对话框 -->
+<div id="ios-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:99999;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:14px;width:270px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.25);">
+        <div id="ios-modal-msg" style="padding:20px 16px 14px;text-align:center;font-size:16px;font-weight:600;color:#000;line-height:1.5;display:flex;align-items:center;justify-content:center;min-height:70px;"></div>
+        <div style="height:0.5px;background:#c6c6c8;"></div>
+        <div style="display:flex;height:44px;">
+            <button id="ios-modal-no" style="flex:1;background:none;border:0;outline:none;font-size:17px;color:#ff3b30;cursor:pointer;">否</button>
+            <div id="ios-modal-divider" style="width:0.5px;background:#c6c6c8;flex-shrink:0;"></div>
+            <button id="ios-modal-yes" style="flex:1;background:none;border:0;outline:none;font-size:17px;color:#007aff;cursor:pointer;font-weight:600;">是</button>
+        </div>
+    </div>
+</div>
+<script>
+function showIosConfirm(msg) {
+    return new Promise(resolve => {
+        const ov = document.getElementById('ios-modal-overlay');
+        document.getElementById('ios-modal-msg').textContent = msg;
+        const noBtn = document.getElementById('ios-modal-no');
+        const yesBtn = document.getElementById('ios-modal-yes');
+        noBtn.style.display = '';
+        noBtn.textContent = '否';
+        yesBtn.textContent = '是';
+        document.getElementById('ios-modal-divider').style.display = '';
+        ov.style.display = 'flex';
+        const done = r => { ov.style.display = 'none'; resolve(r); };
+        noBtn.onclick = () => done(false);
+        yesBtn.onclick = () => done(true);
+    });
+}
+function showIosAlert(msg) {
+    return new Promise(resolve => {
+        const ov = document.getElementById('ios-modal-overlay');
+        document.getElementById('ios-modal-msg').textContent = msg;
+        const noBtn = document.getElementById('ios-modal-no');
+        const yesBtn = document.getElementById('ios-modal-yes');
+        noBtn.style.display = 'none';
+        document.getElementById('ios-modal-divider').style.display = 'none';
+        yesBtn.textContent = '确定';
+        ov.style.display = 'flex';
+        yesBtn.onclick = () => { ov.style.display = 'none'; noBtn.style.display = ''; document.getElementById('ios-modal-divider').style.display = ''; resolve(); };
+    });
+}
+</script>
+<script src="{{ url_for('static', filename='async-market-cap.js') }}"></script>
+<script>
+window.initAsyncMarketCapRefresh({
+    dataStores: [() => stocksData]
+});
+</script>
+</body>
+</html>

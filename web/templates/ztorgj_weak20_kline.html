@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>弱阴线K线图</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            color: #0f172a;
+            background: #f5f7fb;
+        }
+        .page { min-height: 100vh; display: flex; flex-direction: column; padding: 14px; gap: 12px; }
+        .topbar {
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            padding: 10px 12px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+        }
+        .title { font-size: 18px; font-weight: 950; }
+        .subtitle { margin-top: 3px; color: #64748b; font-size: 12px; font-weight: 700; }
+        .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .action-btn {
+            border: 1px solid #cbd5e1;
+            border-radius: 7px;
+            background: #f8fafc;
+            color: #334155;
+            font-size: 12px;
+            font-weight: 900;
+            padding: 7px 10px;
+            cursor: pointer;
+        }
+        .action-btn.active { color: #ffffff; background: #1d4ed8; border-color: #1d4ed8; }
+        .back-link { color: #ffffff; background: #dc2626; border-color: #dc2626; text-decoration: none; }
+        .table-panel {
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-self: flex-start;
+            max-width: 100%;
+        }
+        .kline-table-head {
+            display: grid;
+            grid-template-columns: minmax(220px, 1fr) minmax(260px, 1fr);
+            min-height: 40px;
+            border-bottom: 1px solid #e2e8f0;
+            background: #f8fafc;
+            color: #0f172a;
+            font-size: 13px;
+            font-weight: 950;
+            min-width: 100%;
+        }
+        .kline-table-head > div {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 9px 10px;
+        }
+        .kline-table-head > div + div { border-left: 1px solid #e2e8f0; }
+        .table-sub { color: #64748b; font-size: 12px; font-weight: 800; }
+        .kline-row-list { flex: 1; min-height: 0; overflow: auto; padding: 10px; }
+        .weak20-kline-group { margin-bottom: 14px; }
+        .weak20-kline-group-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 34px;
+            margin-bottom: 8px;
+            padding: 7px 10px;
+            border: 1px solid #dbeafe;
+            border-radius: 7px;
+            background: #eff6ff;
+            color: #1e3a8a;
+            font-size: 13px;
+            font-weight: 950;
+        }
+        .weak20-kline-group-count { color: #475569; font-size: 12px; font-weight: 900; }
+        .weak20-kline-group-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        .weak20-kline-group-toggle {
+            min-height: 24px;
+            padding: 3px 8px;
+            border: 1px solid #bfdbfe;
+            border-radius: 6px;
+            background: #ffffff;
+            color: #1d4ed8;
+            font-size: 12px;
+            font-weight: 900;
+            cursor: pointer;
+        }
+        .weak20-kline-group-toggle:hover { background: #dbeafe; }
+        .weak20-kline-group-body.collapsed { display: none; }
+        .kline-two-column-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 620px);
+            gap: 10px;
+            align-items: start;
+            width: max-content;
+        }
+        .kline-row {
+            display: flex;
+            flex-direction: column;
+            min-height: 392px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #ffffff;
+        }
+        .kline-name-cell {
+            padding: 9px 10px;
+            border-bottom: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+        .stock-name {
+            font-size: 15px;
+            font-weight: 950;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+        .stock-code { margin-top: 4px; font-size: 12px; color: #64748b; font-weight: 800; }
+        .stock-metrics {
+            margin-top: 7px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .stock-metric {
+            display: inline-flex;
+            align-items: center;
+            min-height: 22px;
+            padding: 2px 7px;
+            border-radius: 999px;
+            background: #eef2ff;
+            color: #3730a3;
+            font-size: 11px;
+            font-weight: 900;
+        }
+        .kline-chart-cell { padding: 8px; min-width: 0; }
+        .kline-chart-small { width: 600px; height: 320px; }
+        .chart-loading, .empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            min-height: 120px;
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 800;
+            text-align: center;
+        }
+        @media (max-width: 760px) {
+            .kline-table-head { grid-template-columns: minmax(0, 1fr); }
+            .kline-table-head > div + div { border-left: 0; border-top: 1px solid #e2e8f0; }
+            .kline-two-column-grid { grid-template-columns: minmax(0, 1fr); width: 100%; }
+            .kline-row { min-height: 292px; }
+            .kline-name-cell { padding: 10px 8px; }
+            .stock-name { font-size: 13px; }
+            .stock-code { font-size: 10px; }
+            .stock-metric { font-size: 10px; padding: 1px 5px; }
+            .kline-chart-cell { padding: 6px; }
+            .kline-chart-small { width: 100%; height: 225px; }
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <div class="topbar">
+        <div>
+            <div class="title">弱阴线K线图</div>
+            <div class="subtitle">20日弱阴线次数排序 · {{ date }}{% if new_high_only == '1' %} · 只看新高{% endif %}</div>
+        </div>
+        <div class="actions">
+            <button type="button" id="theme_tdxWhite" class="action-btn" onclick="setWeak20KlineTheme('tdxWhite')">白底</button>
+            <button type="button" id="theme_tdxDark" class="action-btn" onclick="setWeak20KlineTheme('tdxDark')">黑底</button>
+            <a class="action-btn back-link" href="/涨停或光脚">返回涨停或光脚</a>
+        </div>
+    </div>
+
+    <main class="table-panel">
+        <div class="kline-table-head">
+            <div><span>股票名称</span><span class="table-sub" id="weak20KlineCount">0只</span></div>
+            <div><span>K线图</span><span class="table-sub" id="weak20KlineStatus">等待加载</span></div>
+        </div>
+        <div id="weak20KlineRowList" class="kline-row-list">
+            <div class="empty">正在加载...</div>
+        </div>
+    </main>
+</div>
+
+<script>
+const WEAK20_KLINE_PAGE = {
+    date: '{{ date }}',
+    new_high_only: '{{ new_high_only }}',
+    max_weak_yin_20d: '{{ max_weak_yin_20d }}',
+    order_token: '{{ order_token }}'
+};
+const WEAK20_KLINE_CONCURRENCY = 4;
+const WEAK20_KLINE_COLLAPSED_GROUP_VALUES = new Set(['3', '4', '5', '>5']);
+
+const KLINE_THEME_VARIANTS = [
+    {
+        key: 'tdxWhite',
+        title: '方案A 通达信白底',
+        desc: '白底灰网格、红涨绿跌、阳线空心，最接近传统通达信日K。',
+        theme: {
+            bg: '#ffffff', grid: '#d6d6d6', text: '#111827', subText: '#64748b',
+            up: '#d40000', down: '#008f3a', ma5: '#f3b300', ma10: '#a000c8', ma20: '#1d4ed8',
+            upFill: 'rgba(255,255,255,0)', downFill: '#008f3a', axisLine: '#9ca3af'
+        }
+    },
+    {
+        key: 'tdxDark',
+        title: '方案B 通达信黑底',
+        desc: '黑底高对比、亮色均线，适合盘中盯盘。',
+        theme: {
+            bg: '#080b10', grid: '#29313d', text: '#d8dee9', subText: '#94a3b8',
+            up: '#ff3030', down: '#00c853', ma5: '#ffd400', ma10: '#ff4fd8', ma20: '#4da3ff',
+            upFill: 'rgba(255,48,48,0)', downFill: '#00c853', axisLine: '#475569'
+        }
+    }
+];
+
+const WEAK20_KLINE_STATE = {
+    themeKey: 'tdxWhite',
+    stocks: [],
+    charts: {},
+    payloads: {},
+    loaded: 0,
+    failed: 0,
+    collapsedGroups: {}
+};
+
+function setText(id, text) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = text;
+}
+
+function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+    });
+}
+
+function metricNumber(stock, key) {
+    var num = Number(stock && stock[key] || 0);
+    return Number.isFinite(num) ? num : 0;
+}
+
+function getKlineStockCode(stock) {
+    return String((stock && (stock.stock_code_with_market || stock.ts_code || stock.code)) || '').trim();
+}
+
+function normalizeWeak20KlineCode(value) {
+    return String(value || '').trim().split('.')[0];
+}
+
+function applyWeak20KlineStoredOrder(stocks) {
+    var token = WEAK20_KLINE_PAGE.order_token;
+    if (!token) return stocks || [];
+    try {
+        var raw = localStorage.getItem(token);
+        if (!raw) return stocks || [];
+        localStorage.removeItem(token);
+        var saved = JSON.parse(raw);
+        if (Array.isArray(saved.stocks) && saved.stocks.length) {
+            return saved.stocks.filter(function(stock) {
+                return !!getKlineStockCode(stock);
+            });
+        }
+        var codes = Array.isArray(saved.codes) ? saved.codes : [];
+        if (!codes.length) return stocks || [];
+        var byCode = new Map();
+        (stocks || []).forEach(function(stock) {
+            byCode.set(normalizeWeak20KlineCode(stock.code), stock);
+            byCode.set(normalizeWeak20KlineCode(stock.stock_code_with_market), stock);
+            byCode.set(normalizeWeak20KlineCode(stock.ts_code), stock);
+        });
+        var used = new Set();
+        var ordered = [];
+        codes.forEach(function(code) {
+            var key = normalizeWeak20KlineCode(code);
+            var stock = byCode.get(key);
+            if (!stock) return;
+            var stockKey = normalizeWeak20KlineCode(stock.code);
+            if (used.has(stockKey)) return;
+            used.add(stockKey);
+            ordered.push(stock);
+        });
+        (stocks || []).forEach(function(stock) {
+            var stockKey = normalizeWeak20KlineCode(stock.code);
+            if (!used.has(stockKey)) ordered.push(stock);
+        });
+        return ordered;
+    } catch (e) {
+        console.warn('[ztorgj][weak20-kline] 读取列表顺序失败:', e);
+        return stocks || [];
+    }
+}
+
+function currentKlineTheme() {
+    return KLINE_THEME_VARIANTS.find(function(item) { return item.key === WEAK20_KLINE_STATE.themeKey; }) || KLINE_THEME_VARIANTS[0];
+}
+
+function updateWeak20ThemeButtons() {
+    KLINE_THEME_VARIANTS.forEach(function(variant) {
+        var btn = document.getElementById('theme_' + variant.key);
+        if (btn) btn.classList.toggle('active', variant.key === WEAK20_KLINE_STATE.themeKey);
+    });
+}
+
+function setWeak20KlineTheme(themeKey) {
+    WEAK20_KLINE_STATE.themeKey = themeKey;
+    updateWeak20ThemeButtons();
+    Object.keys(WEAK20_KLINE_STATE.payloads).forEach(function(index) {
+        renderLoadedWeak20KlineChart(Number(index));
+    });
+}
+
+function calcKlineMA(rows, period) {
+    return rows.map(function(_, idx) {
+        if (idx < period - 1) return null;
+        var sum = 0;
+        for (var i = idx - period + 1; i <= idx; i++) sum += Number(rows[i].close || 0);
+        return +(sum / period).toFixed(2);
+    });
+}
+
+function buildKlineOption(payload, variant) {
+    var rows = payload.data || [];
+    var theme = variant.theme;
+    var dates = rows.map(function(r) { return r.date_label || r.trade_date; });
+    var candleData = rows.map(function(r) { return [Number(r.open), Number(r.close), Number(r.low), Number(r.high)]; });
+    var last = rows[rows.length - 1] || {};
+    var title = `${payload.stock.name} ${payload.stock.code}  ${payload.start_date}-${payload.end_date}`;
+    var sub = `收 ${Number(last.close || 0).toFixed(2)}  涨幅 ${Number(last.pct_chg || 0).toFixed(2)}%  高 ${Number(last.high || 0).toFixed(2)}  低 ${Number(last.low || 0).toFixed(2)}`;
+    return {
+        backgroundColor: theme.bg,
+        animation: false,
+        title: [
+            { text: title, left: 8, top: 5, textStyle: { color: theme.text, fontSize: 12, fontWeight: 800 } },
+            { text: sub, left: 8, top: 23, textStyle: { color: theme.subText, fontSize: 10, fontWeight: 500 } }
+        ],
+        legend: {
+            top: 40, left: 6, itemWidth: 12, itemHeight: 7,
+            textStyle: { color: theme.text, fontSize: 9 },
+            data: ['K线', 'MA5', 'MA10', 'MA20']
+        },
+        tooltip: {
+            trigger: 'axis', axisPointer: { type: 'cross' }, confine: true,
+            formatter: function(params) {
+                var p = params.find(function(x) { return x.seriesName === 'K线'; });
+                if (!p) return '';
+                var r = rows[p.dataIndex] || {};
+                var pct = Number(r.pct_chg || 0);
+                var pctColor = pct >= 0 ? theme.up : theme.down;
+                return `${r.trade_date}<br/>开 ${Number(r.open).toFixed(2)}　高 ${Number(r.high).toFixed(2)}<br/>低 ${Number(r.low).toFixed(2)}　收 ${Number(r.close).toFixed(2)}<br/>涨幅 <span style="color:${pctColor};font-weight:900">${pct.toFixed(2)}%</span>`;
+            }
+        },
+        axisPointer: { link: [{ xAxisIndex: 'all' }] },
+        grid: [
+            { left: 42, right: 52, top: 60, height: 230 }
+        ],
+        xAxis: [
+            { type: 'category', data: dates, boundaryGap: true, axisLine: { lineStyle: { color: theme.axisLine } }, axisLabel: { color: theme.text, fontSize: 9 }, splitLine: { show: true, lineStyle: { color: theme.grid } } }
+        ],
+        yAxis: [
+            { scale: true, position: 'right', splitLine: { show: true, lineStyle: { color: theme.grid } }, axisLabel: { color: theme.text, fontSize: 9, formatter: function(v) { return Number(v).toFixed(2); } } }
+        ],
+        dataZoom: [
+            { type: 'inside', xAxisIndex: [0], start: 0, end: 100 }
+        ],
+        series: [
+            { name: 'K线', type: 'candlestick', data: candleData, barWidth: '74%', barMinWidth: 8, barMaxWidth: 20,
+              itemStyle: { color: theme.upFill, color0: theme.downFill, borderColor: theme.up, borderColor0: theme.down, borderWidth: 1.2 } },
+            { name: 'MA5', type: 'line', data: calcKlineMA(rows, 5), smooth: false, showSymbol: false, lineStyle: { color: theme.ma5, width: 1.1 } },
+            { name: 'MA10', type: 'line', data: calcKlineMA(rows, 10), smooth: false, showSymbol: false, lineStyle: { color: theme.ma10, width: 1.1 } },
+            { name: 'MA20', type: 'line', data: calcKlineMA(rows, 20), smooth: false, showSymbol: false, lineStyle: { color: theme.ma20, width: 1.1 } }
+        ]
+    };
+}
+
+function getWeak20KlineGroupValue(stock) {
+    var value = metricNumber(stock, 'weak_yin_20d');
+    return value > 5 ? '>5' : String(value);
+}
+
+function formatWeak20KlineGroupTitle(groupValue) {
+    return '20日弱阴线次数：' + (groupValue === '>5' ? '>5次' : groupValue + '次');
+}
+
+function resetWeak20KlineCollapsedGroups() {
+    WEAK20_KLINE_STATE.collapsedGroups = {};
+    WEAK20_KLINE_COLLAPSED_GROUP_VALUES.forEach(function(groupValue) {
+        WEAK20_KLINE_STATE.collapsedGroups[String(groupValue)] = true;
+    });
+}
+
+function isWeak20KlineGroupCollapsed(groupValue) {
+    return !!WEAK20_KLINE_STATE.collapsedGroups[String(groupValue)];
+}
+
+function isWeak20KlineStockCollapsed(index) {
+    var stock = WEAK20_KLINE_STATE.stocks[index];
+    if (!stock) return false;
+    return isWeak20KlineGroupCollapsed(getWeak20KlineGroupValue(stock));
+}
+
+function getWeak20KlineCollapsedStockCount() {
+    var count = 0;
+    WEAK20_KLINE_STATE.stocks.forEach(function(_, index) {
+        if (isWeak20KlineStockCollapsed(index)) count += 1;
+    });
+    return count;
+}
+
+function getWeak20KlineGroupDomKey(groupValue) {
+    return String(groupValue).replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+function buildWeak20KlineGroupedRows(stocks) {
+    var groups = [];
+    (stocks || []).forEach(function(stock) {
+        var groupValue = getWeak20KlineGroupValue(stock);
+        var current = groups[groups.length - 1];
+        if (!current || current.value !== groupValue) {
+            current = { value: groupValue, stocks: [] };
+            groups.push(current);
+        }
+        current.stocks.push(stock);
+    });
+    return groups;
+}
+
+function buildWeak20KlineIndexByCode() {
+    var indexByCode = new Map();
+    WEAK20_KLINE_STATE.stocks.forEach(function(stock, idx) {
+        indexByCode.set(normalizeWeak20KlineCode(stock.code), idx);
+        indexByCode.set(normalizeWeak20KlineCode(stock.stock_code_with_market), idx);
+        indexByCode.set(normalizeWeak20KlineCode(stock.ts_code), idx);
+    });
+    return indexByCode;
+}
+
+function getWeak20KlineStockIndex(stock, indexByCode) {
+    var idx = indexByCode.get(normalizeWeak20KlineCode(stock.code));
+    if (idx == null) idx = indexByCode.get(normalizeWeak20KlineCode(stock.stock_code_with_market));
+    if (idx == null) idx = indexByCode.get(normalizeWeak20KlineCode(stock.ts_code));
+    return idx == null ? 0 : idx;
+}
+
+function buildWeak20KlineStockCard(stock, indexByCode) {
+    var idx = getWeak20KlineStockIndex(stock, indexByCode);
+    return ''
+        + '<section class="kline-row">'
+        + '<div class="kline-name-cell">'
+        + '<div class="stock-name">' + escapeHtml(stock.name || '-') + '</div>'
+        + '<div class="stock-code">' + escapeHtml(getKlineStockCode(stock)) + '</div>'
+        + '<div class="stock-metrics">'
+        + '<span class="stock-metric">弱阴线 ' + metricNumber(stock, 'weak_yin_20d') + '</span>'
+        + '<span class="stock-metric">阴线 ' + metricNumber(stock, 'yin_count_20') + '</span>'
+        + '</div>'
+        + '</div>'
+        + '<div class="kline-chart-cell">'
+        + '<div id="weak20KlineChart_' + idx + '" class="kline-chart-small"><div class="chart-loading">等待加载...</div></div>'
+        + '</div>'
+        + '</section>';
+}
+
+function buildWeak20KlineGroupCards(group, indexByCode) {
+    return (group.stocks || []).map(function(stock) {
+        return buildWeak20KlineStockCard(stock, indexByCode);
+    }).join('');
+}
+
+function getWeak20KlineGroupByValue(groupValue) {
+    var normalized = String(groupValue);
+    return buildWeak20KlineGroupedRows(WEAK20_KLINE_STATE.stocks).find(function(group) {
+        return String(group.value) === normalized;
+    }) || null;
+}
+
+function renderWeak20KlineGroupBody(groupValue) {
+    var group = getWeak20KlineGroupByValue(groupValue);
+    if (!group) return;
+    var body = document.getElementById('weak20KlineGroupBody_' + getWeak20KlineGroupDomKey(groupValue));
+    if (!body) return;
+    body.classList.remove('collapsed');
+    body.innerHTML = buildWeak20KlineGroupCards(group, buildWeak20KlineIndexByCode());
+    var groupNode = document.querySelector('[data-kline-group-value="' + String(groupValue) + '"]');
+    if (groupNode) groupNode.classList.remove('is-collapsed');
+    var btn = document.querySelector('.weak20-kline-group-toggle[data-kline-group-value="' + String(groupValue) + '"]');
+    if (btn) btn.style.display = 'none';
+}
+
+function getWeak20KlineGroupIndexes(groupValue) {
+    var normalized = String(groupValue);
+    var indexes = [];
+    WEAK20_KLINE_STATE.stocks.forEach(function(stock, index) {
+        if (String(getWeak20KlineGroupValue(stock)) === normalized) indexes.push(index);
+    });
+    return indexes;
+}
+
+async function loadWeak20KlineGroupCharts(groupValue) {
+    var indexes = getWeak20KlineGroupIndexes(groupValue);
+    for (var i = 0; i < indexes.length; i++) {
+        var index = indexes[i];
+        if (WEAK20_KLINE_STATE.payloads[index]) {
+            renderLoadedWeak20KlineChart(index);
+        } else {
+            await renderWeak20KlineChart(index);
+        }
+    }
+    updateWeak20KlineLoadStatus();
+}
+
+async function toggleWeak20KlineGroup(groupValue) {
+    groupValue = String(groupValue);
+    if (!isWeak20KlineGroupCollapsed(groupValue)) return;
+    WEAK20_KLINE_STATE.collapsedGroups[groupValue] = false;
+    renderWeak20KlineGroupBody(groupValue);
+    updateWeak20KlineLoadStatus();
+    await loadWeak20KlineGroupCharts(groupValue);
+}
+
+function installWeak20KlineGroupToggleHandlers() {
+    document.querySelectorAll('.weak20-kline-group-toggle').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            toggleWeak20KlineGroup(btn.getAttribute('data-kline-group-value') || '');
+        });
+    });
+}
+
+function renderWeak20KlineChartCards() {
+    var list = document.getElementById('weak20KlineRowList');
+    if (!list) return;
+    setText('weak20KlineCount', WEAK20_KLINE_STATE.stocks.length + '只');
+    if (!WEAK20_KLINE_STATE.stocks.length) {
+        list.innerHTML = '<div class="empty">没有符合条件的股票</div>';
+        return;
+    }
+    var indexByCode = buildWeak20KlineIndexByCode();
+    list.innerHTML = buildWeak20KlineGroupedRows(WEAK20_KLINE_STATE.stocks).map(function(group) {
+        var collapsed = isWeak20KlineGroupCollapsed(group.value);
+        var cards = collapsed ? '' : buildWeak20KlineGroupCards(group, indexByCode);
+        var groupValueAttr = escapeHtml(group.value);
+        var groupDomKey = getWeak20KlineGroupDomKey(group.value);
+        var toggleBtn = collapsed
+            ? '<button type="button" class="weak20-kline-group-toggle" data-kline-group-value="' + groupValueAttr + '">显示折叠的K线图</button>'
+            : '';
+        return ''
+            + '<section class="weak20-kline-group' + (collapsed ? ' is-collapsed' : '') + '" data-kline-group-value="' + groupValueAttr + '">'
+            + '<div class="weak20-kline-group-title">'
+            + '<span>' + escapeHtml(formatWeak20KlineGroupTitle(group.value)) + '</span>'
+            + '<span class="weak20-kline-group-actions">'
+            + '<span class="weak20-kline-group-count">' + (group.stocks || []).length + '只</span>'
+            + toggleBtn
+            + '</span>'
+            + '</div>'
+            + '<div id="weak20KlineGroupBody_' + groupDomKey + '" class="kline-two-column-grid weak20-kline-group-body' + (collapsed ? ' collapsed' : '') + '">' + cards + '</div>'
+            + '</section>';
+    }).join('');
+    installWeak20KlineGroupToggleHandlers();
+}
+
+function renderLoadedWeak20KlineChart(index) {
+    var chartEl = document.getElementById('weak20KlineChart_' + index);
+    var payload = WEAK20_KLINE_STATE.payloads[index];
+    if (!chartEl || !payload || typeof echarts === 'undefined') return;
+    var chart = WEAK20_KLINE_STATE.charts[index];
+    if (!chart) {
+        chart = echarts.init(chartEl, null, { renderer: 'canvas' });
+        WEAK20_KLINE_STATE.charts[index] = chart;
+    }
+    chart.setOption(buildKlineOption(payload, currentKlineTheme()), true);
+}
+
+function updateWeak20KlineLoadStatus() {
+    var collapsedCount = getWeak20KlineCollapsedStockCount();
+    var total = WEAK20_KLINE_STATE.stocks.length - collapsedCount;
+    var done = WEAK20_KLINE_STATE.loaded + WEAK20_KLINE_STATE.failed;
+    if (!total) {
+        setText('weak20KlineStatus', collapsedCount ? ('0/0 · 折叠' + collapsedCount) : '0/0');
+        return;
+    }
+    var failText = WEAK20_KLINE_STATE.failed ? ' · 失败' + WEAK20_KLINE_STATE.failed : '';
+    var collapsedText = collapsedCount ? (' · 折叠' + collapsedCount) : '';
+    setText('weak20KlineStatus', 'K线加载 ' + done + '/' + total + failText + collapsedText);
+}
+
+async function renderWeak20KlineChart(index) {
+    var stock = WEAK20_KLINE_STATE.stocks[index];
+    var chartEl = document.getElementById('weak20KlineChart_' + index);
+    if (!stock || !chartEl) return;
+    try {
+        chartEl.innerHTML = '<div class="chart-loading">正在加载K线...</div>';
+        var params = new URLSearchParams({ code: getKlineStockCode(stock), days: '30' });
+        if (WEAK20_KLINE_PAGE.date) params.set('end_date', WEAK20_KLINE_PAGE.date);
+        var url = '/api/ztorgj/kline?' + params.toString();
+        console.log('[ztorgj][weak20-kline][fetch-start]', {
+            index: index,
+            code: getKlineStockCode(stock),
+            name: stock.name,
+            url: url,
+            date: WEAK20_KLINE_PAGE.date
+        });
+        var resp = await fetch(url, { cache: 'no-store' });
+        console.log('[ztorgj][weak20-kline][fetch-http]', {
+            index: index,
+            code: getKlineStockCode(stock),
+            ok: resp.ok,
+            status: resp.status,
+            statusText: resp.statusText
+        });
+        var payload = await resp.json();
+        console.log('[ztorgj][weak20-kline][fetch-payload]', {
+            index: index,
+            code: getKlineStockCode(stock),
+            success: !!payload.success,
+            error: payload.error || '',
+            dataLength: Array.isArray(payload.data) ? payload.data.length : 0,
+            startDate: payload.start_date || '',
+            endDate: payload.end_date || '',
+            stock: payload.stock || null
+        });
+        if (!resp.ok || !payload.success) throw new Error(payload.error || ('K线数据加载失败 HTTP ' + resp.status));
+        payload.stock = payload.stock || {};
+        payload.stock.name = stock.name || payload.stock.name || '';
+        payload.stock.code = getKlineStockCode(stock) || payload.stock.code || '';
+        chartEl.innerHTML = '';
+        WEAK20_KLINE_STATE.payloads[index] = payload;
+        renderLoadedWeak20KlineChart(index);
+        WEAK20_KLINE_STATE.loaded += 1;
+    } catch (e) {
+        console.error('[ztorgj][weak20-kline][render-fail]', {
+            index: index,
+            code: getKlineStockCode(stock),
+            name: stock.name,
+            message: e && e.message,
+            stack: e && e.stack,
+            stock: stock
+        }, e);
+        chartEl.innerHTML = '<div class="chart-loading">K线加载失败<br>' + escapeHtml((e && e.message) || '') + '</div>';
+        WEAK20_KLINE_STATE.failed += 1;
+    } finally {
+        updateWeak20KlineLoadStatus();
+    }
+}
+
+async function loadWeak20KlineChartBatch() {
+    var nextIndex = 0;
+    async function worker() {
+        while (nextIndex < WEAK20_KLINE_STATE.stocks.length) {
+            var index = nextIndex;
+            nextIndex += 1;
+            if (isWeak20KlineStockCollapsed(index)) continue;
+            await renderWeak20KlineChart(index);
+        }
+    }
+    var workerCount = Math.min(WEAK20_KLINE_CONCURRENCY, WEAK20_KLINE_STATE.stocks.length);
+    var workers = [];
+    for (var i = 0; i < workerCount; i++) workers.push(worker());
+    await Promise.all(workers);
+    updateWeak20KlineLoadStatus();
+}
+
+function renderAllWeak20KlineCharts() {
+    Object.keys(WEAK20_KLINE_STATE.charts).forEach(function(index) {
+        try { WEAK20_KLINE_STATE.charts[index].dispose(); } catch (e) {}
+    });
+    WEAK20_KLINE_STATE.charts = {};
+    WEAK20_KLINE_STATE.payloads = {};
+    WEAK20_KLINE_STATE.loaded = 0;
+    WEAK20_KLINE_STATE.failed = 0;
+    resetWeak20KlineCollapsedGroups();
+    renderWeak20KlineChartCards();
+    updateWeak20KlineLoadStatus();
+    loadWeak20KlineChartBatch();
+}
+
+async function loadWeak20KlineStocks() {
+    updateWeak20ThemeButtons();
+    try {
+        var params = new URLSearchParams({
+            date: WEAK20_KLINE_PAGE.date,
+            new_high_only: WEAK20_KLINE_PAGE.new_high_only
+        });
+        if (WEAK20_KLINE_PAGE.max_weak_yin_20d) {
+            params.set('max_weak_yin_20d', WEAK20_KLINE_PAGE.max_weak_yin_20d);
+        }
+        var url = '/api/ztorgj/weak20/kline-stocks?' + params.toString();
+        console.log('[ztorgj][weak20-kline][list-fetch-start]', {
+            url: url,
+            date: WEAK20_KLINE_PAGE.date,
+            newHighOnly: WEAK20_KLINE_PAGE.new_high_only,
+            maxWeakYin20d: WEAK20_KLINE_PAGE.max_weak_yin_20d,
+            orderToken: WEAK20_KLINE_PAGE.order_token
+        });
+        var resp = await fetch(url, { cache: 'no-store' });
+        console.log('[ztorgj][weak20-kline][list-fetch-http]', {
+            ok: resp.ok,
+            status: resp.status,
+            statusText: resp.statusText
+        });
+        var payload = await resp.json();
+        console.log('[ztorgj][weak20-kline][list-fetch-payload]', {
+            success: !!payload.success,
+            error: payload.error || '',
+            count: payload.count,
+            dataLength: Array.isArray(payload.data) ? payload.data.length : 0
+        });
+        if (!resp.ok || !payload.success) throw new Error(payload.error || ('股票列表加载失败 HTTP ' + resp.status));
+        WEAK20_KLINE_STATE.stocks = applyWeak20KlineStoredOrder(payload.data || []);
+        renderAllWeak20KlineCharts();
+    } catch (e) {
+        console.error('[ztorgj][weak20-kline][list-fetch-fail]', {
+            message: e && e.message,
+            stack: e && e.stack
+        }, e);
+        setText('weak20KlineStatus', '列表加载失败: ' + (e.message || e));
+        var rowList = document.getElementById('weak20KlineRowList');
+        if (rowList) rowList.innerHTML = '<div class="empty">列表加载失败</div>';
+    }
+}
+
+window.addEventListener('resize', function() {
+    Object.keys(WEAK20_KLINE_STATE.charts).forEach(function(index) {
+        try { WEAK20_KLINE_STATE.charts[index].resize(); } catch (e) {}
+    });
+});
+
+document.addEventListener('DOMContentLoaded', loadWeak20KlineStocks);
+</script>
+</body>
+</html>

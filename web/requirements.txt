@@ -1,0 +1,12 @@
+flask==3.0.0
+flask-cors==4.0.0
+redis==5.0.1
+tushare==1.4.24
+gunicorn==21.2.0; platform_system != "Windows"
+gevent==23.9.1; platform_system != "Windows"
+openpyxl==3.1.5
+matplotlib==3.10.9
+Pillow==12.2.0
+cryptography==46.0.3
+requests>=2.31
+pandas>=2.1

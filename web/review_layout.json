@@ -1,0 +1,841 @@
+{
+  "version": 1,
+  "column_widths_px": [
+    456,
+    392,
+    456,
+    392,
+    456,
+    80,
+    456,
+    80
+  ],
+  "blocks": [
+    {
+      "fixed": [
+        [
+          "同花顺板块",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "板块名称",
+          "板块涨跌幅",
+          "板块涨停家数",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ]
+      ]
+    },
+    {
+      "data": "boards"
+    },
+    {
+      "fixed": [
+        [
+          "同花顺板块相关个股",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "全阳",
+          "",
+          "5拉阴后拉或吃",
+          "",
+          "20阴<=4",
+          "",
+          "无阴线（全阳）",
+          ""
+        ]
+      ]
+    },
+    {
+      "data": "related"
+    },
+    {
+      "fixed": [
+        [
+          "1全阳",
+          [
+            {
+              "cellPosition": null,
+              "link": "/%E9%87%8D%E7%82%B9%E5%85%B3%E6%B3%A8?date=2026-09-30&page=5",
+              "text": "筛选出跌破5日线少的并且漂亮K多的（点击跳转）",
+              "type": "url"
+            }
+          ],
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          [
+            {
+              "segmentStyle": {
+                "bold": false,
+                "fontSize": 14,
+                "foreColor": "#000000",
+                "italic": false,
+                "strikeThrough": false,
+                "underline": false
+              },
+              "text": "阴小4",
+              "type": "text"
+            },
+            {
+              "segmentStyle": {
+                "bold": true,
+                "fontSize": 14,
+                "foreColor": "#d93025",
+                "italic": false,
+                "strikeThrough": false,
+                "underline": false
+              },
+              "text": "（必做任务）",
+              "type": "text"
+            }
+          ],
+          [
+            {
+              "cellPosition": null,
+              "link": "/%E9%87%8D%E7%82%B9%E5%85%B3%E6%B3%A8?date=2026-09-30&page=1",
+              "text": "筛选有一字或者厂子形态的股（点击跳转）",
+              "type": "url"
+            }
+          ],
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "1.一字横盘",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "2.厂子横盘",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "3.全阳都在5日上（几乎都不下插5日线 通达创智）",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "20日阴线<=6，阴线收盘低于MA5次数<=1",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          [
+            {
+              "segmentStyle": {
+                "bold": false,
+                "fontSize": 14,
+                "foreColor": "#000000",
+                "italic": false,
+                "strikeThrough": false,
+                "underline": false
+              },
+              "text": "阴线跌破5日线",
+              "type": "text"
+            },
+            {
+              "segmentStyle": {
+                "bold": true,
+                "fontSize": 14,
+                "foreColor": "#d93025",
+                "italic": false,
+                "strikeThrough": false,
+                "underline": false
+              },
+              "text": "（必做任务）",
+              "type": "text"
+            }
+          ],
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "筛选一字或者厂子",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "条件1 ZDZF8(拉伸6.5)",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "20天阴线=0",
+          "20天阴线=1",
+          "20天阴线=2",
+          "20天阴线=3",
+          "20天阴线=4",
+          "",
+          "",
+          ""
+        ]
+      ]
+    },
+    {
+      "data": "condition1"
+    },
+    {
+      "fixed": [
+        [
+          "条件2 4不碰",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "20天阴线=0",
+          "20天阴线=1",
+          "20天阴线=2",
+          "20天阴线=3",
+          "20天阴线=4",
+          "",
+          "",
+          ""
+        ]
+      ]
+    },
+    {
+      "data": "condition2"
+    },
+    {
+      "fixed": [
+        [
+          "3.5拉升",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "1.5拉一阴一阳",
+          "2.5拉强吃",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ]
+      ]
+    },
+    {
+      "data": "five_priority"
+    },
+    {
+      "fixed": [
+        [
+          [
+            {
+              "cellPosition": null,
+              "link": "/%E9%87%8D%E7%82%B9%E5%85%B3%E6%B3%A8?date=2026-09-30&page=5",
+              "text": "4. 全阳阴线后面强势K（点击跳转）",
+              "type": "url"
+            }
+          ],
+          " stetp1 \n光脚阳线或者光头阳线 \n十字星（上下阴线很少，中体产业吃亏）  \n拉升6.5阴被吃",
+          "step2  \n\n最近K线上下引线不多（中体产业吃亏）",
+          "tep3 \n\n涨幅不要太大",
+          null,
+          "",
+          "",
+          ""
+        ]
+      ]
+    },
+    {
+      "data": "qy2"
+    },
+    {
+      "fixed": [
+        [
+          "5. 涨停复盘",
+          " stetp1 \n光脚阳线或者光头阳线 \n十字星（上下阴线很少，中体产业吃亏）  \n拉升6.5阴被吃",
+          "step2  \n\n最近K线上下引线不多（中体产业吃亏）",
+          "tep3 \n\n涨幅不要太大",
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          null,
+          "",
+          null,
+          "",
+          null,
+          "",
+          null,
+          null
+        ],
+        [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          null,
+          "",
+          null,
+          "",
+          null,
+          "",
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "Final",
+          null,
+          null,
+          null,
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          [
+            {
+              "segmentStyle": {
+                "bold": true,
+                "fontSize": 12,
+                "foreColor": "#e33d3d",
+                "italic": false,
+                "strikeThrough": false,
+                "underline": false
+              },
+              "text": "优先选出",
+              "type": "text"
+            },
+            {
+              "segmentStyle": {
+                "bold": true,
+                "fontSize": 12,
+                "foreColor": "#9333ea",
+                "italic": false,
+                "strikeThrough": false,
+                "underline": false
+              },
+              "text": "阴后强（漂亮K）",
+              "type": "text"
+            },
+            {
+              "segmentStyle": {
+                "bold": true,
+                "fontSize": 12,
+                "foreColor": "#e33d3d",
+                "italic": false,
+                "strikeThrough": false,
+                "underline": false
+              },
+              "text": "\n（非常重要，必做任务）",
+              "type": "text"
+            }
+          ],
+          "最近K线上下引线不多（中体产业吃亏）",
+          "涨幅不要太大",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "光脚阳线或者光头阳线 ",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "十字星（上下阴线很少，中体产业吃亏）",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "拉升6.5阴被吃",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "阴小4（必做任务）和阴线跌破5日线（必做任务）：\n筛选一字或厂子",
+          null,
+          null,
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "筛选出K线最漂亮的（必做任务）",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "优先级1.优先20日跌破小于等于1 或者  阴小于4（通达信20阴破小于3）",
+          "厂子或者一字（有没有）",
+          "1.一阴一阳",
+          null,
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "无",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "优先级2.5拉升阴后极品阳K（有没有）",
+          "1.一阴一阳",
+          "2.一阴一阳强吃",
+          [
+            {
+              "segmentStyle": {
+                "bold": true,
+                "fontSize": 11,
+                "foreColor": "#9333ea",
+                "italic": false,
+                "strikeThrough": false,
+                "underline": false
+              },
+              "text": "3.一浪5日圆弧或者厂子最佳（",
+              "type": "text"
+            },
+            {
+              "segmentStyle": {
+                "bold": true,
+                "fontSize": 12,
+                "foreColor": "#f54a45",
+                "italic": false,
+                "strikeThrough": false,
+                "underline": false
+              },
+              "text": "涨幅不要太大",
+              "type": "text"
+            },
+            {
+              "segmentStyle": {
+                "bold": true,
+                "fontSize": 11,
+                "foreColor": "#9333ea",
+                "italic": false,
+                "strikeThrough": false,
+                "underline": false
+              },
+              "text": "）",
+              "type": "text"
+            }
+          ],
+          [
+            {
+              "segmentStyle": {
+                "bold": true,
+                "fontSize": 11,
+                "foreColor": "#9333ea",
+                "italic": false,
+                "strikeThrough": false,
+                "underline": false
+              },
+              "text": "4.最近K线上下引线不多",
+              "type": "text"
+            },
+            {
+              "segmentStyle": {
+                "bold": true,
+                "fontSize": 11,
+                "foreColor": "#f54a45",
+                "italic": false,
+                "strikeThrough": false,
+                "underline": false
+              },
+              "text": "（中体产业吃亏）",
+              "type": "text"
+            }
+          ],
+          "",
+          "",
+          ""
+        ],
+        [
+          null,
+          "无",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "优先级3.低位全阳（有没有）阴线小于等于3 ",
+          "1.通达信全阳阴小于3",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "",
+          "无",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          null,
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "优先级4.涨停按照阴线次数由小到大排序 ，找厂子和一字",
+          "厂子或者一字（有没有）",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "优先级5.涨停多的板块排名查找，找出漂亮的",
+          "中科海讯，润和软件",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        [
+          "低位优先级高（有没有）",
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      ]
+    }
+  ]
+}

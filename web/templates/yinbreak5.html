@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>阴线跌破5日次数</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            background: #f5f7fb;
+            color: #1f2937;
+            padding: 16px;
+        }
+
+        .container {
+            max-width: 1180px;
+            margin: 0 auto;
+        }
+
+        .nav-buttons {
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .nav-left {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .nav-right {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+        }
+
+        .nav-btn {
+            display: inline-block;
+            padding: 5px 9px;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.3s;
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .nav-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-home { background: #667eea; }
+        .nav-btn-yhy { background: #10b981; }
+        .nav-btn-yx205 { background: #06b6d4; }
+        .nav-btn-yinbreak { background: #ca8a04; }
+        .nav-btn-ztorgj { background: #d946ef; }
+        .nav-btn-lszty { background: #e11d48; }
+        .nav-btn-intraday4up { background: #f97316; }
+
+        .date-selector {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: white;
+            padding: 4px 6px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .date-nav-btn {
+            border: 0;
+            background: #06b6d4;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        #datePicker {
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 6px 9px;
+            width: 118px;
+            font-size: 13px;
+            text-align: center;
+            cursor: pointer;
+            background: #fff;
+        }
+
+        .page-title {
+            background: white;
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .page-title h1 {
+            font-size: 24px;
+            color: #111827;
+            font-weight: 700;
+        }
+
+        .meta {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            color: #4b5563;
+            font-size: 13px;
+        }
+
+        .meta span {
+            background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            border-radius: 999px;
+            padding: 4px 10px;
+        }
+
+        .status {
+            background: white;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 1px 6px rgba(15, 23, 42, 0.07);
+            margin-bottom: 12px;
+            color: #4b5563;
+            font-size: 14px;
+        }
+
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            border: 1px solid #d1d5db;
+            background: #f9fafb;
+            color: #374151;
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .filter-btn:hover {
+            border-color: #ca8a04;
+            color: #92400e;
+            background: #fffbeb;
+        }
+
+        .filter-btn.active {
+            border-color: #ca8a04;
+            background: #ca8a04;
+            color: white;
+            box-shadow: 0 4px 10px rgba(202, 138, 4, 0.22);
+        }
+
+        .filter-count {
+            margin-left: auto;
+            color: #6b7280;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .group {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+            margin-bottom: 12px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .group-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            background: linear-gradient(90deg, #854d0e, #ca8a04);
+            color: white;
+            padding: 9px 12px;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .group-count {
+            font-size: 12px;
+            font-weight: 600;
+            opacity: 0.92;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        th {
+            background: #f8fafc;
+            color: #374151;
+            padding: 7px 4px;
+            font-size: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            text-align: center;
+            font-weight: 700;
+        }
+
+        td {
+            padding: 6px 4px;
+            border-bottom: 1px solid #f1f5f9;
+            text-align: center;
+            font-size: 13px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        tr:hover {
+            background: #fffbeb;
+        }
+
+        .stock-tooltip {
+            position: fixed;
+            display: none;
+            background: #fff;
+            border: 1px solid #e1e1e1;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            z-index: 10000;
+            pointer-events: none;
+        }
+
+        .stock-tooltip img {
+            display: block;
+            width: 680px;
+            height: 380px;
+            background: #f5f5f7;
+        }
+
+        .stock-tooltip .tooltip-header {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+
+        .kline-summary {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            color: #374151;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .kline-summary .gain-up {
+            color: #ef4444;
+        }
+
+        .kline-summary .gain-down {
+            color: #22c55e;
+        }
+
+        .kline-yin-count.is-low,
+        .kline-break-count.is-low {
+            color: #dc2626;
+            font-weight: 900;
+        }
+
+        .col-index { width: 40px; }
+        .col-code { width: 76px; }
+        .col-name { width: 84px; }
+        .col-number { width: 76px; }
+        .stock-code {
+            color: #2563eb;
+            font-weight: 700;
+        }
+
+        .stock-name {
+            color: #111827;
+            font-weight: 700;
+        }
+
+        .stock-row {
+            cursor: pointer;
+        }
+
+        .gain-up {
+            color: #ef4444;
+            font-weight: 800;
+        }
+
+        .gain-down {
+            color: #22c55e;
+            font-weight: 800;
+        }
+
+        .pct-sign {
+            display: inline-block;
+            min-width: 0.55em;
+            font-weight: 900;
+        }
+
+        .pct-number {
+            color: #111827 !important;
+            font-weight: 900;
+        }
+
+        .stock-row [data-field="today_change"] {
+            font-size: 15px;
+            font-weight: 900;
+        }
+
+        .stock-row [data-field="today_change"].gain-up {
+            color: #ef4444;
+        }
+
+        .stock-row [data-field="today_change"].gain-down {
+            color: #22c55e;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #92400e;
+            background: #fef3c7;
+            border: 1px solid #fbbf24;
+        }
+
+        .empty {
+            background: white;
+            border-radius: 10px;
+            padding: 34px 16px;
+            text-align: center;
+            color: #6b7280;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+        }
+
+        @media (max-width: 900px) {
+            body { padding: 8px; }
+            .page-title { align-items: flex-start; }
+            .page-title h1 { font-size: 20px; }
+            .nav-buttons { gap: 8px; }
+            .nav-right { gap: 4px; }
+            .nav-btn { font-size: 12px; padding: 5px 7px; }
+            .filter-count {
+                width: 100%;
+                margin-left: 0;
+            }
+            th, td { font-size: 12px; padding: 6px 4px; }
+            .col-number { width: 72px; }
+            .stock-tooltip {
+                left: 10px !important;
+                right: 10px;
+                bottom: 18px;
+                top: auto !important;
+                max-width: calc(100vw - 20px);
+                padding: 8px;
+            }
+            .stock-tooltip img {
+                width: min(600px, calc(100vw - 42px));
+                height: auto;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: 6px;
+                background: #f3f4f6;
+            }
+
+            .container {
+                max-width: 100%;
+            }
+
+            .nav-buttons {
+                display: block;
+                margin-bottom: 8px;
+            }
+
+            .nav-left {
+                width: 100%;
+                margin-bottom: 8px;
+            }
+
+            .date-selector {
+                width: 100%;
+                justify-content: center;
+            }
+
+            #datePicker {
+                flex: 1;
+                max-width: 180px;
+            }
+
+            .nav-right {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                width: 100%;
+                padding-bottom: 4px;
+                scrollbar-width: thin;
+            }
+
+            .nav-btn {
+                padding: 6px 9px;
+                font-size: 12px;
+                border-radius: 7px;
+            }
+
+            .page-title {
+                padding: 10px 12px;
+                border-radius: 8px;
+                gap: 8px;
+            }
+
+            .page-title h1 {
+                width: 100%;
+                font-size: 18px;
+                line-height: 1.25;
+            }
+
+            .meta {
+                width: 100%;
+                gap: 6px;
+            }
+
+            .meta span {
+                flex: 1 1 calc(50% - 4px);
+                min-width: 0;
+                padding: 4px 8px;
+                font-size: 12px;
+                text-align: center;
+            }
+
+            .status {
+                padding: 9px;
+                border-radius: 8px;
+                margin-bottom: 10px;
+            }
+
+            .filter-bar {
+                gap: 6px;
+            }
+
+            .filter-btn {
+                flex: 1 1 calc(50% - 3px);
+                padding: 7px 8px;
+                font-size: 12px;
+                text-align: center;
+            }
+
+            .filter-count {
+                width: 100%;
+                text-align: center;
+                font-size: 12px;
+            }
+
+            .group {
+                border-radius: 8px;
+                overflow: visible;
+                margin-bottom: 10px;
+            }
+
+            .group-header {
+                border-radius: 8px 8px 0 0;
+                padding: 8px 10px;
+                font-size: 13px;
+            }
+
+            table,
+            tbody {
+                display: block;
+                width: 100%;
+            }
+
+            thead {
+                display: none;
+            }
+
+            .stock-row {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 6px 8px;
+                margin: 8px;
+                padding: 9px;
+                border: 1px solid #e5e7eb;
+                border-radius: 8px;
+                background: #fff;
+                box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+            }
+
+            .stock-row.kline-selected {
+                border-color: #ca8a04;
+                background: #fffbeb;
+                box-shadow: 0 0 0 2px rgba(202, 138, 4, 0.22), 0 5px 14px rgba(15, 23, 42, 0.12);
+            }
+
+            .stock-row:hover {
+                background: #fff;
+            }
+
+            .stock-row.kline-selected:hover {
+                background: #fffbeb;
+            }
+
+            .stock-row td {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 6px;
+                order: 10;
+                min-width: 0;
+                padding: 0;
+                border-bottom: 0;
+                text-align: right;
+                white-space: normal;
+                overflow: visible;
+                text-overflow: clip;
+                font-size: 12px;
+                line-height: 1.35;
+            }
+
+            .stock-row td::before {
+                content: attr(data-label);
+                flex: 0 0 auto;
+                color: #6b7280;
+                font-weight: 700;
+                font-size: 11px;
+            }
+
+            .stock-row td:first-child {
+                display: none;
+            }
+
+            .stock-row .stock-code,
+            .stock-row .stock-name,
+            .stock-row [data-field="today_change"] {
+                font-size: 13px;
+            }
+
+            .stock-row .stock-name {
+                order: 1;
+                grid-column: 1;
+                grid-row: 1;
+                justify-content: flex-start;
+                text-align: left;
+                font-size: 14px;
+            }
+
+            .stock-row .stock-code {
+                order: 2;
+                grid-column: 2;
+                grid-row: 1;
+                justify-content: flex-end;
+                text-align: right;
+            }
+
+            .stock-row .stock-name::before,
+            .stock-row .stock-code::before {
+                display: none;
+            }
+
+            .stock-row [data-field="today_change"] {
+                order: 3;
+            }
+
+            .stock-row .stock-name {
+                overflow-wrap: anywhere;
+            }
+
+            .stock-row td:last-child {
+                grid-column: 1 / -1;
+                justify-content: flex-start;
+                flex-wrap: wrap;
+                text-align: left;
+            }
+
+            .stock-row td:last-child::before {
+                margin-right: 2px;
+            }
+
+            .badge {
+                padding: 2px 5px;
+                font-size: 10px;
+            }
+
+            .empty {
+                padding: 24px 12px;
+                font-size: 13px;
+            }
+
+            #groups {
+                padding-bottom: 100vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="stock-tooltip" id="klineTooltip">
+        <div class="tooltip-header" id="klineTooltipHeader"></div>
+        <img id="klineImage" src="" alt="K线图">
+    </div>
+
+    <div class="container">
+        <div class="nav-buttons">
+            <div class="nav-left">
+                <div class="date-selector">
+                    <button class="date-nav-btn" id="prevDateBtn" onclick="prevDate()">◀</button>
+                    <input type="text" id="datePicker" placeholder="选择日期" readonly>
+                    <button class="date-nav-btn" id="nextDateBtn" onclick="nextDate()">▶</button>
+                </div>
+            </div>
+            <div class="nav-right">
+                <a href="/" class="nav-btn nav-btn-home">首页</a>
+                <a href="/涨停前横盘" class="nav-btn" style="background:#2563eb;">涨停前横盘</a>
+                <a href="/阴后强" class="nav-btn nav-btn-yhy">阴后强</a>
+                <a href="/5拉升" class="nav-btn" style="background:#2563eb;">5拉升</a>
+                <a href="/20阴少跌少横盘" class="nav-btn nav-btn-yx205">20阴少跌少横盘</a>
+                <a href="/阴线跌破5日次数" class="nav-btn nav-btn-yinbreak">阴线跌破5日次数</a>
+                <a href="/10天大5日线" class="nav-btn" style="background:#0f766e;">10天大5日线</a>
+                <a href="/涨停或光脚" class="nav-btn nav-btn-ztorgj">涨停或光脚</a>
+                <a href="/连续5不碰" class="nav-btn" style="background:#f43f5e;">连续5不碰</a>
+                <a href="/连续涨停" class="nav-btn nav-btn-lszty">连续涨停</a>
+                <a href="/连续4天拉升" class="nav-btn nav-btn-intraday4up">连续4天拉升</a>
+                <a href="/极品关注" class="nav-btn" style="background:#f59e0b;">极品关注</a>
+                <a href="/同花顺板块" class="nav-btn" style="background:#2563eb;">同花顺板块</a>
+            </div>
+        </div>
+
+        <div class="page-title">
+            <h1>阴线跌破5日次数</h1>
+            <div class="meta">
+                <span id="dateText">日期: -</span>
+                <span id="countText">共 0 只</span>
+                <span id="updateText">更新: -</span>
+            </div>
+        </div>
+
+        <div id="status" class="status">
+            <div class="filter-bar">
+                <button type="button" class="filter-btn" data-filter="ref_is_limit_up">是否涨停</button>
+                <button type="button" class="filter-btn" data-filter="ref_high_gain_gte_6_5_yang_low_above_ma5">拉升且不碰</button>
+                <button type="button" class="filter-btn" data-filter="ref_high_gain_ok">是否拉升</button>
+                <button type="button" class="filter-btn" data-filter="is_bare_foot_yang">是否光脚拉升</button>
+                <button type="button" class="filter-btn" data-filter="high_gain_10d_gte_5">是否5拉升</button>
+                <span class="filter-count" id="filterCount">正在加载数据...</span>
+            </div>
+        </div>
+        <div id="groups"></div>
+    </div>
+
+    <script>
+        let currentDate = '';
+        let availableDates = [];
+        let stocksData = [];
+        let datePicker = null;
+        let realtimeTimer = null;
+        let klineVisible = false;
+        let selectedKlineCode = '';
+        let scrollKlineRaf = 0;
+        const activeFilters = new Set();
+
+        function toNumber(value, fallback = 0) {
+            const num = Number(value);
+            return Number.isFinite(num) ? num : fallback;
+        }
+
+        function formatPct(value) {
+            const num = toNumber(value, 0);
+            return `${num >= 0 ? '+' : ''}${num.toFixed(2)}%`;
+        }
+
+        function formatChangePct(value) {
+            const num = toNumber(value, 0);
+            const sign = num >= 0 ? '+' : '-';
+            return `<span class="pct-sign ${gainClass(num)}">${sign}</span><span class="pct-number">${Math.abs(num).toFixed(2)}%</span>`;
+        }
+
+        function gainClass(value) {
+            return toNumber(value, 0) >= 0 ? 'gain-up' : 'gain-down';
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        async function loadDates() {
+            const response = await fetch('/api/yinbreak5/dates');
+            const result = await response.json();
+            availableDates = result.success ? (result.dates || []) : [];
+            currentDate = availableDates[0] || new Date().toISOString().slice(0, 10);
+
+            datePicker = flatpickr('#datePicker', {
+                locale: 'zh',
+                dateFormat: 'Y-m-d',
+                defaultDate: currentDate,
+                enable: availableDates.length ? availableDates : undefined,
+                onChange: function(selectedDates, dateStr) {
+                    currentDate = dateStr;
+                    loadStocks();
+                }
+            });
+        }
+
+        async function loadStocks() {
+            clearInterval(realtimeTimer);
+            updateFilterCount('正在加载数据...');
+            const url = currentDate ? `/api/yinbreak5/stocks?date=${encodeURIComponent(currentDate)}` : '/api/yinbreak5/stocks';
+            const response = await fetch(url, { cache: 'no-store' });
+            const result = await response.json();
+            if (!result.success) {
+                updateFilterCount(`加载失败: ${result.error || '未知错误'}`);
+                return;
+            }
+
+            stocksData = result.data || [];
+            currentDate = result.date || currentDate;
+            document.getElementById('dateText').textContent = `日期: ${currentDate}`;
+            document.getElementById('countText').textContent = `共 ${stocksData.length} 只`;
+            document.getElementById('updateText').textContent = `更新: ${result.update_time || '-'}`;
+            if (datePicker && currentDate) {
+                datePicker.setDate(currentDate, false);
+            }
+            renderGroups();
+            startRealtimeRefresh();
+        }
+
+        function isTruthyFlag(value) {
+            return value === true || value === 1 || value === '1' || value === 'true' || value === 'True';
+        }
+
+        function filteredStocks() {
+            if (!activeFilters.size) {
+                return stocksData.slice();
+            }
+            return stocksData.filter(stock => Array.from(activeFilters).every(field => isTruthyFlag(stock[field])));
+        }
+
+        function updateFilterCount(text) {
+            const el = document.getElementById('filterCount');
+            if (el) {
+                el.textContent = text;
+            }
+        }
+
+        function groupStocks(sourceStocks) {
+            const groups = new Map();
+            sourceStocks.forEach(stock => {
+                const key = toNumber(stock.weak_yin_20d, 0);
+                if (!groups.has(key)) {
+                    groups.set(key, []);
+                }
+                groups.get(key).push(stock);
+            });
+
+            return Array.from(groups.entries())
+                .sort((a, b) => a[0] - b[0])
+                .map(([weakYin, stocks]) => {
+                    stocks.sort((a, b) => toNumber(b.today_change, 0) - toNumber(a.today_change, 0));
+                    return { weakYin, stocks };
+                });
+        }
+
+        function renderGroups() {
+            const container = document.getElementById('groups');
+            const displayStocks = filteredStocks();
+            if (!stocksData.length) {
+                updateFilterCount('当前日期没有数据');
+                container.innerHTML = '<div class="empty">没有找到 20dpnum 数据</div>';
+                return;
+            }
+            if (!displayStocks.length) {
+                updateFilterCount(`筛选后 0 只 / 共 ${stocksData.length} 只`);
+                container.innerHTML = '<div class="empty">当前筛选条件下没有股票</div>';
+                return;
+            }
+
+            updateFilterCount(`筛选后 ${displayStocks.length} 只 / 共 ${stocksData.length} 只`);
+            const html = groupStocks(displayStocks).map(group => `
+                <section class="group">
+                    <div class="group-header">
+                        <span>weak_yin_20d = ${group.weakYin}</span>
+                        <span class="group-count">${group.stocks.length} 只</span>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="col-index">序号</th>
+                                <th class="col-code">代码</th>
+                                <th class="col-name">名称</th>
+                                <th class="col-number">涨跌幅</th>
+                                <th class="col-number">阴线次数</th>
+                                <th class="col-number">20日涨幅</th>
+                                <th class="col-number">最高涨幅</th>
+                                <th class="col-number">拉升大于5</th>
+                                <th class="col-number">标签</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${group.stocks.map((stock, index) => renderRow(stock, index + 1)).join('')}
+                        </tbody>
+                    </table>
+                </section>
+            `).join('');
+            container.innerHTML = html;
+            bindKlineHover();
+            restoreKlineSelection();
+        }
+
+        function renderRow(stock, index) {
+            const badges = [];
+            if (toNumber(stock.is_limit_up, 0) || toNumber(stock.ref_is_limit_up, 0)) {
+                badges.push('<span class="badge">涨停</span>');
+            }
+            if (toNumber(stock.ref_high_gain_gte_6_5_yang_low_above_ma5, 0)) {
+                badges.push('<span class="badge">拉升不碰</span>');
+            }
+            if (toNumber(stock.is_bare_foot_yang, 0)) {
+                badges.push('<span class="badge">光脚</span>');
+            }
+            return `
+                <tr class="stock-row" data-code="${escapeHtml(stock.code)}" data-name="${escapeHtml(stock.name)}" data-change="${toNumber(stock.today_change, 0)}" data-break-count="${toNumber(stock.weak_yin_20d, 0)}" data-yin-count="${toNumber(stock.yin_count_20, 0)}">
+                    <td data-label="序号">${index}</td>
+                    <td class="stock-code" data-label="代码">${escapeHtml(stock.code)}</td>
+                    <td class="stock-name" data-label="名称" title="${escapeHtml(stock.name)}">${escapeHtml(stock.name)}</td>
+                    <td data-label="涨跌幅" data-field="today_change">${formatChangePct(stock.today_change)}</td>
+                    <td data-label="阴线次数">${toNumber(stock.yin_count_20, 0)}</td>
+                    <td data-label="20日涨幅">${formatPct(stock.gain_20d)}</td>
+                    <td data-label="最高涨幅">${formatPct(stock.max_gain)}</td>
+                    <td data-label="拉升大于5">${toNumber(stock.high_gain_10d_gte_5, 0) ? '是' : ''}</td>
+                    <td data-label="标签">${badges.join(' ') || '-'}</td>
+                </tr>
+            `;
+        }
+
+        function getEastMoneyPrefix(code) {
+            return String(code || '').startsWith('6') ? '1' : '0';
+        }
+
+        function showKline(event, code, name, change, breakCount, yinCount) {
+            if (!code) {
+                return;
+            }
+            const tooltip = document.getElementById('klineTooltip');
+            const image = document.getElementById('klineImage');
+            const header = document.getElementById('klineTooltipHeader');
+            const prefix = getEastMoneyPrefix(code);
+            const displayChange = toNumber(change, 0);
+            const displayBreakCount = toNumber(breakCount, 0);
+            const displayYinCount = toNumber(yinCount, 0);
+            const breakCountClass = displayBreakCount <= 2 ? 'kline-break-count is-low' : 'kline-break-count';
+            const yinCountClass = displayYinCount <= 4 ? 'kline-yin-count is-low' : 'kline-yin-count';
+            image.src = `https://webquoteklinepic.eastmoney.com/GetPic.aspx?nid=${prefix}.${code}&imageType=KXL&token=44c9d251add88e27b65ed86506f6e5da&at=1`;
+            header.innerHTML = `
+                <div class="kline-summary">
+                    <span>${escapeHtml(name || '')} (${escapeHtml(code)})</span>
+                    <span>${formatChangePct(displayChange)}</span>
+                    <span>跌破次数: <strong class="${breakCountClass}">${displayBreakCount}</strong></span>
+                    <span>阴线次数: <strong class="${yinCountClass}">${displayYinCount}</strong></span>
+                </div>
+            `;
+            moveKlineTooltip(event);
+            tooltip.style.display = 'block';
+            klineVisible = true;
+            selectedKlineCode = String(code);
+        }
+
+        function hideKline() {
+            const tooltip = document.getElementById('klineTooltip');
+            const image = document.getElementById('klineImage');
+            tooltip.style.display = 'none';
+            image.src = '';
+            klineVisible = false;
+            selectedKlineCode = '';
+            if (isTouchLikeDevice()) {
+                clearKlineSelection();
+            }
+        }
+
+        function moveKlineTooltip(event) {
+            const tooltip = document.getElementById('klineTooltip');
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                tooltip.style.left = '10px';
+                tooltip.style.right = '10px';
+                tooltip.style.top = 'auto';
+                tooltip.style.bottom = '18px';
+                return;
+            }
+            const tooltipWidth = isMobile ? Math.min(600, window.innerWidth - 20) : 700;
+            const tooltipHeight = isMobile ? 260 : 420;
+            let left = event.clientX + 15;
+            let top = event.clientY + 15;
+
+            if (left + tooltipWidth > window.innerWidth) {
+                left = event.clientX - tooltipWidth - 15;
+            }
+            if (top + tooltipHeight > window.innerHeight) {
+                top = event.clientY - tooltipHeight - 15;
+            }
+            if (left < 0) left = 10;
+            if (top < 0) top = 10;
+
+            tooltip.style.left = `${left}px`;
+            tooltip.style.top = `${top}px`;
+        }
+
+        function isTouchLikeDevice() {
+            return window.innerWidth <= 768 || (window.matchMedia && window.matchMedia('(hover: none), (pointer: coarse)').matches);
+        }
+
+        function clearKlineSelection() {
+            document.querySelectorAll('.stock-row.kline-selected').forEach(row => {
+                row.classList.remove('kline-selected');
+            });
+        }
+
+        function selectKlineRow(row, event) {
+            if (!row) {
+                return;
+            }
+            const sameSelected = row.classList.contains('kline-selected')
+                && klineVisible
+                && selectedKlineCode === String(row.dataset.code || '');
+            if (sameSelected) {
+                hideKline();
+                return;
+            }
+            clearKlineSelection();
+            row.classList.add('kline-selected');
+            showKline(event, row.dataset.code, row.dataset.name, row.dataset.change, row.dataset.breakCount, row.dataset.yinCount);
+        }
+
+        function restoreKlineSelection() {
+            if (!isTouchLikeDevice() || !klineVisible || !selectedKlineCode) {
+                return;
+            }
+            const row = Array.from(document.querySelectorAll('.stock-row'))
+                .find(item => String(item.dataset.code || '') === selectedKlineCode);
+            if (row) {
+                row.classList.add('kline-selected');
+            } else {
+                hideKline();
+            }
+        }
+
+        function klineVisibleBottomLimit() {
+            const tooltip = document.getElementById('klineTooltip');
+            if (tooltip && tooltip.style.display === 'block') {
+                const rect = tooltip.getBoundingClientRect();
+                if (rect.top > 0) {
+                    return rect.top - 8;
+                }
+            }
+            return window.innerHeight;
+        }
+
+        function isRowVisibleAboveKline(row) {
+            const rect = row.getBoundingClientRect();
+            const bottomLimit = klineVisibleBottomLimit();
+            return rect.bottom > 0 && rect.top < bottomLimit;
+        }
+
+        function findTopVisibleStockRow() {
+            const bottomLimit = klineVisibleBottomLimit();
+            const rows = Array.from(document.querySelectorAll('.stock-row'))
+                .map(row => ({ row, rect: row.getBoundingClientRect() }))
+                .filter(item => item.rect.bottom > 0 && item.rect.top < bottomLimit)
+                .sort((a, b) => Math.max(a.rect.top, 0) - Math.max(b.rect.top, 0));
+            return rows.length ? rows[0].row : null;
+        }
+
+        function updateKlineSelectionOnScroll() {
+            if (!isTouchLikeDevice() || !klineVisible) {
+                return;
+            }
+            const selectedRow = document.querySelector('.stock-row.kline-selected');
+            if (selectedRow && isRowVisibleAboveKline(selectedRow)) {
+                return;
+            }
+            const nextRow = findTopVisibleStockRow();
+            if (!nextRow) {
+                return;
+            }
+            clearKlineSelection();
+            nextRow.classList.add('kline-selected');
+            showKline(
+                { clientX: window.innerWidth / 2, clientY: window.innerHeight - 40 },
+                nextRow.dataset.code,
+                nextRow.dataset.name,
+                nextRow.dataset.change,
+                nextRow.dataset.breakCount,
+                nextRow.dataset.yinCount
+            );
+        }
+
+        function bindKlineHover() {
+            document.querySelectorAll('.stock-row').forEach(row => {
+                row.addEventListener('mouseenter', event => {
+                    if (isTouchLikeDevice()) {
+                        return;
+                    }
+                    showKline(event, row.dataset.code, row.dataset.name, row.dataset.change, row.dataset.breakCount, row.dataset.yinCount);
+                });
+                row.addEventListener('mousemove', moveKlineTooltip);
+                row.addEventListener('mouseleave', hideKline);
+                row.addEventListener('click', event => {
+                    if (!isTouchLikeDevice()) {
+                        return;
+                    }
+                    selectKlineRow(row, event);
+                });
+            });
+        }
+
+        function syncFilterButtons() {
+            document.querySelectorAll('.filter-btn[data-filter]').forEach(button => {
+                button.classList.toggle('active', activeFilters.has(button.dataset.filter));
+            });
+        }
+
+        function bindFilterButtons() {
+            document.querySelectorAll('.filter-btn[data-filter]').forEach(button => {
+                button.addEventListener('click', () => {
+                    const field = button.dataset.filter;
+                    if (activeFilters.has(field)) {
+                        activeFilters.delete(field);
+                    } else {
+                        activeFilters.add(field);
+                    }
+                    syncFilterButtons();
+                    renderGroups();
+                });
+            });
+        }
+
+        function bindKlineDismiss() {
+            document.addEventListener('click', event => {
+                if (!isTouchLikeDevice()) {
+                    return;
+                }
+                if (event.target.closest('.stock-row') || event.target.closest('.stock-tooltip')) {
+                    return;
+                }
+                hideKline();
+            });
+        }
+
+        function bindKlineScrollFollow() {
+            window.addEventListener('scroll', () => {
+                if (!isTouchLikeDevice() || !klineVisible) {
+                    return;
+                }
+                if (scrollKlineRaf) {
+                    return;
+                }
+                scrollKlineRaf = window.requestAnimationFrame(() => {
+                    scrollKlineRaf = 0;
+                    updateKlineSelectionOnScroll();
+                });
+            }, { passive: true });
+        }
+
+        async function refreshRealtime() {
+            if (!stocksData.length) {
+                return;
+            }
+            try {
+                const codes = stocksData.map(stock => stock.code).filter(Boolean);
+                const response = await fetch('/api/yinbreak5/realtime', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ codes })
+                });
+                const result = await response.json();
+                if (!result.success || !result.data) {
+                    return;
+                }
+                let changed = false;
+                stocksData.forEach(stock => {
+                    const rt = result.data[stock.code];
+                    if (rt && typeof rt.change === 'number' && stock.today_change !== rt.change) {
+                        stock.today_change = rt.change;
+                        changed = true;
+                    }
+                });
+                if (changed) {
+                    renderGroups();
+                    document.getElementById('updateText').textContent = `更新: ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`;
+                }
+            } catch (error) {
+                console.error('[yinbreak5][realtime] 请求失败:', error);
+            }
+        }
+
+        function startRealtimeRefresh() {
+            refreshRealtime();
+            realtimeTimer = setInterval(refreshRealtime, 3000);
+        }
+
+        function prevDate() {
+            const index = availableDates.indexOf(currentDate);
+            if (index >= 0 && index < availableDates.length - 1) {
+                currentDate = availableDates[index + 1];
+                loadStocks();
+            }
+        }
+
+        function nextDate() {
+            const index = availableDates.indexOf(currentDate);
+            if (index > 0) {
+                currentDate = availableDates[index - 1];
+                loadStocks();
+            }
+        }
+
+        async function init() {
+            try {
+                bindFilterButtons();
+                bindKlineDismiss();
+                bindKlineScrollFollow();
+                await loadDates();
+                await loadStocks();
+            } catch (error) {
+                document.getElementById('status').textContent = `初始化失败: ${error.message || error}`;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+        window.addEventListener('beforeunload', () => clearInterval(realtimeTimer));
+    </script>
+</body>
+</html>

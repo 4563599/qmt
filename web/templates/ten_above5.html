@@ -1,0 +1,1777 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>10天大5日线</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            background: #f5f7fb;
+            color: #1f2937;
+            padding: 16px;
+        }
+
+        .container {
+            max-width: 1180px;
+            margin: 0 auto;
+        }
+
+        .nav-buttons {
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .nav-left {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .nav-right {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+        }
+
+        .nav-btn {
+            display: inline-block;
+            padding: 5px 9px;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.3s;
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .nav-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-home { background: #667eea; }
+        .nav-btn-yhy { background: #10b981; }
+        .nav-btn-yx205 { background: #06b6d4; }
+        .nav-btn-yinbreak { background: #ca8a04; }
+        .nav-btn-ztorgj { background: #d946ef; }
+        .nav-btn-lszty { background: #e11d48; }
+        .nav-btn-intraday4up { background: #f97316; }
+
+        .date-selector {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: white;
+            padding: 4px 6px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .date-nav-btn {
+            border: 0;
+            background: #06b6d4;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        #datePicker {
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 6px 9px;
+            width: 118px;
+            font-size: 13px;
+            text-align: center;
+            cursor: pointer;
+            background: #fff;
+        }
+
+        .page-title {
+            background: white;
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .page-title h1 {
+            font-size: 24px;
+            color: #111827;
+            font-weight: 700;
+        }
+
+        .title-main {
+            display: flex;
+            align-items: center;
+            gap: 22px;
+            flex-wrap: wrap;
+            min-width: 0;
+        }
+
+        .shape-stats {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            font-size: 16px;
+            font-weight: 800;
+            color: #374151;
+        }
+
+        .shape-stat {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            border-radius: 999px;
+            padding: 5px 10px;
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+            white-space: nowrap;
+        }
+
+        .shape-stat strong {
+            color: #dc2626;
+            font-size: 18px;
+        }
+
+        .meta {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            color: #4b5563;
+            font-size: 13px;
+        }
+
+        .meta span {
+            background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            border-radius: 999px;
+            padding: 4px 10px;
+        }
+
+        .status {
+            background: white;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 1px 6px rgba(15, 23, 42, 0.07);
+            margin-bottom: 12px;
+            color: #4b5563;
+            font-size: 14px;
+        }
+
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            border: 1px solid #d1d5db;
+            background: #f9fafb;
+            color: #374151;
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .filter-btn:hover {
+            border-color: #ca8a04;
+            color: #92400e;
+            background: #fffbeb;
+        }
+
+        .filter-btn.active {
+            border-color: #ca8a04;
+            background: #ca8a04;
+            color: white;
+            box-shadow: 0 4px 10px rgba(202, 138, 4, 0.22);
+        }
+
+        .sort-low-btn {
+            border-color: #a855f7;
+            color: #7e22ce;
+            background: #faf5ff;
+        }
+
+        .sort-low-btn:hover,
+        .sort-low-btn.active {
+            border-color: #7e22ce;
+            background: #7e22ce;
+            color: white;
+            box-shadow: 0 4px 10px rgba(126, 34, 206, 0.22);
+        }
+
+        .sort-bare-foot-btn {
+            border-color: #f97316;
+            color: #c2410c;
+            background: #fff7ed;
+        }
+
+        .sort-bare-foot-btn:hover,
+        .sort-bare-foot-btn.active {
+            border-color: #ea580c;
+            background: #ea580c;
+            color: white;
+            box-shadow: 0 4px 10px rgba(234, 88, 12, 0.22);
+        }
+
+        .filter-count {
+            margin-left: 0;
+            color: #6b7280;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .export-excel-btn {
+            margin-left: auto;
+            border: 1px solid #059669;
+            background: #059669;
+            color: #fff;
+            border-radius: 999px;
+            padding: 6px 14px;
+            font-size: 13px;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(5, 150, 105, 0.18);
+            white-space: nowrap;
+        }
+
+        .export-excel-btn:hover {
+            background: #047857;
+            border-color: #047857;
+        }
+
+        .group {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+            margin-bottom: 12px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .group-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            background: linear-gradient(90deg, #854d0e, #ca8a04);
+            color: white;
+            padding: 9px 12px;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .group-count {
+            font-size: 12px;
+            font-weight: 600;
+            opacity: 0.92;
+        }
+
+        .groups-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            align-items: start;
+        }
+
+        .groups-grid .group {
+            margin-bottom: 0;
+        }
+
+        .priority-block {
+            border-bottom: 1px solid #e5e7eb;
+            background: #fff7ed;
+        }
+
+        .priority-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 8px 10px;
+            background: #fed7aa;
+            color: #9a3412;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .table-group-row td {
+            background: #fff7ed;
+            color: #9a3412;
+            font-weight: 900;
+            text-align: left;
+            padding: 7px 9px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        th {
+            background: #f8fafc;
+            color: #374151;
+            padding: 7px 4px;
+            font-size: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            text-align: center;
+            font-weight: 700;
+        }
+
+        td {
+            padding: 6px 4px;
+            border-bottom: 1px solid #f1f5f9;
+            text-align: center;
+            font-size: 13px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        tr:hover {
+            background: #fffbeb;
+        }
+
+        .stock-tooltip {
+            position: fixed;
+            display: none;
+            background: #fff;
+            border: 1px solid #e1e1e1;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            z-index: 10000;
+            pointer-events: none;
+        }
+
+        .stock-tooltip img {
+            display: block;
+            width: 680px;
+            height: 380px;
+            background: #f5f5f7;
+        }
+
+        .stock-tooltip .tooltip-header {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+
+        .kline-summary {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            color: #374151;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .kline-summary .gain-up {
+            color: #ef4444;
+        }
+
+        .kline-summary .gain-down {
+            color: #22c55e;
+        }
+
+        .kline-yin-count.is-low,
+        .kline-break-count.is-low {
+            color: #dc2626;
+            font-weight: 900;
+        }
+
+        .col-index { width: 40px; }
+        .col-code { width: 76px; }
+        .col-name { width: 84px; }
+        .col-number { width: 76px; }
+        .stock-code {
+            color: #2563eb;
+            font-weight: 700;
+        }
+
+        .stock-name {
+            color: #111827;
+            font-weight: 700;
+        }
+
+        .stock-row {
+            cursor: pointer;
+        }
+
+        .gain-up {
+            color: #ef4444;
+            font-weight: 800;
+        }
+
+        .gain-down {
+            color: #22c55e;
+            font-weight: 800;
+        }
+
+        .pct-sign {
+            display: inline-block;
+            min-width: 0.55em;
+            font-weight: 900;
+        }
+
+        .pct-number {
+            color: #111827 !important;
+            font-weight: 900;
+        }
+
+        .stock-row [data-field="today_change"] {
+            font-size: 15px;
+            font-weight: 900;
+        }
+
+        .stock-row [data-field="today_change"].gain-up {
+            color: #ef4444;
+        }
+
+        .stock-row [data-field="today_change"].gain-down {
+            color: #22c55e;
+        }
+
+        .low-above-cell {
+            color: #dc2626;
+            font-weight: 900;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #92400e;
+            background: #fef3c7;
+            border: 1px solid #fbbf24;
+        }
+
+        .empty {
+            background: white;
+            border-radius: 10px;
+            padding: 34px 16px;
+            text-align: center;
+            color: #6b7280;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+        }
+
+        @media (max-width: 900px) {
+            body { padding: 8px; }
+            .page-title { align-items: flex-start; }
+            .page-title h1 { font-size: 20px; }
+            .shape-stats { font-size: 14px; gap: 6px; }
+            .shape-stat { padding: 4px 8px; }
+            .shape-stat strong { font-size: 16px; }
+            .nav-buttons { gap: 8px; }
+            .nav-right { gap: 4px; }
+            .nav-btn { font-size: 12px; padding: 5px 7px; }
+            .export-excel-btn {
+                margin-left: 0;
+            }
+            .filter-count {
+                width: 100%;
+                margin-left: 0;
+            }
+            th, td { font-size: 12px; padding: 6px 4px; }
+            .col-number { width: 72px; }
+            .stock-tooltip {
+                left: 10px !important;
+                right: 10px;
+                bottom: 18px;
+                top: auto !important;
+                max-width: calc(100vw - 20px);
+                padding: 8px;
+            }
+            .stock-tooltip img {
+                width: min(600px, calc(100vw - 42px));
+                height: auto;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: 6px;
+                background: #f3f4f6;
+            }
+
+            .container {
+                max-width: 100%;
+            }
+
+            .nav-buttons {
+                display: block;
+                margin-bottom: 8px;
+            }
+
+            .nav-left {
+                width: 100%;
+                margin-bottom: 8px;
+            }
+
+            .date-selector {
+                width: 100%;
+                justify-content: center;
+            }
+
+            #datePicker {
+                flex: 1;
+                max-width: 180px;
+            }
+
+            .nav-right {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                width: 100%;
+                padding-bottom: 4px;
+                scrollbar-width: thin;
+            }
+
+            .nav-btn {
+                padding: 6px 9px;
+                font-size: 12px;
+                border-radius: 7px;
+            }
+
+            .page-title {
+                padding: 10px 12px;
+                border-radius: 8px;
+                gap: 8px;
+            }
+
+            .page-title h1 {
+                font-size: 18px;
+                line-height: 1.25;
+            }
+
+            .title-main {
+                width: 100%;
+                gap: 8px;
+            }
+
+            .shape-stats {
+                width: 100%;
+                font-size: 13px;
+            }
+
+            .shape-stat {
+                flex: 1 1 calc(33.333% - 5px);
+                justify-content: center;
+                padding: 4px 5px;
+            }
+
+            .shape-stat strong {
+                font-size: 15px;
+            }
+
+            .meta {
+                width: 100%;
+                gap: 6px;
+            }
+
+            .meta span {
+                flex: 1 1 calc(50% - 4px);
+                min-width: 0;
+                padding: 4px 8px;
+                font-size: 12px;
+                text-align: center;
+            }
+
+            .status {
+                padding: 9px;
+                border-radius: 8px;
+                margin-bottom: 10px;
+            }
+
+            .filter-bar {
+                gap: 6px;
+            }
+
+            .filter-btn {
+                flex: 1 1 calc(50% - 3px);
+                padding: 7px 8px;
+                font-size: 12px;
+                text-align: center;
+            }
+
+            .export-excel-btn {
+                flex: 1 1 calc(50% - 3px);
+                padding: 7px 8px;
+                font-size: 12px;
+                text-align: center;
+            }
+
+            .filter-count {
+                width: 100%;
+                text-align: center;
+                font-size: 12px;
+            }
+
+            .group {
+                border-radius: 8px;
+                overflow: visible;
+                margin-bottom: 10px;
+            }
+
+            .group-header {
+                border-radius: 8px 8px 0 0;
+                padding: 8px 10px;
+                font-size: 13px;
+            }
+
+            table,
+            tbody {
+                display: block;
+                width: 100%;
+            }
+
+            thead {
+                display: none;
+            }
+
+            .stock-row {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 6px 8px;
+                margin: 8px;
+                padding: 9px;
+                border: 1px solid #e5e7eb;
+                border-radius: 8px;
+                background: #fff;
+                box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+            }
+
+            .stock-row.kline-selected {
+                border-color: #ca8a04;
+                background: #fffbeb;
+                box-shadow: 0 0 0 2px rgba(202, 138, 4, 0.22), 0 5px 14px rgba(15, 23, 42, 0.12);
+            }
+
+            .stock-row:hover {
+                background: #fff;
+            }
+
+            .stock-row.kline-selected:hover {
+                background: #fffbeb;
+            }
+
+            .priority-header {
+                padding: 7px 9px;
+                font-size: 12px;
+            }
+
+            .priority-block {
+                position: relative;
+                margin: 8px;
+                border: 0;
+                border-radius: 10px;
+                background: #faf5ff;
+                box-shadow: none;
+                overflow: hidden;
+            }
+
+            .priority-block::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                z-index: 2;
+                pointer-events: none;
+                border-radius: 10px;
+                background:
+                    repeating-linear-gradient(90deg, #a855f7 0 18px, transparent 18px 23px) top left / 100% 3px no-repeat,
+                    repeating-linear-gradient(90deg, #a855f7 0 18px, transparent 18px 23px) bottom left / 100% 3px no-repeat,
+                    repeating-linear-gradient(180deg, #a855f7 0 18px, transparent 18px 23px) top left / 3px 100% no-repeat,
+                    repeating-linear-gradient(180deg, #a855f7 0 18px, transparent 18px 23px) top right / 3px 100% no-repeat;
+            }
+
+            .table-group-row {
+                display: block;
+                margin: 8px 8px 2px;
+            }
+
+            .table-group-row td {
+                display: block;
+                border-radius: 7px;
+                padding: 7px 9px;
+                border-bottom: 0;
+                font-size: 12px;
+                text-align: left;
+            }
+
+            .stock-row td {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 6px;
+                order: 10;
+                min-width: 0;
+                padding: 0;
+                border-bottom: 0;
+                text-align: right;
+                white-space: normal;
+                overflow: visible;
+                text-overflow: clip;
+                font-size: 12px;
+                line-height: 1.35;
+            }
+
+            .stock-row td::before {
+                content: attr(data-label);
+                flex: 0 0 auto;
+                color: #6b7280;
+                font-weight: 700;
+                font-size: 11px;
+            }
+
+            .stock-row td:first-child {
+                display: none;
+            }
+
+            .stock-row .stock-code,
+            .stock-row .stock-name,
+            .stock-row [data-field="today_change"] {
+                font-size: 13px;
+            }
+
+            .stock-row .stock-name {
+                order: 1;
+                grid-column: 1;
+                grid-row: 1;
+                justify-content: flex-start;
+                text-align: left;
+                font-size: 14px;
+            }
+
+            .stock-row .stock-code {
+                order: 2;
+                grid-column: 2;
+                grid-row: 1;
+                justify-content: flex-end;
+                text-align: right;
+            }
+
+            .stock-row .stock-name::before,
+            .stock-row .stock-code::before {
+                display: none;
+            }
+
+            .stock-row [data-field="today_change"] {
+                order: 3;
+            }
+
+            .stock-row .stock-name {
+                overflow-wrap: anywhere;
+            }
+
+            .stock-row td:last-child {
+                grid-column: 1 / -1;
+                justify-content: flex-start;
+                flex-wrap: wrap;
+                text-align: left;
+            }
+
+            .stock-row td:last-child::before {
+                margin-right: 2px;
+            }
+
+            .badge {
+                padding: 2px 5px;
+                font-size: 10px;
+            }
+
+            .empty {
+                padding: 24px 12px;
+                font-size: 13px;
+            }
+
+            .groups-grid {
+                display: block;
+            }
+
+            .groups-grid .group {
+                margin-bottom: 12px;
+            }
+
+            #groups {
+                padding-bottom: 100vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="stock-tooltip" id="klineTooltip">
+        <div class="tooltip-header" id="klineTooltipHeader"></div>
+        <img id="klineImage" src="" alt="K线图">
+    </div>
+
+    <div class="container">
+        <div class="nav-buttons">
+            <div class="nav-left">
+                <div class="date-selector">
+                    <button class="date-nav-btn" id="prevDateBtn" onclick="prevDate()">◀</button>
+                    <input type="text" id="datePicker" placeholder="选择日期" readonly>
+                    <button class="date-nav-btn" id="nextDateBtn" onclick="nextDate()">▶</button>
+                </div>
+            </div>
+            <div class="nav-right">
+                <a href="/" class="nav-btn nav-btn-home">首页</a>
+                <a href="/涨停前横盘" class="nav-btn" style="background:#2563eb;">涨停前横盘</a>
+                <a href="/阴后强" class="nav-btn nav-btn-yhy">阴后强</a>
+                <a href="/5拉升" class="nav-btn" style="background:#2563eb;">5拉升</a>
+                <a href="/20阴少跌少横盘" class="nav-btn nav-btn-yx205">20阴少跌少横盘</a>
+                <a href="/阴线跌破5日次数" class="nav-btn nav-btn-yinbreak">阴线跌破5日次数</a>
+                <a href="/10天大5日线" class="nav-btn" style="background:#0f766e;">10天大5日线</a>
+<a href="/涨停或光脚" class="nav-btn nav-btn-ztorgj">涨停或光脚</a>
+                <a href="/连续5不碰" class="nav-btn" style="background:#f43f5e;">连续5不碰</a>
+                <a href="/连续涨停" class="nav-btn nav-btn-lszty">连续涨停</a>
+                <a href="/连续4天拉升" class="nav-btn nav-btn-intraday4up">连续4天拉升</a>
+                <a href="/极品关注" class="nav-btn" style="background:#f59e0b;">极品关注</a>
+                <a href="/同花顺板块" class="nav-btn" style="background:#2563eb;">同花顺板块</a>
+            </div>
+        </div>
+
+        <div class="page-title">
+            <div class="title-main">
+                <h1>10天大5日线</h1>
+                <div class="shape-stats" id="shapeStats">
+                    <span class="shape-stat">几乎光头 <strong>0</strong></span>
+                    <span class="shape-stat">几乎光脚 <strong>0</strong></span>
+                    <span class="shape-stat">短头短脚十字星 <strong>0</strong></span>
+                </div>
+            </div>
+            <div class="meta">
+                <span id="dateText">日期: -</span>
+                <span id="countText">共 0 只</span>
+                <span id="updateText">更新: -</span>
+            </div>
+        </div>
+
+        <div id="status" class="status">
+            <div class="filter-bar">
+                <button type="button" class="filter-btn sort-low-btn" id="lowAboveSortBtn">低不碰排序</button>
+                <button type="button" class="filter-btn sort-bare-foot-btn" id="bareFootYangSortBtn">光脚阳线排序</button>
+                <button type="button" class="filter-btn" data-filter="ref_is_limit_up">是否涨停</button>
+                <button type="button" class="filter-btn" data-filter="ref_high_gain_gte_6_5_yang_low_above_ma5">拉升且不碰</button>
+                <button type="button" class="filter-btn" data-filter="ref_high_gain_ok">是否拉升</button>
+                <button type="button" class="filter-btn" data-filter="is_bare_foot_yang">是否光脚拉升</button>
+                <button type="button" class="filter-btn" data-filter="high_gain_10d_gte_5">是否5拉升</button>
+                <button type="button" class="export-excel-btn" id="exportExcelBtn">导出Excel</button>
+                <span class="filter-count" id="filterCount">正在加载数据...</span>
+            </div>
+        </div>
+        <div id="groups"></div>
+    </div>
+
+    <script>
+        let currentDate = '';
+        let availableDates = [];
+        let stocksData = [];
+        let datePicker = null;
+        let realtimeTimer = null;
+        let klineVisible = false;
+        let selectedKlineCode = '';
+        let scrollKlineRaf = 0;
+        const activeFilters = new Set();
+        let lowAboveSortDirection = '';
+        let bareFootYangSortDirection = '';
+
+        function toNumber(value, fallback = 0) {
+            const num = Number(value);
+            return Number.isFinite(num) ? num : fallback;
+        }
+
+        function formatPct(value) {
+            const num = toNumber(value, 0);
+            return `${num >= 0 ? '+' : ''}${num.toFixed(2)}%`;
+        }
+
+        function formatChangePct(value) {
+            const num = toNumber(value, 0);
+            const sign = num >= 0 ? '+' : '-';
+            return `<span class="pct-sign ${gainClass(num)}">${sign}</span><span class="pct-number">${Math.abs(num).toFixed(2)}%</span>`;
+        }
+
+        function gainClass(value) {
+            return toNumber(value, 0) >= 0 ? 'gain-up' : 'gain-down';
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function excelCell(value) {
+            return escapeHtml(value ?? '');
+        }
+
+        function shapeStatFlag(stock, primary, aliases = []) {
+            if (isTruthyFlag(stock?.[primary])) return true;
+            return aliases.some(field => isTruthyFlag(stock?.[field]));
+        }
+
+        function isNearlyBareHeadStock(stock) {
+            if (shapeStatFlag(stock, 'is_bare_head', ['is_nearly_bare_head'])) return true;
+            const o = toNumber(stock.ref_open, 0);
+            const c = toNumber(stock.ref_close, 0);
+            const h = toNumber(stock.ref_high, 0);
+            if (!o || !c || !h || c < o) return false;
+            const top = Math.max(o, c);
+            const upper = h - top;
+            return upper <= 0 || (top > 0 && upper / top * 100 < 0.1) || Math.abs(h - c) <= 0.01;
+        }
+
+        function isNearlyBareFootStock(stock) {
+            if (shapeStatFlag(stock, 'is_bare_foot', ['is_bare_foot_yang', 'is_nearly_bare_foot_yang'])) return true;
+            const o = toNumber(stock.ref_open, 0);
+            const c = toNumber(stock.ref_close, 0);
+            const l = toNumber(stock.ref_low, 0);
+            if (!o || !c || !l || c < o) return false;
+            const bottom = Math.min(o, c);
+            const lower = bottom - l;
+            return lower <= 0 || (bottom > 0 && lower / bottom * 100 < 0.1) || Math.abs(l - o) <= 0.01;
+        }
+
+        function isShortHeadFootDojiStock(stock) {
+            if (shapeStatFlag(stock, 'is_short_head_foot_doji')) return true;
+            const o = toNumber(stock.ref_open, 0);
+            const c = toNumber(stock.ref_close, 0);
+            const h = toNumber(stock.ref_high, 0);
+            const l = toNumber(stock.ref_low, 0);
+            const prev = toNumber(stock.ref_prev_close, 0);
+            if (!o || !c || !h || !l || prev <= 0) return false;
+            const body = Math.abs(c - o);
+            if (body <= 0 || Math.abs(c - o) / prev * 100 > 1.9) return false;
+            const upper = Math.max(h - Math.max(o, c), 0);
+            const lower = Math.max(Math.min(o, c) - l, 0);
+            return upper < body && lower < body;
+        }
+
+        function updateShapeStats(sourceStocks) {
+            const stocks = sourceStocks || [];
+            const bareHead = stocks.filter(isNearlyBareHeadStock).length;
+            const bareFoot = stocks.filter(isNearlyBareFootStock).length;
+            const shortDoji = stocks.filter(isShortHeadFootDojiStock).length;
+            const el = document.getElementById('shapeStats');
+            if (!el) return;
+            el.innerHTML = `
+                <span class="shape-stat">几乎光头 <strong>${bareHead}</strong></span>
+                <span class="shape-stat">几乎光脚 <strong>${bareFoot}</strong></span>
+                <span class="shape-stat">短头短脚十字星 <strong>${shortDoji}</strong></span>
+            `;
+        }
+
+        async function loadDates() {
+            const response = await fetch('/api/10above5/dates');
+            const result = await response.json();
+            availableDates = result.success ? (result.dates || []) : [];
+            currentDate = availableDates[0] || new Date().toISOString().slice(0, 10);
+
+            datePicker = flatpickr('#datePicker', {
+                locale: 'zh',
+                dateFormat: 'Y-m-d',
+                defaultDate: currentDate,
+                enable: availableDates.length ? availableDates : undefined,
+                onChange: function(selectedDates, dateStr) {
+                    currentDate = dateStr;
+                    loadStocks();
+                }
+            });
+        }
+
+        async function loadStocks() {
+            clearInterval(realtimeTimer);
+            updateFilterCount('正在加载数据...');
+            const url = currentDate ? `/api/10above5/stocks?date=${encodeURIComponent(currentDate)}` : '/api/10above5/stocks';
+            const response = await fetch(url, { cache: 'no-store' });
+            const result = await response.json();
+            if (!result.success) {
+                updateFilterCount(`加载失败: ${result.error || '未知错误'}`);
+                return;
+            }
+
+            stocksData = result.data || [];
+            currentDate = result.date || currentDate;
+            document.getElementById('dateText').textContent = `日期: ${currentDate}`;
+            document.getElementById('countText').textContent = `共 ${stocksData.length} 只`;
+            document.getElementById('updateText').textContent = `更新: ${result.update_time || '-'}`;
+            if (datePicker && currentDate) {
+                datePicker.setDate(currentDate, false);
+            }
+            renderGroups();
+            startRealtimeRefresh();
+        }
+
+        function isTruthyFlag(value) {
+            return value === true || value === 1 || value === '1' || value === 'true' || value === 'True';
+        }
+
+        function filteredStocks() {
+            if (!activeFilters.size) {
+                return stocksData.slice();
+            }
+            return stocksData.filter(stock => Array.from(activeFilters).every(field => isTruthyFlag(stock[field])));
+        }
+
+        function updateFilterCount(text) {
+            const el = document.getElementById('filterCount');
+            if (el) {
+                el.textContent = text;
+            }
+        }
+
+        function closeAboveMa5Count(stock) {
+            return toNumber(stock.close_above_ma5_count_10d ?? stock.close_above_ma5_10d_count, 0);
+        }
+
+        function bareFootYangCount10d(stock) {
+            return toNumber(stock.bare_foot_yang_count_10d ?? stock.almost_bare_foot_yang_count, 0);
+        }
+
+        function isHighGainLowAboveStock(stock) {
+            return toNumber(stock.low_above_ma5_count, 0) >= 4 && isTruthyFlag(stock.ref_high_gain_ok);
+        }
+
+        function buildLowAboveGroups(stocks) {
+            const groups = new Map();
+            stocks.filter(isHighGainLowAboveStock).forEach(stock => {
+                const count = toNumber(stock.low_above_ma5_count, 0);
+                if (!groups.has(count)) {
+                    groups.set(count, []);
+                }
+                groups.get(count).push(stock);
+            });
+            return Array.from(groups.entries())
+                .sort((a, b) => b[0] - a[0])
+                .map(([count, rows]) => ({
+                    count,
+                    stocks: rows.slice().sort((a, b) => toNumber(b.today_change, 0) - toNumber(a.today_change, 0))
+                }));
+        }
+
+        function buildColumns(sourceStocks) {
+            return [10, 9].map(count => {
+                const stocks = sourceStocks
+                    .filter(stock => closeAboveMa5Count(stock) === count)
+                    .sort((a, b) => {
+                        if (bareFootYangSortDirection) {
+                            const diff = bareFootYangCount10d(a) - bareFootYangCount10d(b);
+                            if (diff !== 0) {
+                                return bareFootYangSortDirection === 'asc' ? diff : -diff;
+                            }
+                        }
+                        if (lowAboveSortDirection) {
+                            const diff = toNumber(a.low_above_ma5_count, 0) - toNumber(b.low_above_ma5_count, 0);
+                            if (diff !== 0) {
+                                return lowAboveSortDirection === 'asc' ? diff : -diff;
+                            }
+                        }
+                        return toNumber(b.today_change, 0) - toNumber(a.today_change, 0);
+                    });
+                return { count, stocks };
+            });
+        }
+
+        function renderGroups() {
+            const container = document.getElementById('groups');
+            const displayStocks = filteredStocks();
+            if (!stocksData.length) {
+                updateShapeStats([]);
+                updateFilterCount('当前日期没有数据');
+                container.innerHTML = '<div class="empty">没有找到 10above5 数据</div>';
+                return;
+            }
+            if (!displayStocks.length) {
+                updateShapeStats([]);
+                updateFilterCount(`筛选后 0 只 / 共 ${stocksData.length} 只`);
+                container.innerHTML = '<div class="empty">当前筛选条件下没有股票</div>';
+                return;
+            }
+
+            const columns = buildColumns(displayStocks);
+            const visibleCount = columns.reduce((sum, group) => sum + group.stocks.length, 0);
+            updateShapeStats(columns.flatMap(group => group.stocks));
+            updateFilterCount(`筛选后 ${visibleCount} 只 / 共 ${stocksData.length} 只`);
+            const html = columns.map(group => `
+                <section class="group">
+                    <div class="group-header">
+                        <span>收盘价 > MA5 次数 = ${group.count}</span>
+                        <span class="group-count">${group.stocks.length} 只</span>
+                    </div>
+                    ${renderPriorityBlock(group)}
+                    ${renderStockTable(group.stocks)}
+                </section>
+            `).join('');
+            container.innerHTML = `<div class="groups-grid">${html}</div>`;
+            bindKlineHover();
+            restoreKlineSelection();
+        }
+
+        function renderTableHeader() {
+            return `
+                <thead>
+                    <tr>
+                        <th class="col-index">序号</th>
+                        <th class="col-code">代码</th>
+                        <th class="col-name">名称</th>
+                        <th class="col-number">涨跌幅</th>
+                        <th class="col-number low-above-cell">低不碰</th>
+                        <th class="col-number">光脚阳线</th>
+                        <th class="col-number">10日阴线</th>
+                        <th class="col-number">20日涨幅</th>
+                        <th class="col-number">最高涨幅</th>
+                        <th class="col-number">标签</th>
+                    </tr>
+                </thead>
+            `;
+        }
+
+        function renderStockTable(stocks, emptyText = '暂无数据') {
+            return `
+                <table>
+                    ${renderTableHeader()}
+                    <tbody>
+                        ${stocks.length ? stocks.map((stock, index) => renderRow(stock, index + 1)).join('') : `<tr><td colspan="10" class="empty">${escapeHtml(emptyText)}</td></tr>`}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function renderPriorityBlock(group) {
+            const lowGroups = buildLowAboveGroups(group.stocks);
+            const total = lowGroups.reduce((sum, item) => sum + item.stocks.length, 0);
+            let rowIndex = 1;
+            const rows = lowGroups.length
+                ? lowGroups.map(item => `
+                    <tr class="table-group-row">
+                        <td colspan="10">低不碰 = ${item.count}，拉升股 ${item.stocks.length} 只</td>
+                    </tr>
+                    ${item.stocks.map(stock => renderRow(stock, rowIndex++)).join('')}
+                `).join('')
+                : '<tr><td colspan="10" class="empty">暂无满足低不碰>=4且拉升的股票</td></tr>';
+            return `
+                <div class="priority-block">
+                    <div class="priority-header">
+                        <span>低不碰>=4 且拉升</span>
+                        <span>${total} 只</span>
+                    </div>
+                    <table>
+                        ${renderTableHeader()}
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function renderRow(stock, index) {
+            const badges = [];
+            if (toNumber(stock.is_limit_up, 0) || toNumber(stock.ref_is_limit_up, 0)) {
+                badges.push('<span class="badge">涨停</span>');
+            }
+            if (toNumber(stock.ref_high_gain_gte_6_5_yang_low_above_ma5, 0)) {
+                badges.push('<span class="badge">拉升不碰</span>');
+            }
+            if (toNumber(stock.is_bare_foot_yang, 0)) {
+                badges.push('<span class="badge">光脚</span>');
+            }
+            if (toNumber(stock.high_gain_10d_gte_5, 0)) {
+                badges.push('<span class="badge">5拉升</span>');
+            }
+            return `
+                <tr class="stock-row" data-code="${escapeHtml(stock.code)}" data-name="${escapeHtml(stock.name)}" data-change="${toNumber(stock.today_change, 0)}" data-break-count="${closeAboveMa5Count(stock)}" data-yin-count="${toNumber(stock.yin_count_10d ?? stock.yin_count_10, 0)}">
+                    <td data-label="序号">${index}</td>
+                    <td class="stock-code" data-label="代码">${escapeHtml(stock.code)}</td>
+                    <td class="stock-name" data-label="名称" title="${escapeHtml(stock.name)}">${escapeHtml(stock.name)}</td>
+                    <td data-label="涨跌幅" data-field="today_change">${formatChangePct(stock.today_change)}</td>
+                    <td class="low-above-cell" data-label="低不碰">${toNumber(stock.low_above_ma5_count, 0)}</td>
+                    <td data-label="光脚阳线">${bareFootYangCount10d(stock)}</td>
+                    <td data-label="10日阴线">${toNumber(stock.yin_count_10d ?? stock.yin_count_10, 0)}</td>
+                    <td data-label="20日涨幅">${formatPct(stock.gain_20d)}</td>
+                    <td data-label="最高涨幅">${formatPct(stock.max_gain)}</td>
+                    <td data-label="标签">${badges.join(' ') || '-'}</td>
+                </tr>
+            `;
+        }
+
+        function currentFilterText() {
+            const labels = [];
+            document.querySelectorAll('.filter-btn[data-filter]').forEach(button => {
+                if (activeFilters.has(button.dataset.filter)) {
+                    labels.push(button.textContent.trim());
+                }
+            });
+            return labels.length ? labels.join('、') : '全部';
+        }
+
+        function currentSortText() {
+            if (bareFootYangSortDirection === 'desc') return '光脚阳线由高到低';
+            if (bareFootYangSortDirection === 'asc') return '光脚阳线由低到高';
+            if (lowAboveSortDirection === 'desc') return '低不碰由高到低';
+            if (lowAboveSortDirection === 'asc') return '低不碰由低到高';
+            return '涨跌幅由高到低';
+        }
+
+        function buildExportRows(group, options = {}) {
+            let exportStocks = group.stocks.slice();
+            let separatorIndex = -1;
+            if (options.sortByLowAboveDesc) {
+                exportStocks.sort((a, b) => {
+                    const lowDiff = toNumber(b.low_above_ma5_count, 0) - toNumber(a.low_above_ma5_count, 0);
+                    if (lowDiff !== 0) return lowDiff;
+                    return toNumber(b.today_change, 0) - toNumber(a.today_change, 0);
+                });
+            } else if (options.sortByChangeDesc) {
+                exportStocks.sort((a, b) => toNumber(b.today_change, 0) - toNumber(a.today_change, 0));
+            }
+            if (options.splitLowAboveLte4) {
+                separatorIndex = exportStocks.findIndex(stock => toNumber(stock.low_above_ma5_count, 0) <= 4);
+            }
+            const rows = exportStocks.map((stock, index) => ({
+                index: index + 1,
+                code: stock.code,
+                name: stock.name,
+                today_change: formatPct(stock.today_change),
+                low_above_ma5_count: toNumber(stock.low_above_ma5_count, 0),
+                bare_foot_yang_count_10d: bareFootYangCount10d(stock),
+                yin_count_10d: toNumber(stock.yin_count_10d ?? stock.yin_count_10, 0),
+                gain_20d: formatPct(stock.gain_20d),
+                max_gain: formatPct(stock.max_gain),
+                limit_up: (toNumber(stock.is_limit_up, 0) || toNumber(stock.ref_is_limit_up, 0)) ? '是' : '',
+                high_gain_no_touch: isTruthyFlag(stock.ref_high_gain_gte_6_5_yang_low_above_ma5) ? '是' : '',
+                five_rise: isTruthyFlag(stock.high_gain_10d_gte_5) ? '是' : '',
+                bare_foot: isNearlyBareFootStock(stock) ? '是' : '',
+                bare_head: isNearlyBareHeadStock(stock) ? '是' : '',
+                short_doji: isShortHeadFootDojiStock(stock) ? '是' : ''
+            }));
+            rows.separatorIndex = separatorIndex;
+            return rows;
+        }
+
+        function excelXmlCell(value, styleId = 'Cell', type = 'String') {
+            return `<Cell ss:StyleID="${styleId}"><Data ss:Type="${type}">${excelCell(value)}</Data></Cell>`;
+        }
+
+        function excelXmlRow(cells) {
+            return `<Row>${cells.join('')}</Row>`;
+        }
+
+        function buildExportWorksheet(group, headerCells, metaText, shapeText, options = {}) {
+            const rows = buildExportRows(group, options);
+            const title = options.title || `收盘价 > MA5 次数 = ${group.count}`;
+            const sheetName = options.sheetName || `次数${group.count}`;
+            const bodyRows = rows.map((row, rowIndex) => {
+                const spacer = rows.separatorIndex === rowIndex
+                    ? '<Row></Row><Row></Row>'
+                    : '';
+                return spacer + excelXmlRow([
+                excelXmlCell(row.index, 'Center', 'Number'),
+                excelXmlCell(row.code, 'Text'),
+                excelXmlCell(row.name, 'Cell'),
+                excelXmlCell(row.today_change, toNumber(String(row.today_change).replace('%', ''), 0) >= 0 ? 'Up' : 'Down'),
+                excelXmlCell(row.low_above_ma5_count, 'Strong', 'Number'),
+                excelXmlCell(row.bare_foot_yang_count_10d, 'Center', 'Number'),
+                excelXmlCell(row.yin_count_10d, 'Center', 'Number'),
+                excelXmlCell(row.gain_20d, 'Center'),
+                excelXmlCell(row.max_gain, 'Center'),
+                excelXmlCell(row.limit_up, 'Center'),
+                excelXmlCell(row.high_gain_no_touch, 'Center'),
+                excelXmlCell(row.five_rise, 'Center'),
+                excelXmlCell(row.bare_foot, 'Center'),
+                excelXmlCell(row.bare_head, 'Center'),
+                excelXmlCell(row.short_doji, 'Center')
+                ]);
+            }).join('');
+            const emptyRow = rows.length ? '' : excelXmlRow([excelXmlCell('暂无数据', 'Center')]);
+            return `
+                <Worksheet ss:Name="${excelCell(sheetName)}">
+                    <Table>
+                        <Column ss:Width="48"/>
+                        <Column ss:Width="78"/>
+                        <Column ss:Width="98"/>
+                        <Column ss:Width="72"/>
+                        <Column ss:Width="62"/>
+                        <Column ss:Width="76"/>
+                        <Column ss:Width="68"/>
+                        <Column ss:Width="76"/>
+                        <Column ss:Width="76"/>
+                        <Column ss:Width="52"/>
+                        <Column ss:Width="72"/>
+                        <Column ss:Width="58"/>
+                        <Column ss:Width="68"/>
+                        <Column ss:Width="68"/>
+                        <Column ss:Width="112"/>
+                        <Row><Cell ss:MergeAcross="${headerCells.length - 1}" ss:StyleID="Title"><Data ss:Type="String">${excelCell(title)}</Data></Cell></Row>
+                        <Row><Cell ss:MergeAcross="${headerCells.length - 1}" ss:StyleID="Meta"><Data ss:Type="String">${excelCell(metaText)}</Data></Cell></Row>
+                        <Row><Cell ss:MergeAcross="${headerCells.length - 1}" ss:StyleID="Meta"><Data ss:Type="String">${excelCell(shapeText)}</Data></Cell></Row>
+                        ${excelXmlRow(headerCells.map(cell => excelXmlCell(cell, 'Header')))}
+                        ${bodyRows || emptyRow}
+                    </Table>
+                    <WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">
+                        <FreezePanes/>
+                        <FrozenNoSplit/>
+                        <SplitHorizontal>4</SplitHorizontal>
+                        <TopRowBottomPane>4</TopRowBottomPane>
+                        <ActivePane>2</ActivePane>
+                    </WorksheetOptions>
+                </Worksheet>
+            `;
+        }
+
+        function exportVisibleExcel() {
+            const columns = buildColumns(filteredStocks());
+            const totalRows = columns.reduce((sum, group) => sum + group.stocks.length, 0);
+            if (!totalRows) {
+                alert('当前没有可导出的股票');
+                return;
+            }
+            const shapeText = document.getElementById('shapeStats')?.textContent.replace(/\s+/g, ' ').trim() || '';
+            const totalText = document.getElementById('filterCount')?.textContent || '';
+            const headerCells = ['序号', '代码', '名称', '涨跌幅', '低不碰', '光脚阳线次数', '10日阴线', '20日涨幅', '最高涨幅', '涨停', '拉升不碰', '5拉升', '几乎光脚', '几乎光头', '短头短脚十字星'];
+            const lowSortMetaText = `日期：${currentDate || '-'}　${totalText}　筛选：${currentFilterText()}　排序：低不碰由高到低`;
+            const changeSortMetaText = `日期：${currentDate || '-'}　${totalText}　筛选：${currentFilterText()}　排序：涨跌幅由高到低`;
+            const count10Group = columns.find(group => group.count === 10) || { count: 10, stocks: [] };
+            const count9Group = columns.find(group => group.count === 9) || { count: 9, stocks: [] };
+            const worksheets = [
+                buildExportWorksheet(count10Group, headerCells, lowSortMetaText, shapeText, {
+                    sheetName: '低不碰次数10',
+                    title: '低不碰次数10',
+                    sortByLowAboveDesc: true,
+                    splitLowAboveLte4: true
+                }),
+                buildExportWorksheet(count9Group, headerCells, lowSortMetaText, shapeText, {
+                    sheetName: '低不碰次数9',
+                    title: '低不碰次数9',
+                    sortByLowAboveDesc: true,
+                    splitLowAboveLte4: true
+                }),
+                buildExportWorksheet(count10Group, headerCells, changeSortMetaText, shapeText, {
+                    sheetName: '次数10',
+                    title: '收盘价 > MA5 次数 = 10',
+                    sortByChangeDesc: true
+                }),
+                buildExportWorksheet(count9Group, headerCells, changeSortMetaText, shapeText, {
+                    sheetName: '次数9',
+                    title: '收盘价 > MA5 次数 = 9',
+                    sortByChangeDesc: true
+                })
+            ].join('');
+            const workbook = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+          xmlns:o="urn:schemas-microsoft-com:office:office"
+          xmlns:x="urn:schemas-microsoft-com:office:excel"
+          xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+    <Styles>
+        <Style ss:ID="Cell">
+            <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+            <Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E5E7EB"/></Borders>
+            <Font ss:FontName="Microsoft YaHei" ss:Size="10"/>
+        </Style>
+        <Style ss:ID="Text" ss:Parent="Cell"><NumberFormat ss:Format="@"/></Style>
+        <Style ss:ID="Center" ss:Parent="Cell"/>
+        <Style ss:ID="Strong" ss:Parent="Cell"><Font ss:FontName="Microsoft YaHei" ss:Size="10" ss:Bold="1" ss:Color="#DC2626"/></Style>
+        <Style ss:ID="Up" ss:Parent="Cell"><Font ss:FontName="Microsoft YaHei" ss:Size="10" ss:Bold="1" ss:Color="#DC2626"/></Style>
+        <Style ss:ID="Down" ss:Parent="Cell"><Font ss:FontName="Microsoft YaHei" ss:Size="10" ss:Bold="1" ss:Color="#2563EB"/></Style>
+        <Style ss:ID="Header" ss:Parent="Cell"><Interior ss:Color="#7C3AED" ss:Pattern="Solid"/><Font ss:FontName="Microsoft YaHei" ss:Size="10" ss:Bold="1" ss:Color="#FFFFFF"/></Style>
+        <Style ss:ID="Title" ss:Parent="Cell"><Interior ss:Color="#F5F3FF" ss:Pattern="Solid"/><Font ss:FontName="Microsoft YaHei" ss:Size="15" ss:Bold="1" ss:Color="#111827"/></Style>
+        <Style ss:ID="Meta" ss:Parent="Cell"><Interior ss:Color="#F8FAFC" ss:Pattern="Solid"/><Font ss:FontName="Microsoft YaHei" ss:Size="10" ss:Bold="1" ss:Color="#374151"/></Style>
+    </Styles>
+    ${worksheets}
+</Workbook>`;
+            const blob = new Blob(['\ufeff', workbook], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+            const link = document.createElement('a');
+            const datePart = String(currentDate || new Date().toISOString().slice(0, 10)).replace(/-/g, '');
+            link.href = URL.createObjectURL(blob);
+            link.download = `10天大5日线_${datePart}.xls`;
+            document.body.appendChild(link);
+            link.click();
+            setTimeout(() => {
+                URL.revokeObjectURL(link.href);
+                link.remove();
+            }, 0);
+        }
+
+        function getEastMoneyPrefix(code) {
+            return String(code || '').startsWith('6') ? '1' : '0';
+        }
+
+        function showKline(event, code, name, change, breakCount, yinCount) {
+            if (!code) {
+                return;
+            }
+            const tooltip = document.getElementById('klineTooltip');
+            const image = document.getElementById('klineImage');
+            const header = document.getElementById('klineTooltipHeader');
+            const prefix = getEastMoneyPrefix(code);
+            const displayChange = toNumber(change, 0);
+            const displayBreakCount = toNumber(breakCount, 0);
+            const displayYinCount = toNumber(yinCount, 0);
+            const breakCountClass = displayBreakCount <= 2 ? 'kline-break-count is-low' : 'kline-break-count';
+            const yinCountClass = displayYinCount <= 4 ? 'kline-yin-count is-low' : 'kline-yin-count';
+            image.src = `https://webquoteklinepic.eastmoney.com/GetPic.aspx?nid=${prefix}.${code}&imageType=KXL&token=44c9d251add88e27b65ed86506f6e5da&at=1`;
+            header.innerHTML = `
+                <div class="kline-summary">
+                    <span>${escapeHtml(name || '')} (${escapeHtml(code)})</span>
+                    <span>${formatChangePct(displayChange)}</span>
+                    <span>大5日线: <strong class="${breakCountClass}">${displayBreakCount}</strong></span>
+                    <span>阴线次数: <strong class="${yinCountClass}">${displayYinCount}</strong></span>
+                </div>
+            `;
+            moveKlineTooltip(event);
+            tooltip.style.display = 'block';
+            klineVisible = true;
+            selectedKlineCode = String(code);
+        }
+
+        function hideKline() {
+            const tooltip = document.getElementById('klineTooltip');
+            const image = document.getElementById('klineImage');
+            tooltip.style.display = 'none';
+            image.src = '';
+            klineVisible = false;
+            selectedKlineCode = '';
+            if (isTouchLikeDevice()) {
+                clearKlineSelection();
+            }
+        }
+
+        function moveKlineTooltip(event) {
+            const tooltip = document.getElementById('klineTooltip');
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                tooltip.style.left = '10px';
+                tooltip.style.right = '10px';
+                tooltip.style.top = 'auto';
+                tooltip.style.bottom = '18px';
+                return;
+            }
+            const tooltipWidth = isMobile ? Math.min(600, window.innerWidth - 20) : 700;
+            const tooltipHeight = isMobile ? 260 : 420;
+            let left = event.clientX + 15;
+            let top = event.clientY + 15;
+
+            if (left + tooltipWidth > window.innerWidth) {
+                left = event.clientX - tooltipWidth - 15;
+            }
+            if (top + tooltipHeight > window.innerHeight) {
+                top = event.clientY - tooltipHeight - 15;
+            }
+            if (left < 0) left = 10;
+            if (top < 0) top = 10;
+
+            tooltip.style.left = `${left}px`;
+            tooltip.style.top = `${top}px`;
+        }
+
+        function isTouchLikeDevice() {
+            return window.innerWidth <= 768 || (window.matchMedia && window.matchMedia('(hover: none), (pointer: coarse)').matches);
+        }
+
+        function clearKlineSelection() {
+            document.querySelectorAll('.stock-row.kline-selected').forEach(row => {
+                row.classList.remove('kline-selected');
+            });
+        }
+
+        function selectKlineRow(row, event) {
+            if (!row) {
+                return;
+            }
+            const sameSelected = row.classList.contains('kline-selected')
+                && klineVisible
+                && selectedKlineCode === String(row.dataset.code || '');
+            if (sameSelected) {
+                hideKline();
+                return;
+            }
+            clearKlineSelection();
+            row.classList.add('kline-selected');
+            showKline(event, row.dataset.code, row.dataset.name, row.dataset.change, row.dataset.breakCount, row.dataset.yinCount);
+        }
+
+        function restoreKlineSelection() {
+            if (!isTouchLikeDevice() || !klineVisible || !selectedKlineCode) {
+                return;
+            }
+            const row = Array.from(document.querySelectorAll('.stock-row'))
+                .find(item => String(item.dataset.code || '') === selectedKlineCode);
+            if (row) {
+                row.classList.add('kline-selected');
+            } else {
+                hideKline();
+            }
+        }
+
+        function klineVisibleBottomLimit() {
+            const tooltip = document.getElementById('klineTooltip');
+            if (tooltip && tooltip.style.display === 'block') {
+                const rect = tooltip.getBoundingClientRect();
+                if (rect.top > 0) {
+                    return rect.top - 8;
+                }
+            }
+            return window.innerHeight;
+        }
+
+        function isRowVisibleAboveKline(row) {
+            const rect = row.getBoundingClientRect();
+            const bottomLimit = klineVisibleBottomLimit();
+            return rect.bottom > 0 && rect.top < bottomLimit;
+        }
+
+        function findTopVisibleStockRow() {
+            const bottomLimit = klineVisibleBottomLimit();
+            const rows = Array.from(document.querySelectorAll('.stock-row'))
+                .map(row => ({ row, rect: row.getBoundingClientRect() }))
+                .filter(item => item.rect.bottom > 0 && item.rect.top < bottomLimit)
+                .sort((a, b) => Math.max(a.rect.top, 0) - Math.max(b.rect.top, 0));
+            return rows.length ? rows[0].row : null;
+        }
+
+        function updateKlineSelectionOnScroll() {
+            if (!isTouchLikeDevice() || !klineVisible) {
+                return;
+            }
+            const selectedRow = document.querySelector('.stock-row.kline-selected');
+            if (selectedRow && isRowVisibleAboveKline(selectedRow)) {
+                return;
+            }
+            const nextRow = findTopVisibleStockRow();
+            if (!nextRow) {
+                return;
+            }
+            clearKlineSelection();
+            nextRow.classList.add('kline-selected');
+            showKline(
+                { clientX: window.innerWidth / 2, clientY: window.innerHeight - 40 },
+                nextRow.dataset.code,
+                nextRow.dataset.name,
+                nextRow.dataset.change,
+                nextRow.dataset.breakCount,
+                nextRow.dataset.yinCount
+            );
+        }
+
+        function bindKlineHover() {
+            document.querySelectorAll('.stock-row').forEach(row => {
+                row.addEventListener('mouseenter', event => {
+                    if (isTouchLikeDevice()) {
+                        return;
+                    }
+                    showKline(event, row.dataset.code, row.dataset.name, row.dataset.change, row.dataset.breakCount, row.dataset.yinCount);
+                });
+                row.addEventListener('mousemove', moveKlineTooltip);
+                row.addEventListener('mouseleave', hideKline);
+                row.addEventListener('click', event => {
+                    if (!isTouchLikeDevice()) {
+                        return;
+                    }
+                    selectKlineRow(row, event);
+                });
+            });
+        }
+
+        function syncFilterButtons() {
+            document.querySelectorAll('.filter-btn[data-filter]').forEach(button => {
+                button.classList.toggle('active', activeFilters.has(button.dataset.filter));
+            });
+        }
+
+        function syncLowAboveSortButton() {
+            const button = document.getElementById('lowAboveSortBtn');
+            if (!button) return;
+            button.classList.toggle('active', Boolean(lowAboveSortDirection));
+            button.textContent = lowAboveSortDirection === 'asc'
+                ? '低不碰排序 ↑'
+                : (lowAboveSortDirection === 'desc' ? '低不碰排序 ↓' : '低不碰排序');
+        }
+
+        function syncBareFootYangSortButton() {
+            const button = document.getElementById('bareFootYangSortBtn');
+            if (!button) return;
+            button.classList.toggle('active', Boolean(bareFootYangSortDirection));
+            button.textContent = bareFootYangSortDirection === 'asc'
+                ? '光脚阳线排序 ↑'
+                : (bareFootYangSortDirection === 'desc' ? '光脚阳线排序 ↓' : '光脚阳线排序');
+        }
+
+        function bindFilterButtons() {
+            document.querySelectorAll('.filter-btn[data-filter]').forEach(button => {
+                button.addEventListener('click', () => {
+                    const field = button.dataset.filter;
+                    if (activeFilters.has(field)) {
+                        activeFilters.delete(field);
+                    } else {
+                        activeFilters.add(field);
+                    }
+                    syncFilterButtons();
+                    renderGroups();
+                });
+            });
+
+            const lowAboveSortBtn = document.getElementById('lowAboveSortBtn');
+            if (lowAboveSortBtn) {
+                lowAboveSortBtn.addEventListener('click', () => {
+                    lowAboveSortDirection = lowAboveSortDirection === 'desc' ? 'asc' : 'desc';
+                    bareFootYangSortDirection = '';
+                    syncLowAboveSortButton();
+                    syncBareFootYangSortButton();
+                    renderGroups();
+                });
+                syncLowAboveSortButton();
+            }
+
+            const bareFootYangSortBtn = document.getElementById('bareFootYangSortBtn');
+            if (bareFootYangSortBtn) {
+                bareFootYangSortBtn.addEventListener('click', () => {
+                    bareFootYangSortDirection = bareFootYangSortDirection === 'desc' ? 'asc' : 'desc';
+                    lowAboveSortDirection = '';
+                    syncBareFootYangSortButton();
+                    syncLowAboveSortButton();
+                    renderGroups();
+                });
+                syncBareFootYangSortButton();
+            }
+
+            const exportExcelBtn = document.getElementById('exportExcelBtn');
+            if (exportExcelBtn) {
+                exportExcelBtn.addEventListener('click', exportVisibleExcel);
+            }
+        }
+
+        function bindKlineDismiss() {
+            document.addEventListener('click', event => {
+                if (!isTouchLikeDevice()) {
+                    return;
+                }
+                if (event.target.closest('.stock-row') || event.target.closest('.stock-tooltip')) {
+                    return;
+                }
+                hideKline();
+            });
+        }
+
+        function bindKlineScrollFollow() {
+            window.addEventListener('scroll', () => {
+                if (!isTouchLikeDevice() || !klineVisible) {
+                    return;
+                }
+                if (scrollKlineRaf) {
+                    return;
+                }
+                scrollKlineRaf = window.requestAnimationFrame(() => {
+                    scrollKlineRaf = 0;
+                    updateKlineSelectionOnScroll();
+                });
+            }, { passive: true });
+        }
+
+        async function refreshRealtime() {
+            if (!stocksData.length) {
+                return;
+            }
+            try {
+                const codes = stocksData.map(stock => stock.code).filter(Boolean);
+                const response = await fetch('/api/10above5/realtime', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ codes })
+                });
+                const result = await response.json();
+                if (!result.success || !result.data) {
+                    return;
+                }
+                let changed = false;
+                stocksData.forEach(stock => {
+                    const rt = result.data[stock.code];
+                    if (rt && typeof rt.change === 'number' && stock.today_change !== rt.change) {
+                        stock.today_change = rt.change;
+                        changed = true;
+                    }
+                });
+                if (changed) {
+                    renderGroups();
+                    document.getElementById('updateText').textContent = `更新: ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`;
+                }
+            } catch (error) {
+                console.error('[10above5][realtime] 请求失败:', error);
+            }
+        }
+
+        function startRealtimeRefresh() {
+            refreshRealtime();
+            realtimeTimer = setInterval(refreshRealtime, 3000);
+        }
+
+        function prevDate() {
+            const index = availableDates.indexOf(currentDate);
+            if (index >= 0 && index < availableDates.length - 1) {
+                currentDate = availableDates[index + 1];
+                loadStocks();
+            }
+        }
+
+        function nextDate() {
+            const index = availableDates.indexOf(currentDate);
+            if (index > 0) {
+                currentDate = availableDates[index - 1];
+                loadStocks();
+            }
+        }
+
+        async function init() {
+            try {
+                bindFilterButtons();
+                bindKlineDismiss();
+                bindKlineScrollFollow();
+                await loadDates();
+                await loadStocks();
+            } catch (error) {
+                document.getElementById('status').textContent = `初始化失败: ${error.message || error}`;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+        window.addEventListener('beforeunload', () => clearInterval(realtimeTimer));
+    </script>
+</body>
+</html>

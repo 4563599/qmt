@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+*.backup
+*.bak
+*.tmp
+node_modules/
+design-qa-*.png
+stock_web_exports/

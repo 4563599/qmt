@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5拉升小于2阴</title>
+    <!-- Flatpickr CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: #ffffff;
+            min-height: 100vh;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        .header h1 {
+            color: #1d1d1f;
+            font-size: 28px;
+            margin-bottom: 10px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .header .info {
+            color: #86868b;
+            font-size: 14px;
+            font-weight: 400;
+        }
+
+        .back-btn {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            transition: all 0.3s;
+            font-size: 15px;
+            font-weight: 500;
+            margin-right: 8px;
+            letter-spacing: 0.2px;
+        }
+
+        .back-btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+
+        .switch-btn {
+            display: inline-block;
+            padding: 6px 12px;
+            background: #4caf50;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            transition: all 0.3s;
+            font-size: 12px;
+        }
+
+        .switch-btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .nav-buttons {
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .nav-left {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .nav-right {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+            flex-wrap: wrap;
+            overflow-x: auto;
+            justify-content: flex-start;
+        }
+
+        .nav-btn {
+            display: inline-block;
+            padding: 5px 9px;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.3s;
+            font-size: 13px;
+            font-weight: 500;
+            letter-spacing: 0.1px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .nav-btn-home {
+            background: #667eea;
+        }
+
+        .nav-btn-home:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-5lsys3 {
+            background: #ec4899;
+        }
+
+        .nav-btn-5lsys3:hover {
+            background: #db2777;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-doji {
+            background: #f59e0b;
+        }
+
+        .nav-btn-doji:hover {
+            background: #d97706;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-up {
+            background: #0ea5e9;
+        }
+
+        .nav-btn-up:hover {
+            background: #0284c7;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-5lsy2 {
+            background: #ef4444;
+        }
+
+        .nav-btn-5lsy2:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-5ls {
+            background: #8b5cf6;
+        }
+
+        .nav-btn-5ls:hover {
+            background: #7c3aed;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-yx205 {
+            background: #06b6d4;
+        }
+
+        .nav-btn-yx205:hover {
+            background: #0891b2;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-lszty {
+            background: #e11d48;
+        }
+
+        .nav-btn-lszty:hover {
+            background: #be123c;
+            transform: translateY(-2px);
+        }
+        .nav-btn-sbzt { background: #f43f5e; }
+        .nav-btn-sbzt:hover { background: #e11d48; transform: translateY(-2px); }
+        .nav-btn-ztorgj  { background: #d946ef; }
+        .nav-btn-ztorgj:hover  { background: #c026d3; transform: translateY(-2px); }
+
+        .nav-btn-ztqq { background: #7c3aed; }
+        .nav-btn-ztqq:hover { background: #6d28d9; transform: translateY(-2px); }
+
+        .nav-btn-jpgz {
+            background: #f59e0b;
+        }
+
+        .nav-btn-jpgz:hover {
+            background: #d97706;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-yhy {
+            background: #e11d48;
+        }
+
+        .nav-btn-yhy:hover {
+            background: #be123c;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-5las3gj {
+            background: #f97316;
+        }
+
+        .nav-btn-5las3gj:hover {
+            background: #ea6c0a;
+            transform: translateY(-2px);
+        }
+
+        /* 日期选择器样式 */
+        .date-selector {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: white;
+            padding: 4px 8px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .date-nav-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 5px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+            font-weight: 500;
+            min-width: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .date-nav-btn:hover {
+            background: #5568d3;
+            transform: scale(1.05);
+        }
+
+        .date-nav-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: scale(1);
+        }
+
+        #datePicker {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.2px;
+            text-align: center;
+            width: auto;
+            min-width: 95px;
+            max-width: 105px;
+        }
+
+        #datePicker:hover {
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        /* Flatpickr 自定义样式 */
+        .flatpickr-calendar {
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3) !important;
+            border-radius: 12px !important;
+            border: none !important;
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', sans-serif !important;
+        }
+
+        .flatpickr-day.selected {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            border-color: #667eea !important;
+        }
+
+        .flatpickr-day.selected:hover {
+            background: linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%) !important;
+        }
+
+        .flatpickr-day:hover {
+            background: rgba(102, 126, 234, 0.1) !important;
+            border-color: rgba(102, 126, 234, 0.3) !important;
+        }
+
+        .flatpickr-months .flatpickr-month {
+            background: #667eea !important;
+            color: white !important;
+        }
+
+        .flatpickr-current-month .flatpickr-monthDropdown-months {
+            background: #667eea !important;
+            color: white !important;
+        }
+
+        .flatpickr-weekdays {
+            background: #f2f2f7 !important;
+        }
+
+        span.flatpickr-weekday {
+            color: #8e8e93 !important;
+            font-weight: 600 !important;
+        }
+
+        /* 提示栏样式 */
+        .tips-panel {
+            position: fixed;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+            width: 240px;
+            z-index: 1000;
+        }
+
+        .tips-panel .tips-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            text-align: center;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+            padding-bottom: 10px;
+        }
+
+        .tips-panel .tips-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .tips-panel .tips-list li {
+            padding: 8px 0;
+            font-size: 13px;
+            line-height: 1.6;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .tips-panel .tips-list li::before {
+            content: "●";
+            margin-right: 8px;
+            color: #ffd700;
+            flex-shrink: 0;
+        }
+
+        /* 移动端隐藏提示栏 */
+        @media (max-width: 768px) {
+            .tips-panel {
+                display: none;
+            }
+        }
+
+        .stats {
+            display: flex;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .stat-item {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 6px;
+            flex: 1;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 11px;
+            margin-bottom: 3px;
+        }
+
+        .stat-value {
+            color: #333;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .table-container {
+            background: white;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #e3f2fd;
+            color: #333;
+        }
+
+        th {
+            padding: 10px 12px;
+            text-align: center;
+            font-weight: 600;
+            white-space: nowrap;
+            font-size: 15px;
+            letter-spacing: 0.3px;
+        }
+
+        tbody tr {
+            border-bottom: 1px solid #eee;
+            transition: all 0.3s;
+        }
+
+        tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        td {
+            padding: 10px 12px;
+            color: #1d1d1f;
+            font-size: 15px;
+            font-weight: 500;
+            letter-spacing: 0.2px;
+            text-align: center;
+        }
+
+        .positive {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .negative {
+            color: #27ae60;
+            font-weight: bold;
+        }
+
+        .neutral {
+            color: #95a5a6;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 30px;
+            color: #999;
+            font-size: 13px;
+        }
+
+        .update-time {
+            color: #666;
+            font-size: 10px;
+            margin-top: 8px;
+            text-align: right;
+        }
+
+        /* K线图提示框样式 */
+        .stock-tooltip {
+            position: fixed;
+            display: none;
+            background: #fff;
+            border: 1px solid #e1e1e1;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            z-index: 10000;
+            pointer-events: none;
+        }
+
+        /* body移动端适配 */
+        body {
+            padding: 10px;
+        }
+
+        /* 标题移动端适配 */
+        h1, .header h1 {
+            font-size: 20px !important;
+            padding: 10px !important;
+        }
+
+        .info, .header .info {
+            font-size: 11px !important;
+            padding: 0 10px 10px !important;
+        }
+
+        /* 返回按钮移动端适配 */
+        .back-btn {
+            font-size: 13px !important;
+            padding: 6px 12px !important;
+        }
+
+        .stock-tooltip img {
+            display: block;
+            width: 680px;
+            height: 380px;
+            background: #f5f5f7;
+        }
+
+        .stock-tooltip .tooltip-header {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+
+        .stock-cell {
+            cursor: pointer;
+        }
+
+        .stock-cell:hover {
+            color: #667eea;
+        }
+
+        /* 最新股票标记样式 */
+        .stock-name {
+            position: relative;
+            display: inline-block;
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .stock-code {
+            font-weight: 600;
+        }
+
+        .stock-number {
+            font-weight: 600;
+            color: #86868b;
+            text-align: center;
+        }
+
+        .new-badge {
+            position: absolute;
+            top: -6px;
+            right: -10px;
+            background: linear-gradient(135deg, #af52de, #bf6ee0);
+            color: white;
+            font-size: 8px;
+            font-weight: 700;
+            padding: 1px 4px;
+            border-radius: 6px;
+        }
+
+        /* 分组显示样式 */
+        .group-container {
+            margin-bottom: 15px;
+        }
+
+        .group-header {
+            background: #f5f5f5;
+            color: #1d1d1f;
+            padding: 12px 15px;
+            border-radius: 0;
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #e0e0e0;
+            border-bottom: none;
+            letter-spacing: 0.3px;
+        }
+
+        .group-header .group-name {
+            font-size: 17px;
+            font-weight: 600;
+        }
+
+        .group-header .stock-count {
+            font-size: 15px;
+            font-weight: 500;
+        }
+
+        .group-highlight {
+            color: #a855f7;
+            font-weight: 700;
+            font-size: 18px;
+            opacity: 0.7;
+        }
+
+        .group-table-container {
+            background: white;
+            padding: 0;
+            border: 1px solid #e0e0e0;
+            border-top: none;
+            border-radius: 0;
+            overflow-x: auto;
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            .stock-tooltip {
+                max-width: 95vw;
+            }
+            .stock-tooltip img {
+                width: 100%;
+                max-width: 600px;
+                height: auto;
+            }
+            .new-badge {
+                font-size: 8px;
+                padding: 1px 4px;
+                top: -6px;
+                right: -10px;
+            }
+            .group-header {
+                font-size: 14px;
+            }
+            .group-header .group-name {
+                font-size: 16px;
+            }
+
+            .nav-container {
+                flex-direction: column;
+                gap: 12px;
+                padding: 12px;
+            }
+
+            .nav-left, .nav-right {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .nav-right {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .nav-btn {
+                flex: 1 1 calc(50% - 4px);
+                min-width: 0;
+                padding: 8px 6px;
+                font-size: 12px;
+                white-space: normal;
+                word-break: keep-all;
+                line-height: 1.3;
+                text-align: center;
+            }
+
+            /* 日期选择器移动端优化 */
+            .date-selector {
+                width: 100%;
+                justify-content: center;
+                padding: 6px 10px;
+            }
+
+            .date-nav-btn {
+                min-width: 36px;
+                padding: 8px 10px;
+                font-size: 14px;
+                touch-action: manipulation;
+            }
+
+            .date-display {
+                min-width: 120px;
+                max-width: 150px;
+                padding: 8px 12px;
+                font-size: 14px;
+                touch-action: manipulation;
+            }
+
+            /* 表格移动端适配 */
+            .stock-table {
+                font-size: 12px;
+            }
+
+            .stock-table th,
+            .stock-table td {
+                padding: 8px 4px;
+                font-size: 12px;
+            }
+
+            .stock-table th:first-child,
+            .stock-table td:first-child {
+                padding-left: 8px;
+            }
+
+            .stock-table th:last-child,
+            .stock-table td:last-child {
+                padding-right: 8px;
+            }
+
+            h1 {
+                font-size: 22px;
+                padding: 12px;
+            }
+
+            .info {
+                font-size: 12px;
+                padding: 0 12px 12px;
+            }
+
+            .container {
+                padding: 8px;
+            }
+
+            .table-container {
+                margin-bottom: 15px;
+            }
+        }
+        .page-title {
+            background: white;
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .page-title h1 { font-size: 22px; font-weight: 700; color: #1d1d1f; letter-spacing: 0.3px; margin: 0; }
+        .page-title .badge { color: white; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+        .page-title .desc { color: #6b7280; font-size: 13px; }
+            /* mobile no-scroll baseline */
+        @media (max-width: 768px) {
+            body {
+                overflow-x: hidden;
+            }
+            .container,
+            .content,
+            .table-container,
+            .group-table-container,
+            .table-wrap {
+                max-width: 100%;
+                overflow-x: hidden !important;
+            }
+            table,
+            .stock-table {
+                width: 100%;
+                table-layout: fixed;
+            }
+            th,
+            td,
+            .stock-table th,
+            .stock-table td,
+            .stock-name,
+            .s-name,
+            .strategy-tag,
+            .nav-btn,
+            .group-title,
+            .group-name {
+                white-space: normal !important;
+                word-break: break-all;
+                overflow-wrap: anywhere;
+            }
+            #datePicker,
+            .date-display {
+                min-width: 0 !important;
+                width: 100%;
+                max-width: 100%;
+            }
+        }
+</style>
+</head>
+<body>
+    <!-- K线图提示框 -->
+    <div class="stock-tooltip" id="klineTooltip">
+        <div class="tooltip-header"></div>
+        <img id="klineImage" src="" alt="K线图">
+    </div>
+
+    <!-- 左侧提示栏 -->
+    <div class="tips-panel">
+        <div class="tips-title">5拉升小于2阴</div>
+        <ul class="tips-list">
+            <li>10天内拉升5次</li>
+            <li>10天内阴线少于2次</li>
+            <li>按阴线次数分组</li>
+            <li>0阴线最优质</li>
+            <li>1阴线次优</li>
+        </ul>
+    </div>
+
+    <div class="container">
+        <div class="nav-buttons">
+            <div class="nav-left">
+                <!-- 日期选择器 -->
+                <div class="date-selector">
+                    <button class="date-nav-btn" id="prevDateBtn" onclick="prevDate()">◀</button>
+                    <input type="text" id="datePicker" placeholder="选择日期" readonly>
+                    <button class="date-nav-btn" id="nextDateBtn" onclick="nextDate()">▶</button>
+                </div>
+            </div>
+            <div class="nav-right">
+                <a href="/" class="nav-btn nav-btn-home">首页</a>
+                <a href="/涨停前横盘" class="nav-btn" style="background:#2563eb;">涨停前横盘</a>
+                <a href="/阴后强" class="nav-btn nav-btn-yhy">阴后强</a>
+                <a href="/5拉升" class="nav-btn" style="background:#2563eb;">5拉升</a>
+                <a href="/20阴少跌少横盘" class="nav-btn nav-btn-yx205">20阴少跌少横盘</a>
+                <a href="/阴线跌破5日次数" class="nav-btn" style="background:#ca8a04;">阴线跌破5日次数</a>
+                <a href="/10天大5日线" class="nav-btn" style="background:#0f766e;">10天大5日线</a>
+                <a href="/涨停或光脚" class="nav-btn nav-btn-ztorgj">涨停或光脚</a>
+                <a href="/连续5不碰" class="nav-btn" style="background:#f43f5e;">连续5不碰</a>
+                <a href="/连续涨停" class="nav-btn nav-btn-lszty">连续涨停</a>
+                <a href="/连续4天拉升" class="nav-btn nav-btn-intraday4up" style="background:#f97316;">连续4天拉升</a>
+
+            </div>
+            <a href="/极品关注" class="nav-btn" style="background:#f59e0b;">极品关注</a>
+            <a href="/同花顺板块" class="nav-btn" style="background:#2563eb;">同花顺板块</a>
+        </div>
+        <div class="page-title">
+            <h1>5拉升小于2阴</h1>
+            <span class="badge" style="background: linear-gradient(135deg, #ef4444, #dc2626);">阴线分组</span>
+            <span class="desc">10天拉升5次 · 10天内阴线少于2次</span>
+        </div>
+        <div class="table-container">
+            <div id="loading" class="loading">正在加载数据...</div>
+            <div id="noData" class="no-data" style="display: none;">暂无数据</div>
+            <table id="stockTable" class="stock-table" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th>股票代码</th>
+                        <th>股票名称</th>
+                        <th>涨跌幅(%)</th>
+                        <th>10天内阴线次数</th>
+                        <th>市值(亿)</th>
+                        <th>预警时间</th>
+                    </tr>
+                </thead>
+                <tbody id="stockTableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let stocksData = [];
+        let lastTimestamp = null;
+        let currentDate = null;
+        let availableDates = [];
+        let currentDateIndex = 0;
+        let marketCapCache = {};
+        let fetchingMarketCap = {};
+
+        let latestTradeDate = new Date().toISOString().split('T')[0];
+        async function fetchLatestTradeDate() {
+            const todayKey = 'latestTradeDate_' + new Date().toISOString().split('T')[0];
+            const cached = localStorage.getItem(todayKey);
+            if (cached) { latestTradeDate = cached; return; }
+            try {
+                const resp = await fetch('/api/latest_trade_date');
+                const result = await resp.json();
+                if (result.success && result.date) {
+                    latestTradeDate = result.date;
+                    localStorage.setItem(todayKey, result.date);
+                }
+            } catch(e) {}
+        }
+
+        function loadTodayMarketCapCache() {
+            const today = new Date().toISOString().split('T')[0];
+            const cacheKey = `marketCap_5lsy2_${today}`;
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                try {
+                    marketCapCache = JSON.parse(cached);
+                } catch (e) {
+                    marketCapCache = {};
+                }
+            }
+            const keysToDelete = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('marketCap_5lsy2_')) {
+                    const cacheDate = key.replace('marketCap_5lsy2_', '');
+                    const daysDiff = Math.floor((new Date() - new Date(cacheDate)) / (1000 * 60 * 60 * 24));
+                    if (daysDiff > 3) keysToDelete.push(key);
+                }
+            }
+            keysToDelete.forEach(key => localStorage.removeItem(key));
+        }
+
+        function saveTodayMarketCapCache() {
+            const today = new Date().toISOString().split('T')[0];
+            const cacheKey = `marketCap_5lsy2_${today}`;
+            try {
+                localStorage.setItem(cacheKey, JSON.stringify(marketCapCache));
+            } catch (e) {}
+        }
+
+        async function loadDates() {
+            loadTodayMarketCapCache();
+            await fetchLatestTradeDate();
+            try {
+                const response = await fetch('/api/5lsy2/dates');
+                const result = await response.json();
+
+                const today = latestTradeDate;
+                currentDate = today;
+
+                if (result.success && result.dates && result.dates.length > 0) {
+                    availableDates = result.dates;
+                    currentDateIndex = availableDates.indexOf(today);
+                    if (currentDateIndex === -1) currentDateIndex = -1;
+                } else {
+                    availableDates = [];
+                    currentDateIndex = -1;
+                }
+
+                initFlatpickr();
+                loadStocks();
+            } catch (error) {
+                console.error('加载日期列表失败:', error);
+                const today = latestTradeDate;
+                currentDate = today;
+                availableDates = [];
+                currentDateIndex = -1;
+                initFlatpickr();
+                loadStocks();
+            }
+        }
+
+        let flatpickrInstance = null;
+
+        function initFlatpickr() {
+            flatpickrInstance = flatpickr("#datePicker", {
+                enable: availableDates,
+                dateFormat: "Y-m-d",
+                defaultDate: currentDate,
+                locale: {
+                    weekdays: {
+                        shorthand: ['日', '一', '二', '三', '四', '五', '六'],
+                        longhand: ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
+                    },
+                    months: {
+                        shorthand: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+                        longhand: ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月']
+                    }
+                },
+                onChange: function(selectedDates, dateStr, instance) {
+                    if (dateStr && dateStr !== currentDate) {
+                        currentDate = dateStr;
+                        currentDateIndex = availableDates.indexOf(dateStr);
+                        loadStocks(currentDate);
+                    }
+                }
+            });
+        }
+
+        function prevDate() {
+            if (currentDateIndex < availableDates.length - 1) {
+                currentDateIndex++;
+                currentDate = availableDates[currentDateIndex];
+                if (flatpickrInstance) flatpickrInstance.setDate(currentDate, false);
+                loadStocks();
+            }
+        }
+
+        function nextDate() {
+            if (currentDateIndex > 0) {
+                currentDateIndex--;
+                currentDate = availableDates[currentDateIndex];
+                if (flatpickrInstance) flatpickrInstance.setDate(currentDate, false);
+                loadStocks();
+            }
+        }
+
+        async function loadStocks() {
+            try {
+                const url = currentDate ? `/api/5lsy2/stocks?date=${currentDate}` : '/api/5lsy2/stocks';
+                const response = await fetch(url);
+                const result = await response.json();
+
+                if (result.refresh_interval) updateRefreshInterval(result.refresh_interval);
+
+                if (result.success && result.data && result.data.length > 0) {
+                    stocksData = result.data;
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('noData').style.display = 'none';
+                    renderTable();
+                    fetchMarketCapForZeroStocks();
+
+                    const today = latestTradeDate;
+                    if (currentDate === today) {
+                        await refreshRealtime();
+                    }
+                } else {
+                    stocksData = [];
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('noData').style.display = 'block';
+                    renderTable();
+                }
+            } catch (error) {
+                console.error('加载股票列表失败:', error);
+                document.getElementById('loading').textContent = '加载失败，请刷新页面重试';
+            }
+        }
+
+        async function fetchMarketCapForZeroStocks() {
+            const zeroMarketCapStocks = stocksData.filter(s => !s.market_cap || s.market_cap === 0);
+            if (zeroMarketCapStocks.length === 0) return;
+
+            for (const stock of zeroMarketCapStocks) {
+                const code = stock.code;
+                if (marketCapCache[code]) { stock.market_cap = marketCapCache[code]; continue; }
+                if (fetchingMarketCap[code]) continue;
+                fetchingMarketCap[code] = true;
+                try {
+                    const response = await fetch(`/api/5lsy2/market_cap/${code}`);
+                    const result = await response.json();
+                    if (result.success && result.market_cap) {
+                        stock.market_cap = result.market_cap;
+                        marketCapCache[code] = result.market_cap;
+                        saveTodayMarketCapCache();
+                        renderTable();
+                    }
+                } catch (error) {
+                    console.error(`获取市值失败 ${code}:`, error);
+                } finally {
+                    delete fetchingMarketCap[code];
+                }
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+        }
+
+        async function refreshRealtime() {
+            if (currentDateIndex !== 0) return;
+            if (stocksData.length === 0) return;
+
+            try {
+                const codes = stocksData.map(s => s.code);
+                const response = await fetch('/api/5lsy2/realtime', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ codes: codes })
+                });
+                const result = await response.json();
+
+                if (result.success && result.data) {
+                    let hasChange = false;
+                    stocksData.forEach(stock => {
+                        if (result.data[stock.code]) {
+                            const newChange = result.data[stock.code].change;
+                            if (stock.today_change !== newChange) {
+                                stock.today_change = newChange;
+                                hasChange = true;
+                            }
+                        }
+                    });
+                    if (hasChange) renderTable();
+                }
+            } catch (error) {
+                console.error('刷新实时行情失败:', error);
+            }
+        }
+
+        // 渲染表格（按10天阴线次数分组）
+        function renderTable() {
+            const tbody = document.getElementById('stockTableBody');
+            const table = document.getElementById('stockTable');
+            const loading = document.getElementById('loading');
+            const noData = document.getElementById('noData');
+
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            if (stocksData.length === 0) {
+                table.style.display = 'none';
+                noData.style.display = 'block';
+                loading.style.display = 'none';
+                return;
+            }
+
+            table.style.display = 'table';
+            noData.style.display = 'none';
+            loading.style.display = 'none';
+
+            // 按预警时间排序，找出最新的5个股票
+            const sortedByTime = [...stocksData].sort((a, b) => {
+                const timeA = a.warning_time || '0';
+                const timeB = b.warning_time || '0';
+                return timeB.localeCompare(timeA);
+            });
+
+            // 按10天阴线次数分组（0/1/2）
+            const groups = { 0: [], 1: [], 2: [] };
+
+            stocksData.forEach(stock => {
+                const yinCount = stock.yin_count_10 || 0;
+                if (yinCount === 0) groups[0].push(stock);
+                else if (yinCount === 1) groups[1].push(stock);
+                else groups[2].push(stock);
+            });
+
+            const groupOrder = [0, 1, 2];
+            let globalIndex = 0;
+
+            groupOrder.forEach(yinCount => {
+                const groupData = groups[yinCount];
+                if (!groupData || groupData.length === 0) return;
+
+                // 按涨跌幅排序
+                groupData.sort((a, b) => (b.today_change || 0) - (a.today_change || 0));
+
+                // 分组标题行
+                const headerRow = document.createElement('tr');
+                headerRow.className = 'group-header-row';
+                headerRow.innerHTML = `
+                    <td colspan="8" style="background: #F3F4F6; color: #374151; padding: 12px; font-weight: 600; font-size: 14px; text-align: left; border-bottom: 2px solid #E5E7EB;">
+                        【${yinCount}阴线】 ${groupData.length}只
+                    </td>
+                `;
+                tbody.appendChild(headerRow);
+
+                groupData.forEach((stock) => {
+                    globalIndex++;
+                    const row = document.createElement('tr');
+
+                    row.addEventListener('mouseenter', (e) => showKline(e, stock.code, stock.name));
+                    row.addEventListener('mouseleave', hideKline);
+                    row.addEventListener('mousemove', moveTooltip);
+
+                    const change = stock.today_change || 0;
+                    let changeClass = 'neutral';
+                    if (change > 0) changeClass = 'positive';
+                    else if (change < 0) changeClass = 'negative';
+
+                    const newIndex = sortedByTime.findIndex(s => s.code === stock.code);
+                    const isNew = newIndex < 5;
+                    const badge = isNew ? `<span class="new-badge">${newIndex + 1}</span>` : '';
+
+                    row.innerHTML = `
+                        <td>${globalIndex}</td>
+                        <td>${stock.code}</td>
+                        <td class="stock-cell"><span class="stock-name">${stock.name}${badge}</span></td>
+                        <td class="${changeClass}">${change > 0 ? '+' : ''}${change.toFixed(2)}%</td>
+                        <td>${stock.yin_count_10 || 0}</td>
+                        <td><span data-market-cap-code="${stock.code}" data-market-cap-decimals="2" data-market-cap-unit="">${(stock.market_cap || 0).toFixed(2)}</span></td>
+                        <td>${stock.warning_time || '-'}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            });
+        }
+
+        // 动态刷新间隔
+        let checkUpdateInterval = 3000;
+        let realtimeRefreshInterval = 3000;
+        let checkUpdateTimer = null;
+        let refreshRealtimeTimer = null;
+
+        function updateRefreshInterval(newInterval) {
+            if (newInterval && checkUpdateInterval !== newInterval * 1000) {
+                checkUpdateInterval = newInterval * 1000;
+                restartCheckUpdateTimer();
+            }
+        }
+
+        function restartCheckUpdateTimer() {
+            if (checkUpdateTimer) clearInterval(checkUpdateTimer);
+            checkUpdateTimer = setInterval(checkUpdate, checkUpdateInterval);
+        }
+
+        function startRealtimeRefreshTimer() {
+            if (refreshRealtimeTimer) clearInterval(refreshRealtimeTimer);
+            refreshRealtimeTimer = setInterval(refreshRealtime, realtimeRefreshInterval);
+        }
+
+        async function checkUpdate() {
+            const today = latestTradeDate;
+            if (currentDate !== today) return;
+
+            try {
+                const response = await fetch('/api/5lsy2/check_update');
+                const result = await response.json();
+
+                if (result.refresh_interval) updateRefreshInterval(result.refresh_interval);
+
+                if (result.success && result.updated) {
+                    const newTimestamp = result.timestamp;
+                    const newCount = result.count || 0;
+
+                    if (lastTimestamp === null) {
+                        lastTimestamp = newTimestamp;
+                    } else if (newTimestamp !== lastTimestamp) {
+                        lastTimestamp = newTimestamp;
+                        await loadStocks(currentDate);
+                    } else if (newCount === 0 && stocksData.length > 0) {
+                        lastTimestamp = newTimestamp;
+                        await loadStocks(currentDate);
+                    }
+                } else if (result.success && !result.updated) {
+                    if (result.timestamp === null && stocksData.length > 0 && lastTimestamp !== null) {
+                        lastTimestamp = null;
+                        stocksData = [];
+                        renderTable();
+                    }
+                }
+            } catch (error) {
+                console.error('检查更新失败:', error);
+            }
+        }
+
+        // 初始化
+        loadDates();
+        checkUpdateTimer = setInterval(checkUpdate, checkUpdateInterval);
+        refreshRealtimeTimer = setInterval(refreshRealtime, realtimeRefreshInterval);
+
+        console.log('🚀 5拉升小于2阴页面初始化完成');
+
+        // K线图相关功能
+        const tooltip = document.getElementById('klineTooltip');
+        const klineImg = document.getElementById('klineImage');
+
+        function getEastMoneyPrefix(code) {
+            return code.startsWith('6') ? '1' : '0';
+        }
+
+        function showKline(e, code, name) {
+            const emPrefix = getEastMoneyPrefix(code);
+            klineImg.src = `https://webquoteklinepic.eastmoney.com/GetPic.aspx?nid=${emPrefix}.${code}&imageType=KXL&token=44c9d251add88e27b65ed86506f6e5da&at=1`;
+            tooltip.querySelector('.tooltip-header').innerText = `${name} (${code}) - 日K线`;
+            moveTooltip(e);
+            tooltip.style.display = 'block';
+        }
+
+        function hideKline() {
+            tooltip.style.display = 'none';
+            klineImg.src = '';
+        }
+
+        function moveTooltip(e) {
+            const isMobile = window.innerWidth <= 768;
+            const tooltipWidth = isMobile ? Math.min(400, window.innerWidth * 0.95) : 565;
+            const tooltipHeight = isMobile ? 250 : 330;
+            let left = e.clientX + 15;
+            let top = e.clientY + 15;
+
+            if (left + tooltipWidth > window.innerWidth) left = e.clientX - tooltipWidth - 15;
+            if (top + tooltipHeight > window.innerHeight) top = e.clientY - tooltipHeight - 15;
+            if (left < 0) left = 10;
+            if (top < 0) top = 10;
+
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+        }
+    </script>
+
+    <!-- Flatpickr JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+<!-- iOS风格对话框 -->
+<div id="ios-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:99999;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:14px;width:270px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.25);">
+        <div id="ios-modal-msg" style="padding:20px 16px 14px;text-align:center;font-size:16px;font-weight:600;color:#000;line-height:1.5;display:flex;align-items:center;justify-content:center;min-height:70px;"></div>
+        <div style="height:0.5px;background:#c6c6c8;"></div>
+        <div style="display:flex;height:44px;">
+            <button id="ios-modal-no" style="flex:1;background:none;border:0;outline:none;font-size:17px;color:#ff3b30;cursor:pointer;">否</button>
+            <div id="ios-modal-divider" style="width:0.5px;background:#c6c6c8;flex-shrink:0;"></div>
+            <button id="ios-modal-yes" style="flex:1;background:none;border:0;outline:none;font-size:17px;color:#007aff;cursor:pointer;font-weight:600;">是</button>
+        </div>
+    </div>
+</div>
+<script>
+function showIosConfirm(msg) {
+    return new Promise(resolve => {
+        const ov = document.getElementById('ios-modal-overlay');
+        document.getElementById('ios-modal-msg').textContent = msg;
+        const noBtn = document.getElementById('ios-modal-no');
+        const yesBtn = document.getElementById('ios-modal-yes');
+        noBtn.style.display = '';
+        noBtn.textContent = '否';
+        yesBtn.textContent = '是';
+        document.getElementById('ios-modal-divider').style.display = '';
+        ov.style.display = 'flex';
+        const done = r => { ov.style.display = 'none'; resolve(r); };
+        noBtn.onclick = () => done(false);
+        yesBtn.onclick = () => done(true);
+    });
+}
+function showIosAlert(msg) {
+    return new Promise(resolve => {
+        const ov = document.getElementById('ios-modal-overlay');
+        document.getElementById('ios-modal-msg').textContent = msg;
+        const noBtn = document.getElementById('ios-modal-no');
+        const yesBtn = document.getElementById('ios-modal-yes');
+        noBtn.style.display = 'none';
+        document.getElementById('ios-modal-divider').style.display = 'none';
+        yesBtn.textContent = '确定';
+        ov.style.display = 'flex';
+        yesBtn.onclick = () => { ov.style.display = 'none'; noBtn.style.display = ''; document.getElementById('ios-modal-divider').style.display = ''; resolve(); };
+    });
+}
+</script>
+<script src="{{ url_for('static', filename='async-market-cap.js') }}"></script>
+<script>
+window.initAsyncMarketCapRefresh({
+    dataStores: [() => stocksData]
+});
+</script>
+</body>
+</html>

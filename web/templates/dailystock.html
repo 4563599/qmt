@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>每日股票数据</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Calibri', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: #f5f5f7;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        /* 头部 */
+        .header {
+            background: white;
+            border-radius: 10px;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .header h1 { font-size: 22px; font-weight: 600; color: #1d1d1f; }
+
+        /* 导航按钮 */
+        .nav-buttons { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .nav-btn {
+            display: inline-block;
+            padding: 7px 14px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+            color: white;
+        }
+        .nav-btn:hover { transform: translateY(-1px); opacity: 0.9; }
+        .btn-home    { background: #667eea; }
+        .btn-current { background: #2c7be5; }
+
+        /* 日期导航 */
+        .date-nav {
+            background: white;
+            border-radius: 10px;
+            padding: 12px 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .date-nav label { font-size: 13px; color: #86868b; font-weight: 500; }
+        .date-nav select, .date-nav button {
+            padding: 7px 14px;
+            border-radius: 8px;
+            border: 1px solid #d2d2d7;
+            font-size: 13px;
+            cursor: pointer;
+            background: white;
+            color: #1d1d1f;
+        }
+        .date-nav select:focus, .date-nav button:focus { outline: none; border-color: #667eea; }
+        .date-arrow {
+            background: #f5f5f7 !important;
+            padding: 7px 12px !important;
+            font-size: 12px;
+        }
+        .date-arrow:hover { background: #e8e8ed !important; }
+
+        /* 主内容区 */
+        .content {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+
+        /* 文件标签页 */
+        .file-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0;
+            border-bottom: 2px solid #f0f0f5;
+            padding: 0 16px;
+            background: #fafafa;
+        }
+        .file-tab {
+            padding: 12px 18px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #86868b;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .file-tab:hover { color: #1d1d1f; }
+        .file-tab.active { color: #667eea; border-bottom-color: #667eea; }
+
+        /* Sheet 标签页 */
+        .sheet-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 10px 16px;
+            border-bottom: 1px solid #f0f0f5;
+            background: white;
+        }
+        .sheet-tab {
+            padding: 5px 14px;
+            font-size: 12px;
+            border-radius: 20px;
+            border: 1px solid #d2d2d7;
+            color: #636366;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .sheet-tab:hover { border-color: #667eea; color: #667eea; }
+        .sheet-tab.active { background: #667eea; border-color: #667eea; color: white; }
+        .sheet-tabs-wrap { display: none; }
+        .sheet-tabs-wrap.has-multiple { display: block; }
+
+        /* 工具栏 */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            border-bottom: 1px solid #f0f0f5;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .toolbar-left { display: flex; align-items: center; gap: 8px; }
+        .row-count { font-size: 13px; color: #86868b; }
+        .search-input {
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid #d2d2d7;
+            font-size: 13px;
+            width: 200px;
+        }
+        .search-input:focus { outline: none; border-color: #667eea; }
+
+        /* 表格容器 */
+        .table-wrap {
+            overflow-x: hidden;
+            overflow-y: auto;
+            max-height: calc(100vh - 320px);
+            min-height: 200px;
+        }
+        table {
+            width: 100%;
+            min-width: 0;
+            table-layout: fixed;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 12px;
+            font-family: 'Calibri', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+        thead th {
+            position: sticky;
+            top: 0;
+            background: #f3f4f6;
+            text-align: center;
+            font-weight: 600;
+            color: #111827;
+            border-right: 1px solid #d9d9de;
+            border-bottom: 1px solid #cfd2d8;
+            white-space: normal;
+            word-break: break-all;
+            padding: 0;
+            min-width: 0;
+            z-index: 5;
+        }
+        thead th:first-child {
+            left: 0;
+            min-width: 46px;
+            max-width: 46px;
+            width: 46px;
+            text-align: center;
+            z-index: 8;
+            border-right: 1px solid #cfd2d8;
+        }
+        .corner-cell {
+            background: #e9edf4;
+            color: #6b7280;
+            padding: 6px 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .col-letter {
+            font-size: 10px;
+            color: #6b7280;
+            border-bottom: 1px solid #e3e6eb;
+            padding: 2px 4px;
+            text-align: center;
+            background: #eef2f7;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+        .col-name {
+            padding: 6px 6px;
+            background: #f8fafc;
+            line-height: 1.25;
+            word-break: break-all;
+            text-align: center;
+        }
+        tbody td {
+            padding: 5px 6px;
+            border-right: 1px solid #eceff3;
+            border-bottom: 1px solid #eceff3;
+            color: #1f2937;
+            white-space: normal;
+            word-break: break-all;
+            overflow-wrap: anywhere;
+            line-height: 1.3;
+            background: #ffffff;
+                    text-align: center;
+        }
+        tbody tr:hover td { background: #f8fbff; }
+        .row-num {
+            position: sticky;
+            left: 0;
+            min-width: 46px;
+            max-width: 46px;
+            width: 46px;
+            text-align: center;
+            padding-right: 0;
+            background: #f4f6fa !important;
+            color: #6b7280;
+            border-right: 1px solid #d9d9de;
+            font-variant-numeric: tabular-nums;
+            z-index: 4;
+            white-space: nowrap;
+        }
+        .data-cell {
+            min-width: 0;
+            max-width: none;
+        }
+        .num-cell {
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+            white-space: normal;
+            word-break: break-all;
+        }
+
+        /* 数值着色 */
+        .val-up   { color: #e53935; font-weight: 500; }
+        .val-down { color: #43a047; font-weight: 500; }
+
+        /* 状态提示 */
+        .state-box {
+            text-align: center;
+            padding: 60px 20px;
+            color: #86868b;
+            font-size: 15px;
+        }
+        .state-box .icon { font-size: 40px; margin-bottom: 12px; }
+
+        /* 空状态/加载中 */
+        #loadingState, #emptyState, #errorState { display: none; }
+
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .container { max-width: none; }
+            .header,
+            .date-nav,
+            .toolbar,
+            .toolbar-left {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .header,
+            .date-nav,
+            .toolbar {
+                padding: 12px;
+                gap: 10px;
+            }
+            .nav-buttons {
+                width: 100%;
+                justify-content: center;
+            }
+            .nav-btn,
+            .date-nav select,
+            .date-nav button,
+            .search-input {
+                width: 100%;
+                max-width: 100%;
+            }
+            .file-tabs,
+            .sheet-tabs {
+                padding-left: 10px;
+                padding-right: 10px;
+            }
+            .table-wrap {
+                overflow-x: hidden;
+                max-height: calc(100vh - 280px);
+            }
+            table {
+                min-width: 0;
+                table-layout: fixed;
+                font-size: 10px;
+            }
+            thead th,
+            tbody td,
+            .col-letter,
+            .col-name {
+                white-space: normal !important;
+                word-break: break-all;
+                overflow-wrap: anywhere;
+            }
+            thead th:first-child,
+            .row-num {
+                min-width: 36px;
+                max-width: 36px;
+                width: 36px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- 头部 -->
+    <div class="header">
+        <h1>每日股票数据</h1>
+        <div class="nav-buttons">
+            <a href="/" class="nav-btn btn-home">首页</a>
+            <a href="/20阴少跌少横盘" class="nav-btn btn-current">20阴少跌少横盘</a>
+            <a href="/阴线跌破5日次数" class="nav-btn" style="background:#ca8a04;">阴线跌破5日次数</a>
+            <a href="/10天大5日线" class="nav-btn" style="background:#0f766e;">10天大5日线</a>
+            <a href="/连续5不碰" class="nav-btn" style="background:#f43f5e;">连续5不碰</a>
+        </div>
+    </div>
+
+    <!-- 日期导航 -->
+    <div class="date-nav">
+        <label>日期：</label>
+        <button class="date-arrow" onclick="prevDate()">◀</button>
+        <select id="dateSelect">
+            <option value="">加载中...</option>
+        </select>
+        <button class="date-arrow" onclick="nextDate()">▶</button>
+        <button style="padding:7px 18px;background:#667eea;color:white;border:none;border-radius:8px;font-size:13px;cursor:pointer;" onclick="onDateChange(document.getElementById('dateSelect').value)">加载</button>
+        <span id="fileDateHint" style="font-size:12px;color:#86868b;"></span>
+    </div>
+
+    <!-- 主内容 -->
+    <div class="content">
+        <!-- 文件标签 -->
+        <div class="file-tabs" id="fileTabs"></div>
+
+        <!-- Sheet 标签（多sheet时显示） -->
+        <div class="sheet-tabs-wrap" id="sheetTabsWrap">
+            <div class="sheet-tabs" id="sheetTabs"></div>
+        </div>
+
+        <!-- 工具栏 -->
+        <div class="toolbar" id="toolbar" style="display:none;">
+            <div class="toolbar-left">
+                <span class="row-count" id="rowCount"></span>
+                <input class="search-input" id="searchInput" type="text" placeholder="搜索..." oninput="filterRows()">
+            </div>
+        </div>
+
+        <!-- 表格 -->
+        <div id="loadingState" class="state-box">
+            <div class="icon">⏳</div>
+            <div>加载中...</div>
+        </div>
+        <div id="emptyState" class="state-box" style="display:block;">
+            <div class="icon">📅</div>
+            <div id="emptyMsg">选择日期后自动加载</div>
+        </div>
+        <div id="errorState" class="state-box">
+            <div class="icon">⚠️</div>
+            <div id="errorMsg">加载失败</div>
+        </div>
+
+        <div class="table-wrap" id="tableWrap">
+            <table id="dataTable">
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    let allDates = [];
+    let allFiles = [];
+    let allSheets = [];
+    let allRows = [];
+    let currentHeaders = [];
+    let currentDate = '';
+    let currentFile = '';
+    let currentSheet = '';
+
+    async function init() {
+        try {
+            const res = await fetch('/api/dailystock/dates');
+            const data = await res.json();
+            const sel = document.getElementById('dateSelect');
+
+            if (!data.success || !data.dates || data.dates.length === 0) {
+                sel.innerHTML = '<option value="">无数据</option>';
+                showEmpty('暂无数据，请先在 /home/stock/web 目录放置Excel文件');
+                return;
+            }
+
+            allDates = data.dates;
+            const today = new Date().toLocaleDateString('sv-SE');
+            currentDate = allDates.includes(today) ? today : allDates[0];
+
+            sel.innerHTML = allDates.map(d => `<option value="${d}">${formatDateLabel(d)}</option>`).join('');
+            sel.value = currentDate;
+            sel.onchange = async (e) => { await onDateChange(e.target.value); };
+
+            await onDateChange(currentDate);
+        } catch (e) {
+            document.getElementById('dateSelect').innerHTML = '<option value="">加载失败</option>';
+            showError('初始化失败: ' + e.message);
+        }
+    }
+
+    async function loadDateData(date) {
+        showLoading();
+        clearTable();
+        try {
+            const res = await fetch(`/api/dailystock/init?date=${encodeURIComponent(date)}`);
+            const data = await res.json();
+            if (!data.success) {
+                showError(data.error || '加载失败');
+                return;
+            }
+
+            allFiles = data.files || [];
+            currentFile = data.current_file || '';
+            allSheets = data.sheets || [];
+            currentSheet = data.current_sheet || '';
+            allRows = data.rows || [];
+
+            renderFileTabs(allFiles, currentFile);
+            renderSheetTabs(allSheets, currentSheet);
+            if (data.headers && data.headers.length) {
+                renderTable(data.headers, allRows);
+            } else {
+                showEmpty('该日期暂无 Excel 文件');
+            }
+        } catch (e) {
+            showError('加载失败: ' + e.message);
+        }
+    }
+
+    async function onDateChange(date) {
+        if (!date) {
+            showEmpty('暂无可用日期');
+            return;
+        }
+        currentDate = date;
+        currentFile = '';
+        currentSheet = '';
+        await loadDateData(date);
+    }
+
+    function prevDate() {
+        const idx = allDates.indexOf(currentDate);
+        if (idx < allDates.length - 1) {
+            const d = allDates[idx + 1];
+            document.getElementById('dateSelect').value = d;
+            onDateChange(d);
+        }
+    }
+
+    function nextDate() {
+        const idx = allDates.indexOf(currentDate);
+        if (idx > 0) {
+            const d = allDates[idx - 1];
+            document.getElementById('dateSelect').value = d;
+            onDateChange(d);
+        }
+    }
+
+    async function selectFile(file) {
+        if (currentFile === file) return;
+        currentFile = file;
+        currentSheet = '';
+        document.querySelectorAll('.file-tab').forEach(t =>
+            t.classList.toggle('active', t.dataset.file === file)
+        );
+        await loadData(currentDate, file, null);
+    }
+
+    async function selectSheet(sheet) {
+        if (currentSheet === sheet) return;
+        currentSheet = sheet;
+        document.querySelectorAll('.sheet-tab').forEach(t =>
+            t.classList.toggle('active', t.dataset.sheet === sheet)
+        );
+        await loadData(currentDate, currentFile, sheet);
+    }
+
+    async function loadData(date, file, sheet) {
+        showLoading();
+        clearTable();
+        try {
+            let url = `/api/dailystock/data?date=${encodeURIComponent(date)}&file=${encodeURIComponent(file)}`;
+            if (sheet) url += `&sheet=${encodeURIComponent(sheet)}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!data.success) {
+                showError(data.error || '加载失败');
+                return;
+            }
+            allSheets = data.sheets || [];
+            currentSheet = data.current_sheet;
+            allRows = data.rows || [];
+            renderSheetTabs(allSheets, currentSheet);
+            renderTable(data.headers || [], allRows);
+        } catch (e) {
+            showError('加载数据失败: ' + e.message);
+        }
+    }
+
+    function renderFileTabs(files, current) {
+        document.getElementById('fileTabs').innerHTML = files.map(f =>
+            `<div class="file-tab${f === current ? ' active' : ''}" data-file="${escHtml(f)}" onclick="selectFile('${escHtml(f)}')">${escHtml(f)}</div>`
+        ).join('');
+    }
+
+    function renderSheetTabs(sheets, current) {
+        const wrap = document.getElementById('sheetTabsWrap');
+        if (sheets.length <= 1) {
+            wrap.classList.remove('has-multiple');
+            return;
+        }
+        wrap.classList.add('has-multiple');
+        document.getElementById('sheetTabs').innerHTML = sheets.map(s =>
+            `<div class="sheet-tab${s === current ? ' active' : ''}" data-sheet="${escHtml(s)}" onclick="selectSheet('${escHtml(s)}')">${escHtml(s)}</div>`
+        ).join('');
+    }
+
+    function renderTable(headers, rows) {
+        hideStates();
+        currentHeaders = headers || [];
+        document.getElementById('toolbar').style.display = 'flex';
+        document.getElementById('tableWrap').style.display = '';
+        document.getElementById('searchInput').value = '';
+
+        const headHtml = currentHeaders.map((h, idx) =>
+            `<th><div class="col-letter">${columnLabel(idx)}</div><div class="col-name">${escHtml(h)}</div></th>`
+        ).join('');
+
+        document.getElementById('tableHead').innerHTML = `<tr><th class="corner-cell">#</th>${headHtml}</tr>`;
+        renderRows(currentHeaders, rows);
+        document.getElementById('fileDateHint').textContent = `共 ${rows.length} 行`;
+    }
+
+    function renderRows(headers, rows) {
+        const tbody = document.getElementById('tableBody');
+        if (!headers || headers.length === 0) {
+            tbody.innerHTML = '<tr><td class="row-num">1</td><td class="data-cell" style="text-align:center;padding:24px;color:#86868b;">暂无数据</td></tr>';
+            document.getElementById('rowCount').textContent = '共 0 条';
+            return;
+        }
+
+        if (!rows || rows.length === 0) {
+            tbody.innerHTML = `<tr><td class="row-num">1</td><td class="data-cell" colspan="${headers.length}" style="text-align:center;padding:24px;color:#86868b;">暂无数据</td></tr>`;
+            document.getElementById('rowCount').textContent = '共 0 条';
+            return;
+        }
+
+        tbody.innerHTML = rows.map((row, rowIdx) => {
+            const cells = headers.map((_, colIdx) => {
+                const cell = row[colIdx] == null ? '' : String(row[colIdx]);
+                return `<td class="${cellClass(cell)}">${escHtml(cell)}</td>`;
+            }).join('');
+            return `<tr><td class="row-num">${rowIdx + 1}</td>${cells}</tr>`;
+        }).join('');
+
+        document.getElementById('rowCount').textContent = `共 ${rows.length} 条`;
+    }
+
+    function filterRows() {
+        const kw = document.getElementById('searchInput').value.trim().toLowerCase();
+        const filtered = kw
+            ? allRows.filter(row => row.some(cell => String(cell).toLowerCase().includes(kw)))
+            : allRows;
+        renderRows(currentHeaders, filtered);
+    }
+
+    function showLoading() {
+        document.getElementById('loadingState').style.display = 'block';
+        document.getElementById('emptyState').style.display = 'none';
+        document.getElementById('errorState').style.display = 'none';
+        document.getElementById('toolbar').style.display = 'none';
+        document.getElementById('tableWrap').style.display = 'none';
+    }
+
+    function showEmpty(msg) {
+        document.getElementById('emptyMsg').textContent = msg || '该日期暂无数据';
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('emptyState').style.display = 'block';
+        document.getElementById('errorState').style.display = 'none';
+        document.getElementById('toolbar').style.display = 'none';
+        document.getElementById('tableWrap').style.display = 'none';
+        document.getElementById('sheetTabsWrap').classList.remove('has-multiple');
+    }
+
+    function showError(msg) {
+        document.getElementById('errorMsg').textContent = msg;
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('emptyState').style.display = 'none';
+        document.getElementById('errorState').style.display = 'block';
+        document.getElementById('toolbar').style.display = 'none';
+        document.getElementById('tableWrap').style.display = 'none';
+    }
+
+    function hideStates() {
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('emptyState').style.display = 'none';
+        document.getElementById('errorState').style.display = 'none';
+    }
+
+    function clearTable() {
+        document.getElementById('tableHead').innerHTML = '';
+        document.getElementById('tableBody').innerHTML = '';
+        document.getElementById('sheetTabsWrap').classList.remove('has-multiple');
+        document.getElementById('fileDateHint').textContent = '';
+        currentHeaders = [];
+    }
+
+    function escHtml(s) {
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function columnLabel(index) {
+        let n = index + 1;
+        let label = '';
+        while (n > 0) {
+            const rem = (n - 1) % 26;
+            label = String.fromCharCode(65 + rem) + label;
+            n = Math.floor((n - 1) / 26);
+        }
+        return label;
+    }
+
+    function formatDateLabel(d) {
+        const [y, m, day] = d.split('-');
+        const dt = new Date(d);
+        const days = ['日', '一', '二', '三', '四', '五', '六'];
+        return `${y}年${m}月${day}日 (周${days[dt.getDay()]})`;
+    }
+
+    function cellClass(val) {
+        const s = String(val).trim();
+        const cls = ['data-cell'];
+        const normalized = s.replace(/,/g, '').replace('%', '');
+        const num = parseFloat(normalized);
+        if (!Number.isNaN(num)) cls.push('num-cell');
+        if (!Number.isNaN(num) && num > 0 && (s.includes('%') || /^-?\d+\.?\d*$/.test(normalized))) cls.push('val-up');
+        if (!Number.isNaN(num) && num < 0) cls.push('val-down');
+        return cls.join(' ');
+    }
+
+    init();
+</script>
+</body>
+</html>

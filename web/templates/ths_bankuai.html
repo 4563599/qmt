@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>同花顺板块</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: #ffffff; min-height: 100vh; padding: 20px; margin: 0;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .nav-buttons { margin-bottom: 10px; display: flex; justify-content: flex-start; align-items: center; gap: 15px; flex-wrap: wrap; }
+        .nav-left { display: flex; gap: 10px; align-items: center; }
+        .nav-right { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; justify-content: flex-start; }
+        .nav-btn {
+            display: inline-block; padding: 5px 9px; color: white; text-decoration: none;
+            border-radius: 8px; transition: all 0.3s; font-size: 13px; font-weight: 500;
+            letter-spacing: 0.1px; white-space: nowrap; flex-shrink: 0;
+        }
+        .nav-btn:hover { transform: translateY(-2px); filter: brightness(0.94); }
+        .nav-btn-home { background: #2563eb; }
+        .nav-btn-yhy { background: #e11d48; }
+        .nav-btn-5ls { background: #3b82f6; }
+        .nav-btn-yx205 { background: #06b6d4; }
+        .nav-btn-ztorgj { background: #60a5fa; }
+        .nav-btn-lx5bp { background: #f43f5e; }
+        .nav-btn-lszty { background: #e11d48; }
+        .nav-btn-jpgz { background: #f59e0b; }
+        .nav-btn-ths { background: #38bdf8; color: #073b4c; font-weight: 700; }
+        .date-selector { display: flex; align-items: center; gap: 6px; background: white; padding: 4px 8px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .date-nav-btn { background: #7dd3fc; color: #073b4c; border: none; padding: 5px 8px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.3s; font-weight: 700; min-width: 28px; display: flex; align-items: center; justify-content: center; }
+        .date-nav-btn:hover { background: #38bdf8; transform: scale(1.05); }
+        .date-nav-btn:disabled { background: #ccc; cursor: not-allowed; transform: scale(1); }
+        #datePicker { background: linear-gradient(135deg, #bae6fd, #7dd3fc); color: #073b4c; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 700; text-align: center; width: auto; min-width: 95px; max-width: 105px; }
+        .flatpickr-calendar { box-shadow: 0 20px 60px rgba(0,0,0,0.3) !important; border-radius: 12px !important; border: none !important; z-index: 99999 !important; }
+        .flatpickr-day.selected { background: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 100%) !important; border-color: #38bdf8 !important; color: #073b4c !important; }
+        .flatpickr-months .flatpickr-month { background: #7dd3fc !important; color: #073b4c !important; }
+        .flatpickr-current-month .flatpickr-monthDropdown-months { background: #7dd3fc !important; color: #073b4c !important; }
+        .flatpickr-weekdays { background: #f2f2f7 !important; }
+        span.flatpickr-weekday { color: #8e8e93 !important; font-weight: 600 !important; }
+        .page-title { background: white; border-radius: 10px; padding: 12px 16px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .page-title h1 { font-size: 22px; font-weight: 700; color: #1d1d1f; margin: 0; }
+        .page-title .badge { color: #073b4c; background: linear-gradient(135deg, #dff6ff, #93c5fd); font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+        .scan-info-text { color: #2563eb; font-size: 13px; font-weight: 700; }
+        .timing-summary {
+            display: none;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(37,99,235,0.08);
+        }
+        .timing-summary-title {
+            font-size: 13px;
+            font-weight: 800;
+            color: #075985;
+            margin-bottom: 8px;
+        }
+        .timing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 8px;
+        }
+        .timing-item {
+            background: white;
+            border: 1px solid #dbeafe;
+            border-radius: 8px;
+            padding: 7px 8px;
+            min-width: 0;
+        }
+        .timing-label {
+            display: block;
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .timing-value {
+            display: block;
+            color: #0f172a;
+            font-size: 15px;
+            font-weight: 800;
+            margin-top: 2px;
+        }
+        .ths-layout {
+            display: grid;
+            grid-template-columns: 340px minmax(0, 1fr);
+            gap: 12px;
+            align-items: start;
+        }
+        .ths-panel {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            border: 1px solid #e0e0e0;
+        }
+        .col-header {
+            padding: 9px 8px;
+            font-size: 13px;
+            font-weight: 700;
+            color: white;
+            text-align: center;
+            background: linear-gradient(135deg, #7dd3fc, #38bdf8);
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        .col-header-sub { font-size: 11px; font-weight: 400; opacity: 0.85; margin-top: 2px; }
+        .board-row-header,
+        .board-row {
+            display: grid;
+            grid-template-columns: 0.52fr 1.5fr 0.86fr 0.72fr 0.72fr;
+            align-items: center;
+        }
+        .stock-row-header,
+        .stock-row {
+            display: grid;
+            grid-template-columns: 0.9fr 1.4fr 0.86fr 0.86fr 1.08fr 1.08fr;
+            align-items: center;
+        }
+        .board-row-header,
+        .stock-row-header {
+            padding: 3px 6px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+        }
+        .board-row-header span,
+        .stock-row-header span { font-size: 10px; font-weight: 600; color: #86868b; text-align: center; }
+        .board-row,
+        .stock-row {
+            padding: 6px 6px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.15s;
+            min-height: 36px;
+        }
+        .board-row:hover,
+        .stock-row:hover { background: #f8f9fa; }
+        .board-row.active { background: #eff6ff; box-shadow: inset 3px 0 0 #38bdf8; }
+        .board-row:last-child,
+        .stock-row:last-child { border-bottom: none; }
+        .board-row > span,
+        .stock-row > span { min-width: 0; text-align: center; }
+        .s-name {
+            font-size: 13px; font-weight: 500; color: #1d1d1f; text-align: center;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+            white-space: normal; overflow: hidden; overflow-wrap: anywhere; word-break: break-all;
+            line-height: 1.25; padding-right: 4px;
+        }
+        .s-code { font-size: 11px; color: #4b5563; font-weight: 600; }
+        .s-gain { font-size: 13px; font-weight: 700; text-align: center; white-space: nowrap; }
+        .s-metric { font-size: 12px; font-weight: 700; text-align: center; color: #374151; white-space: nowrap; }
+        .positive { color: #e74c3c; }
+        .negative { color: #27ae60; }
+        .neutral { color: #95a5a6; }
+        .no-data { padding: 12px 8px; font-size: 12px; color: #bbb; text-align: center; }
+        .loading-msg { text-align: center; padding: 40px; color: #666; font-size: 14px; }
+        .error-msg { text-align: center; padding: 18px; color: #dc2626; font-size: 13px; font-weight: 700; }
+        .stock-list-wrap { overflow-x: auto; }
+        .stock-tooltip { position: fixed; display: none; background: #fff; border: 1px solid #e1e1e1; border-radius: 8px; padding: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 10000; pointer-events: none; }
+        .stock-tooltip img { display: block; width: 680px; height: 380px; background: #f5f5f7; }
+        .stock-tooltip .tooltip-header { font-size: 12px; color: #666; margin-bottom: 5px; text-align: center; }
+        @media (max-width: 1200px) {
+            .nav-left, .nav-right { width: 100%; justify-content: center; }
+            .nav-buttons { flex-wrap: wrap; }
+            .ths-layout { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 768px) {
+            body { padding: 10px; overflow-x: hidden; }
+            .nav-buttons { gap: 10px; }
+            .nav-btn { flex: 1 1 calc(50% - 4px); min-width: 0; padding: 7px 5px; font-size: 11px; white-space: normal; word-break: keep-all; line-height: 1.3; text-align: center; }
+            .date-selector { width: 100%; justify-content: center; flex-wrap: wrap; }
+            .page-title { padding: 10px 12px; gap: 6px; }
+            .page-title h1 { font-size: 18px; }
+            #datePicker { min-width: 0 !important; width: 100%; max-width: 100%; }
+            .ths-layout { grid-template-columns: 1fr; gap: 8px; }
+            .board-row-header, .board-row { grid-template-columns: 0.46fr 1.25fr 0.72fr 0.62fr 0.62fr; }
+            .stock-list-wrap { overflow-x: auto; }
+            .stock-row-header, .stock-row { min-width: 720px; }
+            .stock-tooltip img { width: 100%; max-width: 600px; height: auto; }
+        }
+    </style>
+</head>
+<body>
+<div class="stock-tooltip" id="klineTooltip">
+    <div class="tooltip-header" id="klineTtHeader"></div>
+    <img id="klineImage" src="" alt="K线图">
+</div>
+
+<div class="container">
+    <div class="nav-buttons">
+        <div class="nav-left">
+            <div class="date-selector">
+                <button class="date-nav-btn" id="prevDateBtn" onclick="prevDate()">◀</button>
+                <input type="text" id="datePicker" placeholder="选择日期" readonly>
+                <button class="date-nav-btn" id="nextDateBtn" onclick="nextDate()">▶</button>
+            </div>
+        </div>
+        <div class="nav-right">
+            <a href="/" class="nav-btn nav-btn-home">首页</a>
+            <a href="/涨停前横盘" class="nav-btn" style="background:#2563eb;">涨停前横盘</a>
+            <a href="/阴后强" class="nav-btn nav-btn-yhy">阴后强</a>
+            <a href="/5拉升" class="nav-btn nav-btn-5ls">5拉升</a>
+            <a href="/20阴少跌少横盘" class="nav-btn nav-btn-yx205">20阴少跌少横盘</a>
+            <a href="/阴线跌破5日次数" class="nav-btn" style="background:#ca8a04;">阴线跌破5日次数</a>
+            <a href="/10天大5日线" class="nav-btn" style="background:#0f766e;">10天大5日线</a>
+            <a href="/涨停或光脚" class="nav-btn nav-btn-ztorgj">涨停或光脚</a>
+            <a href="/连续5不碰" class="nav-btn nav-btn-lx5bp">连续5不碰</a>
+            <a href="/连续涨停" class="nav-btn nav-btn-lszty">连续涨停</a>
+                <a href="/连续4天拉升" class="nav-btn nav-btn-intraday4up" style="background:#f97316;">连续4天拉升</a>
+            <a href="/极品关注" class="nav-btn nav-btn-jpgz">极品关注</a>
+            <a href="/同花顺板块" class="nav-btn nav-btn-ths">同花顺板块</a>
+        </div>
+    </div>
+
+    <div class="page-title">
+        <h1>同花顺板块</h1>
+        <span class="badge">Redis</span>
+        <span class="scan-info-text" id="scanInfoText">加载中...</span>
+    </div>
+
+    <div class="timing-summary" id="timingSummary"></div>
+
+    <div id="mainContent">
+        <div class="loading-msg">正在加载同花顺板块数据...</div>
+    </div>
+</div>
+
+<script>
+let _allDates = [];
+let _currentDateIdx = 0;
+let _currentData = null;
+let _selectedBoard = '';
+let _flatpickrInstance = null;
+const TIMING_ORDER = [
+    '打开/前置同花顺',
+    '进入板块页',
+    '导出板块当前数据',
+    '解析板块当前数据',
+    '逐板块导出当前数据',
+    '写入Redis',
+    '写入TXT',
+    // 兼容历史 OCR 数据
+    '截图板块区域',
+    '识别板块列表',
+    '逐板块采集',
+    '写入OCR原文'
+];
+
+function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
+function gainClass(value) {
+    const n = parseFloat(String(value ?? '').replace('%', ''));
+    if (Number.isNaN(n)) return 'neutral';
+    if (n > 0) return 'positive';
+    if (n < 0) return 'negative';
+    return 'neutral';
+}
+
+function fmtDate(date) {
+    if (!date) return '';
+    const text = String(date);
+    if (/^\d{8}$/.test(text)) return `${text.slice(0,4)}-${text.slice(4,6)}-${text.slice(6,8)}`;
+    return text;
+}
+
+function compactDate(date) {
+    return String(date || '').replace(/\D/g, '').slice(0, 8);
+}
+
+function jsString(value) {
+    return String(value ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, ' ');
+}
+
+function formatSeconds(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '';
+    return `${n.toFixed(2)}秒`;
+}
+
+function formatTimeText(value) {
+    return String(value || '').replace('T', ' ');
+}
+
+function renderTimings() {
+    const el = document.getElementById('timingSummary');
+    const payload = _currentData || {};
+    const timings = payload.timings || {};
+    const snapshot = payload.snapshot || {};
+    const entries = [];
+
+    if (snapshot.total_seconds !== undefined) {
+        entries.push(['总耗时', snapshot.total_seconds]);
+    }
+    TIMING_ORDER.forEach(name => {
+        if (timings[name] !== undefined) entries.push([name, timings[name]]);
+    });
+    Object.entries(timings).forEach(([name, seconds]) => {
+        if (!TIMING_ORDER.includes(name)) entries.push([name, seconds]);
+    });
+
+    if (!entries.length) {
+        el.style.display = 'none';
+        el.innerHTML = '';
+        return;
+    }
+    el.style.display = 'block';
+    el.innerHTML = `
+        <div class="timing-summary-title">关键耗时</div>
+        <div class="timing-grid">
+            ${entries.map(([name, value, type]) => `
+                <div class="timing-item">
+                    <span class="timing-label">${esc(name)}</span>
+                    <span class="timing-value">${esc(type === 'time' ? formatTimeText(value) : formatSeconds(value))}</span>
+                </div>
+            `).join('')}
+        </div>`;
+}
+
+const tooltip = document.getElementById('klineTooltip');
+const klineImg = document.getElementById('klineImage');
+
+function getPrefix(code) {
+    return String(code || '').startsWith('6') ? '1' : '0';
+}
+
+function showKline(e, code, name) {
+    if (!code) return;
+    klineImg.src = `https://webquoteklinepic.eastmoney.com/GetPic.aspx?nid=${getPrefix(code)}.${code}&imageType=KXL&token=44c9d251add88e27b65ed86506f6e5da&at=1`;
+    document.getElementById('klineTtHeader').innerText = `${name || ''} (${code}) - 日K线`;
+    moveTooltip(e);
+    tooltip.style.display = 'block';
+}
+
+function hideKline() {
+    tooltip.style.display = 'none';
+    klineImg.src = '';
+}
+
+function moveTooltip(e) {
+    const w = window.innerWidth <= 768 ? Math.min(400, window.innerWidth * 0.95) : 565;
+    const h = window.innerWidth <= 768 ? 250 : 330;
+    let left = e.clientX + 15;
+    let top = e.clientY + 15;
+    if (left + w > window.innerWidth) left = e.clientX - w - 15;
+    if (top + h > window.innerHeight) top = e.clientY - h - 15;
+    tooltip.style.left = Math.max(8, left) + 'px';
+    tooltip.style.top = Math.max(8, top) + 'px';
+}
+
+async function loadDates() {
+    const resp = await fetch('/api/ths/dates');
+    const result = await resp.json();
+    _allDates = result.success ? (result.dates || []) : [];
+    if (!_allDates.length && result.latest_date) _allDates = [result.latest_date];
+    if (!_allDates.length) _allDates = [new Date().toISOString().slice(0, 10)];
+    _currentDateIdx = 0;
+    setupDatePicker();
+}
+
+function setupDatePicker() {
+    const input = document.getElementById('datePicker');
+    input.value = _allDates[_currentDateIdx] || '';
+    if (_flatpickrInstance) _flatpickrInstance.destroy();
+    _flatpickrInstance = flatpickr(input, {
+        dateFormat: 'Y-m-d',
+        defaultDate: input.value,
+        onChange: function(selectedDates, dateStr) {
+            const idx = _allDates.indexOf(dateStr);
+            _currentDateIdx = idx >= 0 ? idx : 0;
+            loadData(dateStr);
+        }
+    });
+    updateDateButtons();
+}
+
+function updateDateButtons() {
+    document.getElementById('prevDateBtn').disabled = _currentDateIdx >= _allDates.length - 1;
+    document.getElementById('nextDateBtn').disabled = _currentDateIdx <= 0;
+}
+
+function prevDate() {
+    if (_currentDateIdx < _allDates.length - 1) {
+        _currentDateIdx++;
+        const date = _allDates[_currentDateIdx];
+        document.getElementById('datePicker').value = date;
+        if (_flatpickrInstance) _flatpickrInstance.setDate(date, false);
+        updateDateButtons();
+        loadData(date);
+    }
+}
+
+function nextDate() {
+    if (_currentDateIdx > 0) {
+        _currentDateIdx--;
+        const date = _allDates[_currentDateIdx];
+        document.getElementById('datePicker').value = date;
+        if (_flatpickrInstance) _flatpickrInstance.setDate(date, false);
+        updateDateButtons();
+        loadData(date);
+    }
+}
+
+async function loadData(date) {
+    const targetDate = date || _allDates[_currentDateIdx] || '';
+    document.getElementById('mainContent').innerHTML = '<div class="loading-msg">正在加载同花顺板块数据...</div>';
+    const url = targetDate ? `/api/ths/data/${compactDate(targetDate)}` : '/api/ths/data';
+    const resp = await fetch(url);
+    const result = await resp.json();
+    if (!result.success) {
+        document.getElementById('mainContent').innerHTML = `<div class="error-msg">${esc(result.error || '加载失败')}</div>`;
+        document.getElementById('scanInfoText').textContent = '加载失败';
+        document.getElementById('timingSummary').style.display = 'none';
+        return;
+    }
+    if (!result.data) {
+        document.getElementById('mainContent').innerHTML = `<div class="no-data">${esc(result.message || '没有数据')}</div>`;
+        document.getElementById('scanInfoText').textContent = `${fmtDate(result.date)} 无数据`;
+        document.getElementById('timingSummary').style.display = 'none';
+        return;
+    }
+    _currentData = result;
+    const boards = result.boards_summary || [];
+    _selectedBoard = boards[0]?.board_name || '';
+    renderPage();
+}
+
+function renderPage() {
+    const payload = _currentData || {};
+    const snapshot = payload.snapshot || {};
+    const statusText = snapshot.status === 'ok' ? '成功' : '失败';
+    const startText = formatTimeText(snapshot.start_time || snapshot.snapshot_time || '');
+    const endText = formatTimeText(snapshot.end_time || payload.updated_at || '');
+    document.getElementById('scanInfoText').textContent =
+        `开始：${startText || '-'} · 结束：${endText || '-'} · ${statusText}`;
+    renderTimings();
+    document.getElementById('mainContent').innerHTML = `
+        <div class="ths-layout">
+            <section class="ths-panel">
+                <div class="col-header">板块列表<div class="col-header-sub">${esc(payload.redis_key || '')}</div></div>
+                <div class="board-row-header">
+                    <span>序</span><span>板块</span><span>涨幅</span><span>涨停</span><span>个股</span>
+                </div>
+                <div id="boardList"></div>
+            </section>
+            <section class="ths-panel">
+                <div class="col-header" id="stockHeader">个股列表</div>
+                <div class="stock-list-wrap">
+                    <div class="stock-row-header">
+                        <span>代码</span><span>名称</span><span>涨幅</span><span>现价</span><span>主力净量</span><span>主力金额</span>
+                    </div>
+                    <div id="stockList"></div>
+                </div>
+            </section>
+        </div>`;
+    renderBoards();
+    renderStocks();
+}
+
+function renderBoards() {
+    const boards = _currentData.boards_summary || [];
+    const boardMeta = new Map((_currentData.boards || []).map(b => [b.board_name, b]));
+    document.getElementById('boardList').innerHTML = boards.map((group, index) => {
+        const meta = boardMeta.get(group.board_name) || {};
+        return `<div class="board-row ${group.board_name === _selectedBoard ? 'active' : ''}" onclick="selectBoard('${esc(group.board_name)}')">
+            <span class="s-metric">${esc(meta.rank || index + 1)}</span>
+            <span class="s-name">${esc(group.board_name)}</span>
+            <span class="s-gain ${gainClass(meta.change_percent_raw)}">${esc(meta.change_percent_raw || '')}</span>
+            <span class="s-metric">${esc(meta.limit_up_count ?? '')}</span>
+            <span class="s-metric">${esc(group.stock_count || 0)}</span>
+        </div>`;
+    }).join('') || '<div class="no-data">没有板块数据</div>';
+}
+
+function selectBoard(boardName) {
+    _selectedBoard = boardName;
+    renderBoards();
+    renderStocks();
+}
+
+function renderStocks() {
+    const boards = _currentData.boards_summary || [];
+    const group = boards.find(item => item.board_name === _selectedBoard) || boards[0] || {stocks: []};
+    const stocks = group.stocks || [];
+    document.getElementById('stockHeader').innerHTML = `${esc(group.board_name || '个股列表')}<div class="col-header-sub">${stocks.length} 只</div>`;
+    document.getElementById('stockList').innerHTML = stocks.map(stock => `
+        <div class="stock-row" onmouseenter="showKline(event, '${jsString(stock.code)}', '${jsString(stock.name)}')" onmouseleave="hideKline()" onmousemove="moveTooltip(event)">
+            <span class="s-code">${esc(stock.code)}</span>
+            <span class="s-name">${esc(stock.name)}</span>
+            <span class="s-gain ${gainClass(stock.change_percent_raw)}">${esc(stock.change_percent_raw || '')}</span>
+            <span class="s-metric">${esc(stock.price_raw || '')}</span>
+            <span class="s-metric">${esc(readExtra(stock, 1))}</span>
+            <span class="s-metric">${esc(readExtra(stock, 2))}</span>
+        </div>`).join('') || '<div class="no-data">没有个股数据</div>';
+}
+
+function readExtra(stock, column) {
+    try {
+        const extra = JSON.parse(stock.extra_columns_json || '{}');
+        return extra[`column_${column}`] || '';
+    } catch (e) {
+        return '';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadDates();
+    await loadData(_allDates[_currentDateIdx]);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>移动端选股</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            background: #f5f7fb;
+            color: #172033;
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        .app {
+            width: 100%;
+            max-width: 520px;
+            margin: 0 auto;
+            padding: 6px 8px 0;
+        }
+
+        .top-panel {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: rgba(245, 247, 251, 0.96);
+            backdrop-filter: blur(8px);
+            padding: 4px 0 6px;
+        }
+
+        .date-row {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 5px;
+        }
+
+        .date-btn {
+            width: 28px;
+            height: 28px;
+            border: 0;
+            border-radius: 7px;
+            background: #2563eb;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        #datePicker {
+            min-width: 0;
+            flex: 1;
+            height: 28px;
+            border: 1px solid #d4dbe7;
+            border-radius: 7px;
+            background: #fff;
+            color: #111827;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .summary-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 5px;
+            margin-bottom: 5px;
+            color: #4b5563;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .summary-row span {
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .module-tabs {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 5px;
+        }
+
+        .module-btn {
+            min-height: 28px;
+            border: 1px solid #d7deea;
+            border-radius: 7px;
+            background: #fff;
+            color: #334155;
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 1.15;
+            padding: 4px 3px;
+            box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+        }
+
+        .module-btn.active {
+            border-color: #ca8a04;
+            background: #ca8a04;
+            color: #fff;
+            box-shadow: 0 5px 12px rgba(202, 138, 4, 0.22);
+        }
+
+        .status {
+            margin: 6px 0 8px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #fff;
+            color: #4b5563;
+            padding: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            box-shadow: 0 1px 6px rgba(15, 23, 42, 0.06);
+        }
+
+        .filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .filter-btn {
+            border: 1px solid #d1d5db;
+            border-radius: 999px;
+            background: #f8fafc;
+            color: #334155;
+            padding: 4px 7px;
+            font-size: 11px;
+            font-weight: 900;
+        }
+
+        .filter-btn.active {
+            border-color: #ca8a04;
+            background: #ca8a04;
+            color: #fff;
+            box-shadow: 0 4px 10px rgba(202, 138, 4, 0.18);
+        }
+
+        .sort-low-btn {
+            border-color: #8b5cf6;
+            background: #f5f3ff;
+            color: #6d28d9;
+        }
+
+        .sort-low-btn.active {
+            border-color: #7c3aed;
+            background: #7c3aed;
+            color: #fff;
+            box-shadow: 0 4px 10px rgba(124, 58, 237, 0.22);
+        }
+
+        #groups {
+            padding-bottom: 100vh;
+        }
+
+        .group {
+            overflow: hidden;
+            margin-bottom: 10px;
+            border: 1px solid #e5e7eb;
+            border-radius: 11px;
+            background: #fff;
+            box-shadow: 0 2px 9px rgba(15, 23, 42, 0.07);
+        }
+
+        .group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(90deg, #854d0e, #ca8a04);
+            color: #fff;
+            padding: 8px 10px;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .group-count {
+            flex: 0 0 auto;
+            font-size: 12px;
+            font-weight: 700;
+            opacity: 0.9;
+        }
+
+        .stock-list {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            padding: 8px;
+        }
+
+        .stock-card {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px 10px;
+            border: 1px solid #e6ebf2;
+            border-radius: 10px;
+            background: #fff;
+            padding: 8px 9px;
+            box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+        }
+
+        .stock-card.kline-selected {
+            border-color: #ca8a04;
+            background: #fffbeb;
+            box-shadow: 0 0 0 2px rgba(202, 138, 4, 0.16);
+        }
+
+        .stock-main {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            min-width: 0;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 5px;
+        }
+
+        .stock-name {
+            min-width: 0;
+            color: #111827;
+            font-size: 15px;
+            font-weight: 900;
+            overflow-wrap: anywhere;
+        }
+
+        .stock-code {
+            flex: 0 0 auto;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .metric {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            min-width: 0;
+            font-size: 12px;
+            line-height: 1.25;
+        }
+
+        .metric-label {
+            flex: 0 0 auto;
+            color: #6b7280;
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .metric-value {
+            min-width: 0;
+            color: #1f2937;
+            font-weight: 900;
+            text-align: right;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .metric-value.today-change {
+            font-size: 14px;
+        }
+
+        .gain-up {
+            color: #ef4444 !important;
+        }
+
+        .gain-down {
+            color: #22c55e !important;
+        }
+
+        .pct-sign {
+            display: inline-block;
+            min-width: 0.55em;
+            font-weight: 900;
+        }
+
+        .pct-number {
+            color: #111827 !important;
+            font-weight: 900;
+        }
+
+        .badge-line {
+            grid-column: 1 / -1;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 18px;
+            border-radius: 999px;
+            background: #eef2ff;
+            color: #3730a3;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        .empty {
+            margin: 12px 0;
+            border: 1px dashed #cbd5e1;
+            border-radius: 10px;
+            background: #fff;
+            color: #64748b;
+            padding: 28px 12px;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .stock-tooltip {
+            position: fixed;
+            left: 10px;
+            right: 10px;
+            bottom: calc(20px + env(safe-area-inset-bottom));
+            display: none;
+            z-index: 1000;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            background: #fff;
+            padding: 8px;
+            box-shadow: 0 12px 34px rgba(15, 23, 42, 0.24);
+        }
+
+        .tooltip-header {
+            margin-bottom: 6px;
+            color: #172033;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .kline-summary {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px 10px;
+        }
+
+        .kline-summary-name {
+            flex: 1 1 100%;
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .kline-name {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .kline-code {
+            flex: 0 0 auto;
+            color: #64748b;
+        }
+
+        .kline-break-count.is-low,
+        .kline-yin-count.is-low {
+            color: #dc2626;
+            font-weight: 900;
+        }
+
+        .stock-tooltip img {
+            display: block;
+            width: 100%;
+            height: auto;
+            max-height: 255px;
+            object-fit: contain;
+        }
+
+        @media (min-width: 769px) {
+            body {
+                background: #eef2f7;
+            }
+
+            .app {
+                border-left: 1px solid #e5e7eb;
+                border-right: 1px solid #e5e7eb;
+                background: #f5f7fb;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .module-tabs {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
+            .module-btn {
+                font-size: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="stock-tooltip" id="klineTooltip">
+        <div class="tooltip-header" id="klineTooltipHeader"></div>
+        <img id="klineImage" src="" alt="K线图">
+    </div>
+
+    <main class="app">
+        <section class="top-panel">
+            <div class="date-row">
+                <button class="date-btn" type="button" onclick="prevDate()">◀</button>
+                <input id="datePicker" type="text" readonly placeholder="选择日期">
+                <button class="date-btn" type="button" onclick="nextDate()">▶</button>
+            </div>
+            <div class="summary-row">
+                <span id="pageTitle">移动端选股</span>
+                <span id="countText">共 0 只</span>
+                <span id="updateText">更新: -</span>
+            </div>
+            <div class="module-tabs" id="moduleTabs"></div>
+            <div class="status" id="status">
+                <div class="filter-bar">
+                    <button type="button" class="filter-btn sort-low-btn" id="lowAboveSortBtn" hidden>低不碰排序</button>
+                    <button type="button" class="filter-btn" data-filter="limitUp">是否涨停</button>
+                    <button type="button" class="filter-btn" data-filter="pullNoTouch">拉升且不碰</button>
+                    <button type="button" class="filter-btn" data-filter="highGain">是否拉升</button>
+                    <button type="button" class="filter-btn" data-filter="bareFootHighGain">是否光脚拉升</button>
+                    <button type="button" class="filter-btn" data-filter="highGain10dGte5">是否5拉升</button>
+                </div>
+            </div>
+        </section>
+
+        <div id="groups"></div>
+    </main>
+
+        <script>
+        const MODULES = [
+            { key: 'tenAbove5', title: '10天大5日线', shortTitle: '10天大5', source: 'tenAbove5' },
+            { key: 'yinbreak5', title: '阴线跌破5日', shortTitle: '阴线跌破5日', source: 'yinbreak5' },
+            { key: 'ztYin20', title: '20日阴线次数', shortTitle: '20日阴线次数', source: 'zt' },
+            { key: 'fiveAllYinUp', title: '阴线都向上', shortTitle: '阴线都向上', source: 'five' },
+            { key: 'fiveYinBody', title: '累计阴线实体', shortTitle: '累计阴线实体', source: 'five' },
+            { key: 'fiveYinCount0', title: '5拉升阴线次数等于0', shortTitle: '阴线次数=0', source: 'five' },
+            { key: 'fiveYinCount1', title: '5拉升阴线次数等于1', shortTitle: '阴线次数=1', source: 'five' },
+            { key: 'fiveYinCount2', title: '5拉升阴线次数等于2', shortTitle: '阴线次数=2', source: 'five' }
+        ];
+
+        let currentDate = '';
+        let availableDates = [];
+        let datePicker = null;
+        let activeModuleKey = 'yinbreak5';
+        let rawData = { tenAbove5: [], yinbreak5: [], ztYin20: [], five: [] };
+        let renderedStocks = [];
+        let realtimeTimer = null;
+        let klineVisible = false;
+        let selectedKlineId = '';
+        let scrollKlineRaf = 0;
+        let lowAboveSortDirection = '';
+        const activeFilters = new Set();
+
+        function toNumber(value, fallback = 0) {
+            const num = Number(value);
+            return Number.isFinite(num) ? num : fallback;
+        }
+
+        function isTruthy(value) {
+            return value === true || value === 1 || value === '1' || value === 'true' || value === 'True' || value === '是';
+        }
+
+        function formatPct(value) {
+            const num = toNumber(value, 0);
+            return `${num >= 0 ? '+' : ''}${num.toFixed(2)}%`;
+        }
+
+        function formatChangePct(value) {
+            const num = toNumber(value, 0);
+            const sign = num >= 0 ? '+' : '-';
+            return `<span class="pct-sign ${gainClass(num)}">${sign}</span><span class="pct-number">${Math.abs(num).toFixed(2)}%</span>`;
+        }
+
+        function formatNumber(value, digits = 2) {
+            const num = toNumber(value, 0);
+            return num.toFixed(digits);
+        }
+
+        function gainClass(value) {
+            return toNumber(value, 0) >= 0 ? 'gain-up' : 'gain-down';
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function normalizeCode(stock) {
+            return String((stock && (stock.code || stock.stock_code || stock.stock_code_with_market)) || '')
+                .replace(/\.(SH|SZ)$/i, '')
+                .trim();
+        }
+
+        function normalizeStock(stock, source) {
+            const code = normalizeCode(stock);
+            const todayChange = toNumber(stock.today_change ?? stock.ref_gain ?? stock.current_gain, 0);
+            const closeAboveMa5Count = toNumber(stock.close_above_ma5_count_10d ?? stock.close_above_ma5_10d_count, 0);
+            const yinCount = source === 'five'
+                ? toNumber(stock.yin_count ?? stock.yin_count_10d ?? stock.yin_count_20, 0)
+                : source === 'tenAbove5'
+                    ? closeAboveMa5Count
+                : toNumber(stock.yin_count_20 ?? stock.yin_count ?? stock.yin_count_10d, 0);
+            const breakCount = source === 'five'
+                ? toNumber(stock.yin_close_below_ma5_10d_count ?? stock.close_below_ma5_10d_count, 0)
+                : source === 'tenAbove5'
+                    ? toNumber(stock.low_above_ma5_count, 0)
+                : toNumber(stock.weak_yin_20d ?? stock.weak_yin_count ?? stock.yin_close_below_ma5_count_10d, 0);
+            const bodyValue = source === 'tenAbove5'
+                ? toNumber(stock.yin_count_10 ?? stock.yin_count_10d, 0)
+                : toNumber(stock.yin_body_pct_sum_10d, 0);
+            return {
+                ...stock,
+                _source: source,
+                _id: `${source}:${code}`,
+                code,
+                name: String(stock.name || ''),
+                today_change: todayChange,
+                display_yin_count: yinCount,
+                display_break_count: breakCount,
+                display_yin_body: bodyValue,
+                display_max_gain: toNumber(stock.max_gain ?? stock.ref_max_gain, 0),
+                display_gain_20d: toNumber(stock.gain_20d ?? stock.gains_10, 0),
+                display_break_label: source === 'tenAbove5' ? '低不碰' : '跌破次数',
+                display_yin_label: source === 'tenAbove5' ? '大5日线' : '阴线次数',
+                display_body_label: source === 'tenAbove5' ? '10日阴线' : '阴线实体',
+                display_body_is_pct: source !== 'tenAbove5',
+                display_gain_label: source === 'tenAbove5' ? '20日涨幅' : '区间涨幅'
+            };
+        }
+
+        function sortByChangeDesc(stocks) {
+            return stocks.slice().sort((a, b) => toNumber(b.today_change, 0) - toNumber(a.today_change, 0));
+        }
+
+        function sortTenAbove5(stocks) {
+            return stocks.slice().sort((a, b) => {
+                if (lowAboveSortDirection) {
+                    const diff = toNumber(a.display_break_count, 0) - toNumber(b.display_break_count, 0);
+                    if (diff !== 0) {
+                        return lowAboveSortDirection === 'asc' ? diff : -diff;
+                    }
+                }
+                return toNumber(b.today_change, 0) - toNumber(a.today_change, 0);
+            });
+        }
+
+        function stockPassesActiveFilters(stock) {
+            if (!activeFilters.size) return true;
+            return Array.from(activeFilters).every(filter => {
+                if (filter === 'limitUp') {
+                    return isTruthy(stock.ref_is_limit_up) || isTruthy(stock.is_limit_up) || isTruthy(stock.ref_limit_up);
+                }
+                if (filter === 'pullNoTouch') {
+                    return isTruthy(stock.ref_high_gain_gte_6_5_yang_low_above_ma5)
+                        || isTruthy(stock.ref_bare_foot_yang_high_gain_gte_6_5_low_gt_ma5);
+                }
+                if (filter === 'highGain') {
+                    return isTruthy(stock.ref_high_gain_ok);
+                }
+                if (filter === 'bareFootHighGain') {
+                    return isTruthy(stock.is_bare_foot_yang)
+                        || isTruthy(stock.ref_bare_foot_yang_high_gain_gte_6_5);
+                }
+                if (filter === 'highGain10dGte5') {
+                    return isTruthy(stock.high_gain_10d_gte_5) || toNumber(stock.high_gain_count, 0) >= 5;
+                }
+                return true;
+            });
+        }
+
+        function buildGroupedByNumber(stocks, field, label) {
+            const groups = new Map();
+            stocks.forEach(stock => {
+                const key = toNumber(stock[field], 0);
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key).push(stock);
+            });
+            return Array.from(groups.entries())
+                .sort((a, b) => a[0] - b[0])
+                .map(([value, rows]) => ({
+                    title: `${label} = ${value}`,
+                    stocks: sortByChangeDesc(rows)
+                }));
+        }
+
+        function buildModuleGroups() {
+            const tenAbove5 = rawData.tenAbove5.map(stock => normalizeStock(stock, 'tenAbove5')).filter(stockPassesActiveFilters);
+            const yinbreak5 = rawData.yinbreak5.map(stock => normalizeStock(stock, 'yinbreak5')).filter(stockPassesActiveFilters);
+            const ztYin20 = rawData.ztYin20.map(stock => normalizeStock(stock, 'zt')).filter(stockPassesActiveFilters);
+            const five = rawData.five.map(stock => normalizeStock(stock, 'five')).filter(stockPassesActiveFilters);
+
+            if (activeModuleKey === 'tenAbove5') {
+                return [
+                    {
+                        title: '大5日线次数 = 10',
+                        stocks: sortTenAbove5(tenAbove5.filter(stock => toNumber(stock.display_yin_count, 0) === 10))
+                    },
+                    {
+                        title: '大5日线次数 = 9',
+                        stocks: sortTenAbove5(tenAbove5.filter(stock => toNumber(stock.display_yin_count, 0) === 9))
+                    }
+                ];
+            }
+
+            if (activeModuleKey === 'yinbreak5') {
+                return buildGroupedByNumber(
+                    yinbreak5.sort((a, b) => toNumber(a.weak_yin_20d, 0) - toNumber(b.weak_yin_20d, 0)),
+                    'display_break_count',
+                    '跌破次数'
+                );
+            }
+
+            if (activeModuleKey === 'ztYin20') {
+                return buildGroupedByNumber(
+                    ztYin20.sort((a, b) => toNumber(a.yin_count_20, 0) - toNumber(b.yin_count_20, 0)),
+                    'display_yin_count',
+                    '20日阴线次数'
+                );
+            }
+
+            if (activeModuleKey === 'fiveAllYinUp') {
+                const rows = sortByChangeDesc(five.filter(stock => isTruthy(stock.all_yin_up)));
+                return [{ title: '阴线都向上', stocks: rows }];
+            }
+
+            if (activeModuleKey === 'fiveYinBody') {
+                const sorted = five.slice().sort((a, b) => {
+                    const diff = toNumber(a.display_yin_body, 0) - toNumber(b.display_yin_body, 0);
+                    return diff !== 0 ? diff : toNumber(b.today_change, 0) - toNumber(a.today_change, 0);
+                });
+                return [
+                    { title: '阴线都是十字星', stocks: sorted.filter(stock => isTruthy(stock.all_yin_cross_star)) },
+                    { title: '全部股票', stocks: sorted }
+                ];
+            }
+
+            if (activeModuleKey === 'fiveYinCount0' || activeModuleKey === 'fiveYinCount1' || activeModuleKey === 'fiveYinCount2') {
+                const target = activeModuleKey === 'fiveYinCount0' ? 0 : activeModuleKey === 'fiveYinCount1' ? 1 : 2;
+                const matched = sortByChangeDesc(five.filter(stock => toNumber(stock.display_yin_count, 0) === target));
+                return [{ title: '全部股票', stocks: matched }];
+            }
+
+            return [];
+        }
+
+        function renderModuleTabs() {
+            const container = document.getElementById('moduleTabs');
+            container.innerHTML = MODULES.map(module => `
+                <button type="button" class="module-btn ${module.key === activeModuleKey ? 'active' : ''}" data-module="${module.key}">
+                    ${escapeHtml(module.shortTitle)}
+                </button>
+            `).join('');
+            container.querySelectorAll('[data-module]').forEach(button => {
+                button.addEventListener('click', () => {
+                    activeModuleKey = button.dataset.module;
+                    hideKline();
+                    render();
+                });
+            });
+        }
+
+        function syncFilterButtons() {
+            document.querySelectorAll('.filter-btn[data-filter]').forEach(button => {
+                button.classList.toggle('active', activeFilters.has(button.dataset.filter));
+            });
+        }
+
+        function syncLowAboveSortButton() {
+            const button = document.getElementById('lowAboveSortBtn');
+            if (!button) return;
+            const visible = activeModuleKey === 'tenAbove5';
+            button.hidden = !visible;
+            button.classList.toggle('active', visible && Boolean(lowAboveSortDirection));
+            button.textContent = lowAboveSortDirection === 'asc'
+                ? '低不碰排序 ↑'
+                : (lowAboveSortDirection === 'desc' ? '低不碰排序 ↓' : '低不碰排序');
+        }
+
+        function bindLowAboveSortButton() {
+            const button = document.getElementById('lowAboveSortBtn');
+            if (!button) return;
+            button.addEventListener('click', () => {
+                lowAboveSortDirection = lowAboveSortDirection === 'desc' ? 'asc' : 'desc';
+                syncLowAboveSortButton();
+                hideKline();
+                render();
+            });
+        }
+
+        function bindFilterButtons() {
+            document.querySelectorAll('.filter-btn[data-filter]').forEach(button => {
+                button.addEventListener('click', () => {
+                    const filter = button.dataset.filter;
+                    if (activeFilters.has(filter)) {
+                        activeFilters.delete(filter);
+                    } else {
+                        activeFilters.add(filter);
+                    }
+                    syncFilterButtons();
+                    hideKline();
+                    render();
+                });
+            });
+        }
+
+        function render() {
+            renderModuleTabs();
+            syncLowAboveSortButton();
+            const module = MODULES.find(item => item.key === activeModuleKey) || MODULES[0];
+            const groups = buildModuleGroups();
+            renderedStocks = groups.flatMap(group => group.stocks);
+            document.getElementById('pageTitle').textContent = module.title;
+            document.getElementById('countText').textContent = `共 ${renderedStocks.length} 只`;
+
+            const container = document.getElementById('groups');
+            if (!renderedStocks.length) {
+                container.innerHTML = '<div class="empty">当前日期没有数据</div>';
+                return;
+            }
+
+            container.innerHTML = groups.map(group => renderGroup(group)).join('');
+            bindKlineCards();
+            restoreKlineSelection();
+        }
+
+        function renderGroup(group) {
+            return `
+                <section class="group">
+                    <div class="group-header">
+                        <span>${escapeHtml(group.title)}</span>
+                        <span class="group-count">${group.stocks.length} 只</span>
+                    </div>
+                    <div class="stock-list">
+                        ${group.stocks.length ? group.stocks.map(renderCard).join('') : '<div class="empty">暂无数据</div>'}
+                    </div>
+                </section>
+            `;
+        }
+
+        function renderMetric(label, value, cls = '') {
+            return `
+                <div class="metric">
+                    <span class="metric-label">${escapeHtml(label)}</span>
+                    <span class="metric-value ${cls}">${value}</span>
+                </div>
+            `;
+        }
+
+        function renderCard(stock) {
+            const badges = [];
+            if (isTruthy(stock.ref_is_limit_up) || isTruthy(stock.is_limit_up) || isTruthy(stock.ref_limit_up)) badges.push('涨停');
+            if (isTruthy(stock.ref_high_gain_gte_6_5_yang_low_above_ma5)) badges.push('拉升不碰');
+            if (isTruthy(stock.ref_high_gain_ok)) badges.push('拉升');
+            if (isTruthy(stock.is_20d_new_high)) badges.push('20新高');
+            if (isTruthy(stock.all_yin_up)) badges.push('阴线向上');
+            if (isTruthy(stock.is_bare_foot_yang) || isTruthy(stock.ref_bare_foot_yang_high_gain_gte_6_5)) badges.push('光脚拉升');
+            if (isTruthy(stock.high_gain_10d_gte_5)) badges.push('5拉升');
+            const bodyText = stock.display_body_is_pct ? `${formatNumber(stock.display_yin_body, 2)}%` : toNumber(stock.display_yin_body, 0);
+
+            return `
+                <article class="stock-card"
+                    data-id="${escapeHtml(stock._id)}"
+                    data-code="${escapeHtml(stock.code)}"
+                    data-name="${escapeHtml(stock.name)}"
+                    data-change="${toNumber(stock.today_change, 0)}"
+                    data-break-count="${toNumber(stock.display_break_count, 0)}"
+                    data-break-label="${escapeHtml(stock.display_break_label || '跌破次数')}"
+                    data-yin-label="${escapeHtml(stock.display_yin_label || '阴线次数')}"
+                    data-yin-count="${toNumber(stock.display_yin_count, 0)}">
+                    <div class="stock-main">
+                        <div class="stock-name">${escapeHtml(stock.name || '-')}</div>
+                        <div class="stock-code">${escapeHtml(stock.code || '-')}</div>
+                    </div>
+                    ${renderMetric('涨跌幅', formatChangePct(stock.today_change), 'today-change')}
+                    ${renderMetric(stock.display_break_label || '跌破次数', toNumber(stock.display_break_count, 0))}
+                    ${renderMetric(stock.display_yin_label || '阴线次数', toNumber(stock.display_yin_count, 0))}
+                    ${renderMetric('最高涨幅', formatPct(stock.display_max_gain))}
+                    ${renderMetric(stock.display_body_label || '阴线实体', bodyText)}
+                    ${renderMetric(stock.display_gain_label || '区间涨幅', formatPct(stock.display_gain_20d))}
+                    <div class="badge-line">${badges.length ? badges.map(text => `<span class="badge">${escapeHtml(text)}</span>`).join('') : '<span class="badge">普通</span>'}</div>
+                </article>
+            `;
+        }
+
+        async function loadDates() {
+            const endpoints = ['/api/10above5/dates', '/api/yinbreak5/dates', '/api/ztorgj/dates', '/api/5ls/dates'];
+            const results = await Promise.allSettled(endpoints.map(url => fetch(url, { cache: 'no-store' }).then(r => r.json())));
+            const dateSet = new Set();
+            results.forEach(result => {
+                if (result.status === 'fulfilled' && result.value && result.value.success) {
+                    (result.value.dates || []).forEach(date => dateSet.add(date));
+                }
+            });
+            availableDates = Array.from(dateSet).sort().reverse();
+            currentDate = availableDates[0] || new Date().toISOString().slice(0, 10);
+            datePicker = flatpickr('#datePicker', {
+                locale: 'zh',
+                dateFormat: 'Y-m-d',
+                defaultDate: currentDate,
+                enable: availableDates.length ? availableDates : undefined,
+                onChange: function(selectedDates, dateStr) {
+                    currentDate = dateStr;
+                    loadData();
+                }
+            });
+        }
+
+        async function loadData() {
+            clearInterval(realtimeTimer);
+            hideKline();
+            const dateParam = encodeURIComponent(currentDate);
+            const [tenAbove5Result, yinbreakResult, ztResult, fiveResult] = await Promise.allSettled([
+                fetch(`/api/10above5/stocks?date=${dateParam}`, { cache: 'no-store' }).then(r => r.json()),
+                fetch(`/api/yinbreak5/stocks?date=${dateParam}`, { cache: 'no-store' }).then(r => r.json()),
+                fetch(`/api/ztorgj/stocks?date=${dateParam}`, { cache: 'no-store' }).then(r => r.json()),
+                fetch(`/api/5ls/stocks?date=${dateParam}`, { cache: 'no-store' }).then(r => r.json())
+            ]);
+
+            const tenAbove5 = tenAbove5Result.status === 'fulfilled' && tenAbove5Result.value.success ? tenAbove5Result.value : {};
+            const yinbreak = yinbreakResult.status === 'fulfilled' && yinbreakResult.value.success ? yinbreakResult.value : {};
+            const zt = ztResult.status === 'fulfilled' && ztResult.value.success ? ztResult.value : {};
+            const five = fiveResult.status === 'fulfilled' && fiveResult.value.success ? fiveResult.value : {};
+            rawData = {
+                tenAbove5: tenAbove5.data || [],
+                yinbreak5: yinbreak.data || [],
+                ztYin20: (zt.datasets && zt.datasets.yxcs) || [],
+                five: five.data || []
+            };
+            document.getElementById('updateText').textContent = `更新: ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`;
+            if (datePicker && currentDate) {
+                datePicker.setDate(currentDate, false);
+            }
+            render();
+            startRealtimeRefresh();
+        }
+
+        function prevDate() {
+            const index = availableDates.indexOf(currentDate);
+            if (index >= 0 && index < availableDates.length - 1) {
+                currentDate = availableDates[index + 1];
+                loadData();
+            }
+        }
+
+        function nextDate() {
+            const index = availableDates.indexOf(currentDate);
+            if (index > 0) {
+                currentDate = availableDates[index - 1];
+                loadData();
+            }
+        }
+
+        function getEastMoneyPrefix(code) {
+            return String(code || '').startsWith('6') ? '1' : '0';
+        }
+
+        function showKline(event, card) {
+            if (!card || !card.dataset.code) return;
+            const tooltip = document.getElementById('klineTooltip');
+            const image = document.getElementById('klineImage');
+            const header = document.getElementById('klineTooltipHeader');
+            const code = card.dataset.code;
+            const name = card.dataset.name || '';
+            const change = toNumber(card.dataset.change, 0);
+            const breakCount = toNumber(card.dataset.breakCount, 0);
+            const yinCount = toNumber(card.dataset.yinCount, 0);
+            const breakLabel = card.dataset.breakLabel || '跌破次数';
+            const yinLabel = card.dataset.yinLabel || '阴线次数';
+            const breakCountClass = breakCount <= 2 ? 'kline-break-count is-low' : 'kline-break-count';
+            const yinCountClass = yinCount <= 4 ? 'kline-yin-count is-low' : 'kline-yin-count';
+            image.src = `https://webquoteklinepic.eastmoney.com/GetPic.aspx?nid=${getEastMoneyPrefix(code)}.${code}&imageType=KXL&token=44c9d251add88e27b65ed86506f6e5da&at=1`;
+            header.innerHTML = `
+                <div class="kline-summary">
+                    <div class="kline-summary-name">
+                        <span class="kline-name">${escapeHtml(name)}</span>
+                        <span class="kline-code">${escapeHtml(code)}</span>
+                    </div>
+                    <span>${formatChangePct(change)}</span>
+                    <span>${escapeHtml(breakLabel)}: <strong class="${breakCountClass}">${breakCount}</strong></span>
+                    <span>${escapeHtml(yinLabel)}: <strong class="${yinCountClass}">${yinCount}</strong></span>
+                </div>
+            `;
+            tooltip.style.display = 'block';
+            klineVisible = true;
+            selectedKlineId = String(card.dataset.id || '');
+        }
+
+        function hideKline() {
+            const tooltip = document.getElementById('klineTooltip');
+            const image = document.getElementById('klineImage');
+            tooltip.style.display = 'none';
+            image.src = '';
+            klineVisible = false;
+            selectedKlineId = '';
+            clearKlineSelection();
+        }
+
+        function clearKlineSelection() {
+            document.querySelectorAll('.stock-card.kline-selected').forEach(card => card.classList.remove('kline-selected'));
+        }
+
+        function selectKlineCard(card, event) {
+            const sameSelected = card.classList.contains('kline-selected') && klineVisible && selectedKlineId === String(card.dataset.id || '');
+            if (sameSelected) {
+                hideKline();
+                return;
+            }
+            clearKlineSelection();
+            card.classList.add('kline-selected');
+            showKline(event, card);
+        }
+
+        function restoreKlineSelection() {
+            if (!klineVisible || !selectedKlineId) return;
+            const card = Array.from(document.querySelectorAll('.stock-card')).find(item => String(item.dataset.id || '') === selectedKlineId);
+            if (card) {
+                card.classList.add('kline-selected');
+            } else {
+                hideKline();
+            }
+        }
+
+        function klineVisibleBottomLimit() {
+            const tooltip = document.getElementById('klineTooltip');
+            if (tooltip && tooltip.style.display === 'block') {
+                const rect = tooltip.getBoundingClientRect();
+                if (rect.top > 0) return rect.top - 8;
+            }
+            return window.innerHeight;
+        }
+
+        function findTopVisibleCard() {
+            const bottomLimit = klineVisibleBottomLimit();
+            const cards = Array.from(document.querySelectorAll('.stock-card'))
+                .map(card => ({ card, rect: card.getBoundingClientRect() }))
+                .filter(item => item.rect.bottom > 0 && item.rect.top < bottomLimit)
+                .sort((a, b) => Math.max(a.rect.top, 0) - Math.max(b.rect.top, 0));
+            return cards.length ? cards[0].card : null;
+        }
+
+        function isCardVisibleAboveKline(card) {
+            const rect = card.getBoundingClientRect();
+            const bottomLimit = klineVisibleBottomLimit();
+            return rect.bottom > 0 && rect.top < bottomLimit;
+        }
+
+        function updateKlineSelectionOnScroll() {
+            if (!klineVisible) return;
+            const selectedCard = document.querySelector('.stock-card.kline-selected');
+            if (selectedCard && isCardVisibleAboveKline(selectedCard)) return;
+            const nextCard = findTopVisibleCard();
+            if (!nextCard) return;
+            clearKlineSelection();
+            nextCard.classList.add('kline-selected');
+            showKline({ clientX: window.innerWidth / 2, clientY: window.innerHeight - 40 }, nextCard);
+        }
+
+        function bindKlineCards() {
+            document.querySelectorAll('.stock-card').forEach(card => {
+                card.addEventListener('click', event => selectKlineCard(card, event));
+            });
+        }
+
+        function bindScrollFollow() {
+            window.addEventListener('scroll', () => {
+                if (!klineVisible || scrollKlineRaf) return;
+                scrollKlineRaf = window.requestAnimationFrame(() => {
+                    scrollKlineRaf = 0;
+                    updateKlineSelectionOnScroll();
+                });
+            }, { passive: true });
+        }
+
+        async function refreshRealtime() {
+            const allStocks = [
+                ...rawData.tenAbove5.map(stock => normalizeStock(stock, 'tenAbove5')),
+                ...rawData.yinbreak5.map(stock => normalizeStock(stock, 'yinbreak5')),
+                ...rawData.ztYin20.map(stock => normalizeStock(stock, 'zt')),
+                ...rawData.five.map(stock => normalizeStock(stock, 'five'))
+            ];
+            const codes = Array.from(new Set(allStocks.map(stock => stock.code).filter(Boolean)));
+            if (!codes.length) return;
+            try {
+                const response = await fetch('/api/yinbreak5/realtime', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ codes })
+                });
+                const result = await response.json();
+                if (!result.success || !result.data) return;
+                let changed = false;
+                ['tenAbove5', 'yinbreak5', 'ztYin20', 'five'].forEach(key => {
+                    rawData[key].forEach(stock => {
+                        const code = normalizeCode(stock);
+                        const rt = result.data[code] || result.data[stock.code];
+                        if (rt && typeof rt.change === 'number' && toNumber(stock.today_change ?? stock.ref_gain, 0) !== rt.change) {
+                            stock.today_change = rt.change;
+                            changed = true;
+                        }
+                    });
+                });
+                if (changed) {
+                    render();
+                    document.getElementById('updateText').textContent = `更新: ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`;
+                }
+            } catch (error) {
+                console.error('[yd][realtime] 请求失败:', error);
+            }
+        }
+
+        function startRealtimeRefresh() {
+            refreshRealtime();
+            realtimeTimer = setInterval(refreshRealtime, 3000);
+        }
+
+        async function init() {
+            try {
+                renderModuleTabs();
+                bindFilterButtons();
+                bindLowAboveSortButton();
+                syncFilterButtons();
+                syncLowAboveSortButton();
+                bindScrollFollow();
+                await loadDates();
+                await loadData();
+            } catch (error) {
+                document.getElementById('status').textContent = `初始化失败: ${error.message || error}`;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

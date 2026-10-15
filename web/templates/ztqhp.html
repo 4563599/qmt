@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>涨停前横盘</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: #ffffff; min-height: 100vh; padding: 20px; margin: 0;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        .nav-buttons { margin-bottom: 10px; display: flex; justify-content: flex-start; align-items: center; gap: 15px; flex-wrap: wrap; }
+        .nav-left { display: flex; gap: 10px; align-items: center; }
+        .nav-right { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; justify-content: flex-start; }
+        .nav-btn {
+            display: inline-block; padding: 5px 9px; color: white; text-decoration: none;
+            border-radius: 8px; transition: all 0.3s; font-size: 13px; font-weight: 500;
+            letter-spacing: 0.1px; white-space: nowrap; flex-shrink: 0;
+        }
+        .nav-btn-home { background: #667eea; }
+        .nav-btn-home:hover { background: #5568d3; transform: translateY(-2px); }
+        .nav-btn-ztqhp { background: #2563eb; }
+        .nav-btn-ztqhp:hover { background: #1d4ed8; transform: translateY(-2px); }
+        .nav-btn-yhy { background: #e11d48; }
+        .nav-btn-yhy:hover { background: #be123c; transform: translateY(-2px); }
+        .nav-btn-yx205 { background: #06b6d4; }
+        .nav-btn-yx205:hover { background: #0891b2; transform: translateY(-2px); }
+        .nav-btn-ztorgj { background: #d946ef; }
+        .nav-btn-ztorgj:hover { background: #c026d3; transform: translateY(-2px); }
+        .nav-btn-lszty { background: #e11d48; }
+        .nav-btn-lszty:hover { background: #be123c; transform: translateY(-2px); }
+        .nav-btn-sbzt { background: #f43f5e; }
+        .nav-btn-sbzt:hover { background: #e11d48; transform: translateY(-2px); }
+        .nav-btn-ztqq { background: #7c3aed; }
+        .nav-btn-ztqq:hover { background: #6d28d9; transform: translateY(-2px); }
+
+        .date-selector { display: flex; align-items: center; gap: 6px; background: white; padding: 4px 8px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .date-nav-btn { background: #2563eb; color: white; border: none; padding: 5px 8px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.3s; font-weight: 500; min-width: 28px; display: flex; align-items: center; justify-content: center; }
+        .date-nav-btn:hover { background: #1d4ed8; transform: scale(1.05); }
+        .date-nav-btn:disabled { background: #ccc; cursor: not-allowed; transform: scale(1); }
+        #datePicker { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; text-align: center; width: auto; min-width: 95px; max-width: 105px; }
+
+        .page-title { background: white; border-radius: 10px; padding: 12px 16px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .page-title h1 { font-size: 22px; font-weight: 700; color: #1d1d1f; margin: 0; }
+        .page-title .badge { color: white; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+        .page-title .desc { color: #6b7280; font-size: 13px; }
+        .page-title .count-badge { background: #eff6ff; color: #2563eb; font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 20px; border: 1px solid #bfdbfe; }
+        .scan-info-text { color: #2563eb; font-size: 13px; font-weight: 700; }
+
+        .columns-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            justify-content: start;
+            align-items: start;
+            gap: 12px;
+            min-width: 0;
+        }
+        .metric-column {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            border: 1px solid #e0e0e0;
+            min-width: 0;
+        }
+        .col-header {
+            padding: 9px 8px;
+            font-size: 13px;
+            font-weight: 700;
+            color: white;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        .col-header.over-five { background: linear-gradient(135deg, #2563eb, #3b82f6); }
+        .col-header.eq-five { background: linear-gradient(135deg, #2563eb, #3b82f6); }
+        .col-header.eq-four { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+        .col-header.eq-three { background: linear-gradient(135deg, #f97316, #ea580c); }
+        .col-header-sub { font-size: 11px; font-weight: 400; opacity: 0.85; margin-top: 2px; }
+
+        .stock-row-header {
+            display: grid;
+            grid-template-columns: 1.9fr 1fr 1fr 1fr;
+            padding: 3px 6px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+        }
+        .stock-row-header span { font-size: 10px; font-weight: 600; color: #86868b; text-align: center; }
+
+        .stock-row {
+            display: grid;
+            grid-template-columns: 1.9fr 1fr 1fr 1fr;
+            align-items: center;
+            padding: 6px 6px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .stock-row:hover { background: #f8f9fa; }
+        .stock-row:last-child { border-bottom: none; }
+        .stock-name { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+        .s-name { font-size: 13px; font-weight: 500; color: #1d1d1f; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+        .s-code { font-size: 10px; color: #86868b; margin-top: 1px; }
+        .s-extra { font-size: 10px; color: #6b7280; margin-top: 1px; text-align: center; }
+        .s-gain { font-size: 13px; font-weight: 700; text-align: center; }
+        .s-metric { font-size: 12px; font-weight: 700; text-align: center; color: #374151; }
+        .positive { color: #e74c3c; }
+        .negative { color: #2563eb; }
+        .neutral  { color: #95a5a6; }
+        .good { color: #2563eb; }
+        .extra { color: #7c3aed; font-weight: 700; }
+
+        .no-data { padding: 12px 8px; font-size: 12px; color: #bbb; text-align: center; }
+        .loading-msg { text-align: center; padding: 40px; color: #666; font-size: 14px; }
+        .stacked-column {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 0;
+        }
+        .task-section {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 14px rgba(124,58,237,0.12);
+            border: 1px solid #ddd6fe;
+        }
+        .task-section-header {
+            padding: 9px 10px;
+            color: #fff;
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .task-section-title { font-size: 13px; font-weight: 700; }
+        .task-section-sub { font-size: 11px; opacity: 0.9; margin-top: 2px; }
+        .task-section-count {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.18);
+            white-space: nowrap;
+        }
+        .task-group-block { border-top: 1px solid #ede9fe; }
+        .task-group-block:first-child { border-top: 0; }
+        .task-group-header {
+            padding: 6px 10px;
+            background: #f5f3ff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .task-group-title { font-size: 13px; font-weight: 700; color: #5b21b6; }
+        .task-group-count {
+            font-size: 10px;
+            font-weight: 700;
+            color: #6d28d9;
+            background: #ede9fe;
+            border-radius: 999px;
+            padding: 2px 8px;
+        }
+        .task-empty-alert {
+            padding: 14px 10px;
+            text-align: center;
+            color: #dc2626;
+            font-size: 13px;
+            font-weight: 800;
+        }
+        .task-row-header {
+            display: grid;
+            grid-template-columns: 1.9fr 1fr 1fr 1fr;
+            padding: 3px 6px;
+            background: #faf5ff;
+            border-top: 1px solid #ede9fe;
+            border-bottom: 1px solid #eee;
+        }
+        .task-row-header span { font-size: 10px; font-weight: 600; color: #7c3aed; text-align: center; }
+        .task-row {
+            display: grid;
+            grid-template-columns: 1.9fr 1fr 1fr 1fr;
+            align-items: center;
+            padding: 6px 6px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .task-row:hover { background: #faf5ff; }
+        .task-row:last-child { border-bottom: none; }
+        .task-name { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+        .task-source { font-size: 10px; color: #7c3aed; margin-top: 1px; text-align: center; }
+        .task-context-menu {
+            position: fixed;
+            display: none;
+            min-width: 170px;
+            background: rgba(255,255,255,0.96);
+            border: 1px solid rgba(15,23,42,0.08);
+            border-radius: 14px;
+            box-shadow: 0 18px 44px rgba(15,23,42,0.18);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            overflow: hidden;
+            z-index: 10030;
+        }
+        .task-context-item {
+            width: 100%;
+            border: 0;
+            background: transparent;
+            text-align: left;
+            padding: 11px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #1f2937;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+        .task-context-item + .task-context-item { border-top: 1px solid #eef2f7; }
+        .task-context-item:hover { background: #f8fafc; }
+        .task-context-item.task-context-yizi { color: #2563eb; }
+        .task-context-item.task-context-changzi { color: #dc2626; }
+        .task-context-item.task-context-hengpan { color: #7c3aed; }
+        .task-context-item.task-context-delete { color: #dc2626; }
+        .task-ios-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+            z-index: 10040;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .task-ios-modal {
+            width: min(320px, calc(100vw - 32px));
+            background: #fff;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 12px 42px rgba(0,0,0,0.24);
+        }
+        .task-ios-title {
+            padding: 18px 18px 6px;
+            text-align: center;
+            font-size: 17px;
+            font-weight: 700;
+            color: #111827;
+        }
+        .task-ios-body {
+            padding: 4px 18px 16px;
+            text-align: center;
+            font-size: 14px;
+            color: #111827;
+            line-height: 1.65;
+        }
+        .task-ios-body .task-kline-tip { margin-bottom: 8px; text-align: center; }
+        .task-ios-body .task-kline-list { margin: 0 auto; width: fit-content; text-align: left; color: #7c3aed; font-weight: 700; }
+        .task-ios-body .task-warn-text { color: #dc2626; font-weight: 800; font-size: 18px; }
+        .task-ios-body .task-gain-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 6px; }
+        .task-ios-body .task-gain-option { border: 0; border-radius: 14px; min-height: 108px; aspect-ratio: 1 / 1; padding: 10px 12px; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.45; white-space: normal; }
+        .task-ios-body .task-gain-option-green { background: #ecfdf5; color: #15803d; }
+        .task-ios-body .task-gain-option-red { background: #fef2f2; color: #dc2626; }
+        .task-ios-actions { display: flex; min-height: 46px; border-top: 0.5px solid #d1d5db; }
+        .task-ios-btn { flex: 1; border: 0; background: transparent; font-size: 17px; cursor: pointer; color: #007aff; font-weight: 600; }
+        .task-ios-btn + .task-ios-btn { border-left: 0.5px solid #d1d5db; }
+        .task-ios-btn.task-ios-btn-cancel { color: #ff3b30; font-weight: 500; }
+
+        .stock-tooltip { position: fixed; display: none; background: #fff; border: 1px solid #e1e1e1; border-radius: 8px; padding: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 10000; pointer-events: none; }
+        .stock-tooltip img { display: block; width: 680px; height: 380px; background: #f5f5f7; }
+        .stock-tooltip .tooltip-header { font-size: 12px; color: #666; margin-bottom: 5px; text-align: center; }
+
+        @media (max-width: 1200px) {
+            .nav-left, .nav-right { width: 100%; justify-content: center; }
+            .nav-buttons { flex-wrap: wrap; }
+            .columns-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 768px) {
+            body { padding: 10px; overflow-x: hidden; }
+            .nav-btn { flex: 1 1 calc(50% - 4px); min-width: 0; padding: 8px 6px; font-size: 12px; white-space: normal; word-break: keep-all; line-height: 1.3; text-align: center; }
+            .columns-grid { grid-template-columns: 1fr; }
+            .stock-tooltip img { width: 100%; max-width: 600px; height: auto; }
+        }
+        @media (max-width: 768px) {
+            .container,
+            .columns-grid,
+            .metric-column,
+            .task-section,
+            .stacked-column {
+                max-width: 100%;
+                overflow-x: hidden !important;
+            }
+            .stock-row-header span,
+            .stock-row span,
+            .stock-name,
+            .s-name,
+            .nav-btn {
+                white-space: normal !important;
+                word-break: break-all;
+                overflow-wrap: anywhere;
+            }
+            #datePicker { min-width: 0 !important; width: 100%; max-width: 100%; }
+            .task-context-menu { min-width: 150px; }
+        }
+        @media (max-width: 768px) {
+            body { padding: 10px; overflow-x: hidden; }
+            .nav-buttons { gap: 10px; }
+            .date-selector { width: 100%; justify-content: center; flex-wrap: wrap; }
+            .page-title { padding: 10px 12px; gap: 6px; }
+            .page-title h1 { font-size: 18px; }
+            .page-title .desc,
+            .page-title .count-badge,
+            .page-title .badge,
+            .scan-info-text { font-size: 11px; }
+        }
+    </style>
+</head>
+<body>
+<div class="stock-tooltip" id="klineTooltip">
+    <div class="tooltip-header" id="klineTtHeader"></div>
+    <img id="klineImage" src="" alt="K线图">
+</div>
+
+<div class="container">
+    <div class="nav-buttons">
+        <div class="nav-left">
+            <div class="date-selector">
+                <button class="date-nav-btn" id="prevDateBtn" onclick="prevDate()">◀</button>
+                <input type="text" id="datePicker" placeholder="选择日期" readonly>
+                <button class="date-nav-btn" id="nextDateBtn" onclick="nextDate()">▶</button>
+            </div>
+        </div>
+        <div class="nav-right">
+            <a href="/" class="nav-btn nav-btn-home">首页</a>
+            <a href="/涨停前横盘" class="nav-btn nav-btn-ztqhp" style="font-weight:700;">涨停前横盘</a>
+            <a href="/阴后强" class="nav-btn nav-btn-yhy">阴后强</a>
+            <a href="/5拉升" class="nav-btn" style="background:#2563eb;">5拉升</a>
+            <a href="/20阴少跌少横盘" class="nav-btn nav-btn-yx205">20阴少跌少横盘</a>
+            <a href="/阴线跌破5日次数" class="nav-btn" style="background:#ca8a04;">阴线跌破5日次数</a>
+            <a href="/10天大5日线" class="nav-btn" style="background:#0f766e;">10天大5日线</a>
+            <a href="/涨停或光脚" class="nav-btn nav-btn-ztorgj">涨停或光脚</a>
+            <a href="/连续5不碰" class="nav-btn" style="background:#f43f5e;">连续5不碰</a>
+            <a href="/连续涨停" class="nav-btn nav-btn-lszty">连续涨停</a>
+                <a href="/连续4天拉升" class="nav-btn nav-btn-intraday4up" style="background:#f97316;">连续4天拉升</a>
+            <a href="/极品关注" class="nav-btn" style="background:#f59e0b;">极品关注</a>
+            <a href="/同花顺板块" class="nav-btn" style="background:#2563eb;">同花顺板块</a>
+        </div>
+    </div>
+
+    <div class="page-title">
+        <h1>涨停前横盘</h1>
+        <span class="badge" style="background: linear-gradient(135deg, #2563eb, #1d4ed8);">4列表</span>
+        <span class="desc">Redis: ztqhp · 按涨停前横盘最大天数分表展示</span>
+        <span class="count-badge" id="totalCount">加载中...</span>
+        <span class="scan-info-text" id="scanInfoText">扫描耗时--s，上次扫描时间:--</span>
+    </div>
+
+    <div id="mainContent">
+        <div class="loading-msg">正在加载数据...</div>
+    </div>
+</div>
+
+<div id="taskContextMenu" class="task-context-menu">
+    <button type="button" class="task-context-item task-context-yizi" data-task-type="yizi">添加一字特征</button>
+    <button type="button" class="task-context-item task-context-changzi" data-task-type="changzi">添加厂子特征</button>
+    <button type="button" class="task-context-item task-context-hengpan" data-task-type="hengpan">添加横盘调整特征</button>
+    <button type="button" class="task-context-item task-context-delete" data-task-type="delete" style="display:none;">删除股票</button>
+</div>
+
+<div id="taskIosOverlay" class="task-ios-overlay">
+    <div class="task-ios-modal">
+        <div class="task-ios-title" id="taskIosTitle"></div>
+        <div class="task-ios-body" id="taskIosBody"></div>
+        <div class="task-ios-actions" id="taskIosActions"></div>
+    </div>
+</div>
+
+<script>
+let _stocks = [];
+let _currentDate = null;
+let _availableDates = [];
+let _currentDateIndex = 0;
+let _flatpickrInstance = null;
+let _scanInfo = null;
+let _manualTasks = [];
+let _taskContextStock = null;
+let _taskContextMode = 'add';
+const YHY_TASK_API_BASE = '/api/yhy/tasks';
+const YHY_TASK_REDIS_PREFIX = 'myStock:task';
+const TASK_GROUP_META = [
+    { key: 'yizi', title: '一字特征', emptyText: '未添加,请完成今日任务!' },
+    { key: 'changzi', title: '厂子特征', emptyText: '未添加,请完成今日任务!' },
+    { key: 'hengpan', title: '横盘调整特征', emptyText: '暂无数据' }
+];
+
+const tooltip = document.getElementById('klineTooltip');
+const klineImg = document.getElementById('klineImage');
+function getPrefix(code) { return code.startsWith('6') ? '1' : '0'; }
+function showKline(e, code, name) {
+    klineImg.src = `https://webquoteklinepic.eastmoney.com/GetPic.aspx?nid=${getPrefix(code)}.${code}&imageType=KXL&token=44c9d251add88e27b65ed86506f6e5da&at=1`;
+    document.getElementById('klineTtHeader').innerText = `${name} (${code}) - 日K线`;
+    moveTooltip(e);
+    tooltip.style.display = 'block';
+}
+function hideKline() { tooltip.style.display = 'none'; klineImg.src = ''; }
+function moveTooltip(e) {
+    const w = window.innerWidth <= 768 ? Math.min(400, window.innerWidth * 0.95) : 565;
+    const h = window.innerWidth <= 768 ? 250 : 330;
+    let left = e.clientX + 15, top = e.clientY + 15;
+    if (left + w > window.innerWidth) left = e.clientX - w - 15;
+    if (top + h > window.innerHeight) top = e.clientY - h - 15;
+    if (left < 0) left = 10;
+    if (top < 0) top = 10;
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+}
+
+async function loadDates() {
+    try {
+        const resp = await fetch('/api/ztqhp/dates');
+        const result = await resp.json();
+        if (result.success && result.dates && result.dates.length > 0) {
+            _availableDates = result.dates;
+            _currentDate = _availableDates[0];
+            _currentDateIndex = 0;
+        }
+    } catch (e) {}
+    initFlatpickr();
+    await loadStocks();
+}
+
+function initFlatpickr() {
+    _flatpickrInstance = flatpickr('#datePicker', {
+        enable: _availableDates,
+        dateFormat: 'Y-m-d',
+        defaultDate: _currentDate,
+        appendTo: document.body,
+        onChange: function(selectedDates, dateStr) {
+            if (dateStr && dateStr !== _currentDate) {
+                _currentDate = dateStr;
+                _currentDateIndex = _availableDates.indexOf(dateStr);
+                loadStocks();
+            }
+        }
+    });
+}
+
+function prevDate() {
+    if (_currentDateIndex < _availableDates.length - 1) {
+        _currentDateIndex++;
+        _currentDate = _availableDates[_currentDateIndex];
+        if (_flatpickrInstance) _flatpickrInstance.setDate(_currentDate, false);
+        loadStocks();
+    }
+}
+
+function nextDate() {
+    if (_currentDateIndex > 0) {
+        _currentDateIndex--;
+        _currentDate = _availableDates[_currentDateIndex];
+        if (_flatpickrInstance) _flatpickrInstance.setDate(_currentDate, false);
+        loadStocks();
+    }
+}
+
+async function loadStocks() {
+    document.getElementById('mainContent').innerHTML = '<div class="loading-msg">正在加载数据...</div>';
+    document.getElementById('totalCount').textContent = '加载中...';
+    updateScanInfoDisplay(null);
+    try {
+        const url = _currentDate ? `/api/ztqhp/stocks?date=${_currentDate}` : '/api/ztqhp/stocks';
+        const resp = await fetch(url);
+        const result = await resp.json();
+        if (result.success) {
+            _stocks = result.data || [];
+            _scanInfo = result.scan_info || null;
+            document.getElementById('totalCount').textContent = `共 ${_stocks.length} 只`;
+            updateScanInfoDisplay(_scanInfo);
+            renderColumns(_stocks);
+            await loadTaskStocks(_currentDate);
+        } else {
+            document.getElementById('mainContent').innerHTML = '<div class="loading-msg">加载失败</div>';
+            document.getElementById('totalCount').textContent = '加载失败';
+        }
+    } catch (e) {
+        document.getElementById('mainContent').innerHTML = '<div class="loading-msg">加载失败: ' + e.message + '</div>';
+        document.getElementById('totalCount').textContent = '加载失败';
+    }
+}
+
+function formatPct(value) {
+    const n = Number(value || 0);
+    return (n > 0 ? '+' : '') + n.toFixed(2) + '%';
+}
+
+function formatPrice(value) {
+    const n = Number(value || 0);
+    return n ? n.toFixed(2) : '--';
+}
+
+function formatScanDuration(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return '--';
+    if (Math.abs(n - Math.round(n)) < 0.001) return String(Math.round(n));
+    return n.toFixed(3).replace(/\.?0+$/, '');
+}
+
+function formatScanEndTime(value) {
+    if (!value) return '--';
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
+    if (!match) return String(value);
+    return `${Number(match[2])}月${Number(match[3])}日${Number(match[4])}点${Number(match[5])}分${Number(match[6])}秒`;
+}
+
+function updateScanInfoDisplay(scanInfo) {
+    const el = document.getElementById('scanInfoText');
+    if (!el) return;
+    if (!scanInfo) {
+        el.textContent = '扫描耗时--s，上次扫描时间:--';
+        return;
+    }
+    const durationText = formatScanDuration(scanInfo.last_scan_duration_sec);
+    const timeText = formatScanEndTime(scanInfo.last_scan_end_time);
+    el.textContent = `扫描耗时${durationText}s，上次扫描时间:${timeText}`;
+}
+
+function toNumber(value, fallback) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : (fallback !== undefined ? Number(fallback) || 0 : 0);
+}
+
+function getDisplayChangeValue(stock) {
+    return toNumber(stock && stock.today_change, stock && stock.ref_gain);
+}
+
+function sortTaskStocks(stocks) {
+    return [...(stocks || [])].sort(function(a, b) {
+        const changeDiff = getDisplayChangeValue(b) - getDisplayChangeValue(a);
+        if (changeDiff !== 0) return changeDiff;
+        return String(a.code || '').localeCompare(String(b.code || ''));
+    });
+}
+
+function buildStackedColumn(children) {
+    const column = document.createElement('div');
+    column.className = 'stacked-column';
+    (children || []).forEach(function(child) {
+        if (child) column.appendChild(child);
+    });
+    return column;
+}
+
+function buildTaskSection() {
+    const section = document.createElement('div');
+    section.className = 'task-section';
+    section.id = 'taskSection';
+    const visibleTasks = getVisibleTaskStocksForCurrentPage();
+    section.innerHTML = `
+        <div class="task-section-header">
+            <div>
+                <div class="task-section-title">今日任务列表</div>
+                <div class="task-section-sub">手动右键添加 · Redis key: ${YHY_TASK_REDIS_PREFIX}:{yyyymmdd}</div>
+            </div>
+            <span class="task-section-count">${visibleTasks.length} 只</span>
+        </div>
+        <div id="taskSectionBody"></div>
+    `;
+    renderTaskSectionContent(section.querySelector('#taskSectionBody'));
+    return section;
+}
+
+function getTaskSourcePageName() {
+    return '涨停前横盘';
+}
+
+function getVisibleTaskStocksForCurrentPage() {
+    const sourceName = getTaskSourcePageName();
+    return (_manualTasks || []).filter(function(item) {
+        const sourcePages = Array.isArray(item.source_pages) ? item.source_pages : [];
+        return sourcePages.includes(sourceName);
+    });
+}
+
+function renderTaskSectionContent(target) {
+    const host = target || document.getElementById('taskSectionBody');
+    if (!host) return;
+    host.innerHTML = '';
+    const visibleTasks = getVisibleTaskStocksForCurrentPage();
+
+    const section = document.getElementById('taskSection');
+    if (section) {
+        const countNode = section.querySelector('.task-section-count');
+        if (countNode) countNode.textContent = `${visibleTasks.length} 只`;
+    }
+
+    TASK_GROUP_META.forEach(function(groupMeta) {
+        const groupStocks = sortTaskStocks(visibleTasks.filter(function(item) {
+            return item.task_type === groupMeta.key;
+        }));
+        host.appendChild(buildTaskGroupBlock(groupMeta, groupStocks));
+    });
+}
+
+function buildTaskGroupBlock(groupMeta, stocks) {
+    const block = document.createElement('div');
+    block.className = 'task-group-block';
+    block.innerHTML = `
+        <div class="task-group-header">
+            <div class="task-group-title">${groupMeta.title}</div>
+            <span class="task-group-count">${stocks.length} 只</span>
+        </div>
+    `;
+
+    if (!stocks.length) {
+        const empty = document.createElement('div');
+        empty.className = groupMeta.key === 'hengpan' ? 'no-data' : 'task-empty-alert';
+        empty.textContent = groupMeta.emptyText;
+        block.appendChild(empty);
+        return block;
+    }
+
+    const rowHeader = document.createElement('div');
+    rowHeader.className = 'task-row-header';
+    rowHeader.innerHTML = '<span>名称</span><span>涨幅</span><span>波动</span><span>收盘</span>';
+    block.appendChild(rowHeader);
+
+    stocks.forEach(function(stock) {
+        block.appendChild(buildTaskRow(stock));
+    });
+    return block;
+}
+
+function buildTaskRow(stock) {
+    const row = document.createElement('div');
+    row.className = 'task-row';
+    row.addEventListener('mouseenter', function(e) { showKline(e, stock.code, stock.name); });
+    row.addEventListener('mouseleave', hideKline);
+    row.addEventListener('mousemove', moveTooltip);
+    row.addEventListener('contextmenu', function(e) { showTaskDeleteMenu(e, stock); });
+
+    const gain = getDisplayChangeValue(stock);
+    const gainClass = gain > 0 ? 'positive' : gain < 0 ? 'negative' : 'neutral';
+    const rangePct = toNumber(stock.hb_range_pct, 0);
+    const close = toNumber(stock.ref_close, 0);
+    const sourcePages = Array.isArray(stock.source_pages) ? stock.source_pages : [];
+    const sourceText = sourcePages.length ? `来源:${sourcePages.join(' / ')}` : '';
+
+    row.innerHTML =
+        '<div class="task-name"><span class="s-name" title="' + stock.code + ' ' + stock.name + '">' + stock.name + '</span><span class="s-code">' + stock.code + '</span><span class="task-source">' + sourceText + '</span></div>' +
+        '<span class="s-gain ' + gainClass + '">' + formatPct(gain) + '</span>' +
+        '<span class="s-metric good">' + formatPct(rangePct) + '</span>' +
+        '<span class="s-metric extra">' + formatPrice(close) + '</span>';
+    return row;
+}
+
+async function loadTaskStocks(date) {
+    const targetDate = date || _currentDate;
+    if (!targetDate) return;
+    try {
+        const resp = await fetch(`/api/yhy/tasks?date=${_currentDate}`);
+        const result = await resp.json();
+        if (result.success) {
+            _manualTasks = result.data || [];
+            renderTaskSectionContent();
+        }
+    } catch (e) {
+        console.error('[ztqhp][loadTaskStocks] 请求失败:', e);
+    }
+}
+
+async function persistTaskStock(stock, taskType, gainConfirmLevel) {
+    const resp = await fetch('/api/yhy/tasks/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            date: _currentDate,
+            task_type: taskType,
+            code: stock.code,
+            name: stock.name,
+            stock_code_with_market: stock.stock_code_with_market || '',
+            ref_gain: stock.ref_gain,
+            today_change: getDisplayChangeValue(stock),
+            market_cap: stock.market_cap,
+            gains_10: stock.gains_10,
+            max_drawdown_10d: stock.max_drawdown_10d,
+            gain_confirm_level: gainConfirmLevel || '',
+            source_page: getTaskSourcePageName()
+        })
+    });
+    const result = await resp.json();
+    if (!result.success) {
+        throw new Error(result.error || '添加失败');
+    }
+    await loadTaskStocks(_currentDate);
+}
+
+async function removeTaskStock(stock) {
+    const resp = await fetch('/api/yhy/tasks/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            date: _currentDate,
+            code: stock.code
+        })
+    });
+    const result = await resp.json();
+    if (!result.success) {
+        throw new Error(result.error || '删除失败');
+    }
+    await loadTaskStocks(_currentDate);
+}
+
+function showTaskContextMenu(event, stock) {
+    event.preventDefault();
+    hideKline();
+    _taskContextStock = stock;
+    _taskContextMode = 'add';
+    const menu = document.getElementById('taskContextMenu');
+    if (!menu) return;
+    const deleteBtn = menu.querySelector('[data-task-type="delete"]');
+    if (deleteBtn) deleteBtn.style.display = 'none';
+    menu.querySelectorAll('[data-task-type="yizi"], [data-task-type="changzi"], [data-task-type="hengpan"]').forEach(function(btn) {
+        btn.style.display = '';
+    });
+    menu.style.display = 'block';
+    const maxLeft = Math.max(8, window.innerWidth - menu.offsetWidth - 8);
+    const maxTop = Math.max(8, window.innerHeight - menu.offsetHeight - 8);
+    menu.style.left = `${Math.min(event.clientX, maxLeft)}px`;
+    menu.style.top = `${Math.min(event.clientY, maxTop)}px`;
+}
+
+function showTaskDeleteMenu(event, stock) {
+    event.preventDefault();
+    hideKline();
+    _taskContextStock = stock;
+    _taskContextMode = 'delete';
+    const menu = document.getElementById('taskContextMenu');
+    if (!menu) return;
+    menu.querySelectorAll('[data-task-type="yizi"], [data-task-type="changzi"], [data-task-type="hengpan"]').forEach(function(btn) {
+        btn.style.display = 'none';
+    });
+    const deleteBtn = menu.querySelector('[data-task-type="delete"]');
+    if (deleteBtn) deleteBtn.style.display = '';
+    menu.style.display = 'block';
+    const maxLeft = Math.max(8, window.innerWidth - menu.offsetWidth - 8);
+    const maxTop = Math.max(8, window.innerHeight - menu.offsetHeight - 8);
+    menu.style.left = `${Math.min(event.clientX, maxLeft)}px`;
+    menu.style.top = `${Math.min(event.clientY, maxTop)}px`;
+}
+
+function hideTaskContextMenu() {
+    const menu = document.getElementById('taskContextMenu');
+    if (menu) menu.style.display = 'none';
+}
+
+function showTaskIosDialog(config) {
+    const overlay = document.getElementById('taskIosOverlay');
+    const titleEl = document.getElementById('taskIosTitle');
+    const bodyEl = document.getElementById('taskIosBody');
+    const actionsEl = document.getElementById('taskIosActions');
+    titleEl.textContent = config.title || '';
+    bodyEl.innerHTML = config.bodyHtml || '';
+    actionsEl.innerHTML = (config.actions || []).map(function(action) {
+        return `<button type="button" class="task-ios-btn ${action.className || ''}" data-modal-value="${action.value}">${action.label}</button>`;
+    }).join('');
+    overlay.style.display = 'flex';
+    return new Promise(function(resolve) {
+        const done = function(value) {
+            overlay.style.display = 'none';
+            bodyEl.innerHTML = '';
+            actionsEl.innerHTML = '';
+            resolve(value);
+        };
+        const clickHandler = function(e) {
+            const button = e.target.closest('[data-modal-value]');
+            if (!button) return;
+            done(button.getAttribute('data-modal-value'));
+        };
+        actionsEl.onclick = clickHandler;
+        bodyEl.onclick = clickHandler;
+        overlay.onclick = function(e) {
+            if (e.target === overlay) done('cancel');
+        };
+    });
+}
+
+async function showTaskKlineConfirmDialog() {
+    return showTaskIosDialog({
+        title: '10天K线特征确认',
+        bodyHtml: `
+            <div class="task-kline-tip">上下阴线不要太多</div>
+            <div class="task-kline-list">
+                <div>1.有上引线无下引线</div>
+                <div>2.有下引线无上引线</div>
+                <div>3.十字星</div>
+            </div>
+        `,
+        actions: [
+            { label: '取消', value: 'cancel', className: 'task-ios-btn-cancel' },
+            { label: '确认', value: 'confirm' }
+        ]
+    });
+}
+
+async function showTaskGainConfirmDialog() {
+    return showTaskIosDialog({
+        title: '10天涨幅确认',
+        bodyHtml: `
+            <div class="task-gain-options">
+                <button type="button" class="task-gain-option task-gain-option-green" data-modal-value="lt35">绿色小于35%</button>
+                <button type="button" class="task-gain-option task-gain-option-red" data-modal-value="gte35">红色大于35%</button>
+            </div>
+        `,
+        actions: [
+            { label: '取消', value: 'cancel', className: 'task-ios-btn-cancel' }
+        ]
+    });
+}
+
+async function showTaskWarnDialog() {
+    return showTaskIosDialog({
+        title: '警告',
+        bodyHtml: '<div class="task-warn-text">涨幅过大</div>',
+        actions: [
+            { label: '取消添加', value: 'cancel', className: 'task-ios-btn-cancel' },
+            { label: '确认添加', value: 'confirm_add' }
+        ]
+    });
+}
+
+async function showTaskDeleteConfirmDialog() {
+    return showTaskIosDialog({
+        title: '删除股票',
+        bodyHtml: '<div>确认删除该股票吗？</div>',
+        actions: [
+            { label: '取消', value: 'cancel', className: 'task-ios-btn-cancel' },
+            { label: '确认', value: 'confirm_delete' }
+        ]
+    });
+}
+
+async function showTaskErrorDialog(message) {
+    return showTaskIosDialog({
+        title: '提示',
+        bodyHtml: `<div>${message}</div>`,
+        actions: [{ label: '确定', value: 'ok' }]
+    });
+}
+
+async function handleTaskMenuAction(taskType) {
+    const stock = _taskContextStock;
+    hideTaskContextMenu();
+    if (!stock) return;
+    try {
+        if (taskType === 'delete') {
+            const confirmed = await showTaskDeleteConfirmDialog();
+            if (confirmed === 'confirm_delete') {
+                await removeTaskStock(stock);
+            }
+            return;
+        }
+        if (taskType === 'hengpan') {
+            await persistTaskStock(stock, 'hengpan', '');
+            return;
+        }
+        const klineConfirm = await showTaskKlineConfirmDialog();
+        if (klineConfirm !== 'confirm') return;
+        const gainConfirm = await showTaskGainConfirmDialog();
+        if (gainConfirm === 'lt35') {
+            await persistTaskStock(stock, taskType, 'lt35');
+            return;
+        }
+        if (gainConfirm !== 'gte35') return;
+        const warnConfirm = await showTaskWarnDialog();
+        if (warnConfirm === 'confirm_add') {
+            await persistTaskStock(stock, taskType, 'gte35');
+        }
+    } catch (e) {
+        console.error('[ztqhp][handleTaskMenuAction] 失败:', e);
+        await showTaskErrorDialog(e.message || '添加失败');
+    }
+}
+
+function renderColumns(stocks) {
+    if (!stocks || stocks.length === 0) {
+        document.getElementById('mainContent').innerHTML = '<div class="loading-msg">暂无数据</div>';
+        return;
+    }
+
+    const safeStocks = Array.isArray(stocks) ? stocks : [];
+    const columns = [
+        { title: '横盘天数大于5', sub: '按 max_n 降序分表，组内按涨幅降序', cls: 'over-five', stocks: safeStocks.filter(s => Number(s.max_n || 0) > 5) },
+        { title: '横盘天数5', sub: '按 max_n 降序分表，组内按涨幅降序', cls: 'eq-five', stocks: safeStocks.filter(s => Number(s.max_n || 0) === 5) },
+        { title: '横盘天数4', sub: '按 max_n 降序分表，组内按涨幅降序', cls: 'eq-four', stocks: safeStocks.filter(s => Number(s.max_n || 0) === 4) },
+        { title: '横盘天数3', sub: '按 max_n 降序分表，组内按涨幅降序', cls: 'eq-three', stocks: safeStocks.filter(s => Number(s.max_n || 0) === 3) }
+    ];
+
+    const grid = document.createElement('div');
+    grid.className = 'columns-grid';
+
+    columns.forEach(function(col, index) {
+        if (index === 0) {
+            grid.appendChild(buildStackedColumn([buildColumn(col), buildTaskSection()]));
+        } else {
+            grid.appendChild(buildColumn(col));
+        }
+    });
+
+    document.getElementById('mainContent').innerHTML = '';
+    document.getElementById('mainContent').appendChild(grid);
+}
+
+function buildColumn(col) {
+    const card = document.createElement('div');
+    card.className = 'metric-column';
+
+    const header = document.createElement('div');
+    header.className = 'col-header ' + col.cls;
+    header.innerHTML = col.title + '<div class="col-header-sub">' + col.sub + '</div>';
+    card.appendChild(header);
+
+    const stocks = (col.stocks || []).slice().sort(function(a, b) {
+        const gainDiff = Number(b.ref_gain || 0) - Number(a.ref_gain || 0);
+        if (gainDiff !== 0) return gainDiff;
+        return Number(b.max_n || 0) - Number(a.max_n || 0);
+    });
+
+    if (stocks.length === 0) {
+        const nd = document.createElement('div');
+        nd.className = 'no-data';
+        nd.textContent = '暂无数据';
+        card.appendChild(nd);
+        return card;
+    }
+
+    const rowHeader = document.createElement('div');
+    rowHeader.className = 'stock-row-header';
+    rowHeader.innerHTML = '<span>名称</span><span>涨幅</span><span>波动</span><span>收盘</span>';
+    card.appendChild(rowHeader);
+
+    stocks.forEach(function(s) {
+        const row = document.createElement('div');
+        row.className = 'stock-row';
+        row.addEventListener('mouseenter', function(e) { showKline(e, s.code, s.name); });
+        row.addEventListener('mouseleave', hideKline);
+        row.addEventListener('mousemove', moveTooltip);
+        row.addEventListener('contextmenu', function(e) { showTaskContextMenu(e, s); });
+
+        const gain = Number(s.ref_gain || 0);
+        const gainClass = gain > 0 ? 'positive' : gain < 0 ? 'negative' : 'neutral';
+        const rangePct = Number(s.hb_range_pct || 0);
+        const close = Number(s.ref_close || 0);
+
+        row.innerHTML =
+            '<div class="stock-name"><span class="s-name" title="' + s.code + ' ' + s.name + '">' + s.name + '</span><span class="s-code">' + s.code + '</span><span class="s-extra">高/低 ' + formatPrice(s.hb_high_close) + '/' + formatPrice(s.hb_low_close) + '</span></div>' +
+            '<span class="s-gain ' + gainClass + '">' + formatPct(gain) + '</span>' +
+            '<span class="s-metric good">' + formatPct(rangePct) + '</span>' +
+            '<span class="s-metric extra">' + formatPrice(close) + '</span>';
+
+        card.appendChild(row);
+    });
+
+    return card;
+}
+
+loadDates();
+document.getElementById('taskContextMenu').addEventListener('click', function(e) {
+    const action = e.target.closest('[data-task-type]');
+    if (!action) return;
+    handleTaskMenuAction(action.getAttribute('data-task-type'));
+});
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#taskContextMenu')) hideTaskContextMenu();
+});
+window.addEventListener('scroll', hideTaskContextMenu, true);
+window.addEventListener('resize', hideTaskContextMenu);
+</script>
+</body>
+</html>

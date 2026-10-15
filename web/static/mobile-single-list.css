@@ -1,0 +1,276 @@
+/*
+ * Generated list tabs are for narrow mobile layouts only.
+ * Keep them hidden by default so desktop pages keep their original controls.
+ */
+.mobile-list-tabs[data-mobile-single-list-generated="1"] {
+    display: none;
+}
+
+.mobile-group-tabs[data-mobile-group-tabs-generated="1"] {
+    display: none;
+}
+
+html.mobile-single-list-enabled .mobile-list-tabs[data-mobile-single-list-generated="1"],
+html.mobile-single-list-enabled .mobile-list-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 80;
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: visible;
+    padding: 2px 2px 8px;
+    margin: 0 0 8px;
+    background: rgba(255, 255, 255, 0.96);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+html.mobile-single-list-enabled .mobile-list-tab {
+    flex: 0 1 auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #374151;
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: 11px;
+    line-height: 1.2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    cursor: pointer;
+}
+
+html.mobile-single-list-enabled .mobile-list-tab.active {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #ffffff;
+}
+
+html.mobile-single-list-enabled .mobile-group-tabs[data-mobile-group-tabs-generated="1"] {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+    padding: 0 6px 8px;
+    margin: 0 0 6px;
+    overflow-x: visible;
+    scrollbar-width: none;
+}
+
+html.mobile-single-list-enabled .mobile-group-tab {
+    flex: 0 1 auto;
+    border: 1px solid #fecaca;
+    border-radius: 999px;
+    background: #fff7f7;
+    color: #991b1b;
+    min-height: 30px;
+    padding: 5px 9px;
+    font-size: 11px;
+    line-height: 1.2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    cursor: pointer;
+}
+
+html.mobile-single-list-enabled .mobile-group-tab.active {
+    background: #ef4444;
+    border-color: #ef4444;
+    color: #ffffff;
+}
+
+html.mobile-single-list-enabled .columns-grid.mobile-single-list,
+html.mobile-single-list-enabled .tables-layout.mobile-single-list,
+html.mobile-single-list-enabled .ths-layout.mobile-single-list,
+html.mobile-single-list-enabled #mainContent.mobile-single-list {
+    display: block !important;
+    grid-template-columns: none !important;
+    grid-auto-flow: initial !important;
+    grid-auto-columns: initial !important;
+    gap: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    scroll-snap-type: none !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+html.mobile-single-list-enabled .mobile-single-list.mobile-single-list-managed > .metric-column,
+html.mobile-single-list-enabled .mobile-single-list.mobile-single-list-managed > .metric-column-stack,
+html.mobile-single-list-enabled .mobile-single-list.mobile-single-list-managed > .task-section,
+html.mobile-single-list-enabled .mobile-single-list.mobile-single-list-managed > .focus-alert-panels,
+html.mobile-single-list-enabled .mobile-single-list.mobile-single-list-managed > .day-column,
+html.mobile-single-list-enabled .mobile-single-list.mobile-single-list-managed > .table-section,
+html.mobile-single-list-enabled .mobile-single-list.mobile-single-list-managed > .stacked-column,
+html.mobile-single-list-enabled .mobile-single-list.mobile-single-list-managed > .ths-panel,
+html.mobile-single-list-enabled .mobile-single-list.mobile-single-list-managed > .group-container {
+    display: none !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    scroll-snap-align: none !important;
+}
+
+html.mobile-single-list-enabled .mobile-single-list.mobile-single-list-managed > .mobile-active-list {
+    display: block !important;
+}
+
+html.mobile-single-list-enabled .mobile-single-list.mobile-single-list-managed > .metric-column-stack.mobile-active-list,
+html.mobile-single-list-enabled .mobile-single-list.mobile-single-list-managed > .stacked-column.mobile-active-list {
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+html.mobile-single-list-enabled .mobile-group-switch > .mobile-group-panel {
+    display: none !important;
+}
+
+html.mobile-single-list-enabled .mobile-group-switch > .mobile-group-panel.mobile-active-group {
+    display: block !important;
+}
+
+@media (max-width: 768px) {
+    .mobile-list-tabs {
+        position: sticky;
+        top: 0;
+        z-index: 80;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: visible;
+        padding: 2px 2px 8px;
+        margin: 0 0 8px;
+        background: rgba(255, 255, 255, 0.96);
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .mobile-list-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .mobile-list-tab {
+        flex: 0 1 auto;
+        border: 1px solid #e5e7eb;
+        border-radius: 999px;
+        background: #ffffff;
+        color: #374151;
+        min-height: 32px;
+        padding: 6px 10px;
+        font-size: 11px;
+        line-height: 1.2;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: normal;
+        cursor: pointer;
+    }
+
+    .mobile-list-tab.active {
+        background: #2563eb;
+        border-color: #2563eb;
+        color: #ffffff;
+    }
+
+    .mobile-group-tabs[data-mobile-group-tabs-generated="1"] {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        width: 100%;
+        padding: 0 6px 8px;
+        margin: 0 0 6px;
+        overflow-x: visible;
+        scrollbar-width: none;
+    }
+
+    .mobile-group-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .mobile-group-tab {
+        flex: 0 1 auto;
+        border: 1px solid #fecaca;
+        border-radius: 999px;
+        background: #fff7f7;
+        color: #991b1b;
+        min-height: 30px;
+        padding: 5px 9px;
+        font-size: 11px;
+        line-height: 1.2;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: normal;
+        cursor: pointer;
+    }
+
+    .mobile-group-tab.active {
+        background: #ef4444;
+        border-color: #ef4444;
+        color: #ffffff;
+    }
+
+    .columns-grid.mobile-single-list,
+    .tables-layout.mobile-single-list,
+    .ths-layout.mobile-single-list,
+    #mainContent.mobile-single-list {
+        display: block !important;
+        grid-template-columns: none !important;
+        grid-auto-flow: initial !important;
+        grid-auto-columns: initial !important;
+        gap: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+        scroll-snap-type: none !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    .mobile-single-list.mobile-single-list-managed > .metric-column,
+    .mobile-single-list.mobile-single-list-managed > .metric-column-stack,
+    .mobile-single-list.mobile-single-list-managed > .task-section,
+    .mobile-single-list.mobile-single-list-managed > .focus-alert-panels,
+    .mobile-single-list.mobile-single-list-managed > .day-column,
+    .mobile-single-list.mobile-single-list-managed > .table-section,
+    .mobile-single-list.mobile-single-list-managed > .stacked-column,
+    .mobile-single-list.mobile-single-list-managed > .ths-panel,
+    .mobile-single-list.mobile-single-list-managed > .group-container {
+        display: none !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        scroll-snap-align: none !important;
+    }
+
+    .mobile-single-list.mobile-single-list-managed > .data-divider {
+        display: none !important;
+    }
+
+    .mobile-single-list.mobile-single-list-managed > .mobile-active-list {
+        display: block !important;
+    }
+
+    .mobile-single-list.mobile-single-list-managed > .metric-column-stack.mobile-active-list,
+    .mobile-single-list.mobile-single-list-managed > .stacked-column.mobile-active-list {
+        display: flex !important;
+        flex-direction: column !important;
+    }
+
+    .mobile-group-switch > .mobile-group-panel {
+        display: none !important;
+    }
+
+    .mobile-group-switch > .mobile-group-panel.mobile-active-group {
+        display: block !important;
+    }
+}

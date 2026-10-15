@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>通达信5拉升阴向上</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+            background: #F5F5F7;
+            min-height: 100vh;
+            color: #1D1D1F;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 0;
+        }
+        
+        /* 顶部导航栏 */
+        .navbar {
+            background: #FFFFFF;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid #E5E7EB;
+        }
+        
+        .navbar-content {
+            max-width: 1920px;
+            margin: 0 auto;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 56px;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        
+        .brand {
+            font-size: 20px;
+            font-weight: 700;
+            color: #2563EB;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+        
+        .status-indicators {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            color: #64748B;
+            font-weight: 500;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .date-selector {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        
+        .date-nav-btn {
+            width: 36px;
+            height: 36px;
+            border: 1px solid #D1D5DB;
+            background: #F9FAFB;
+            color: #374151;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .date-nav-btn:hover:not(:disabled) {
+            background: #F3F4F6;
+            border-color: #2563EB;
+            color: #2563EB;
+        }
+        
+        .date-nav-btn:disabled {
+            border-color: #E5E7EB;
+            color: #D1D5DB;
+            cursor: not-allowed;
+            background: #FAFBFC;
+        }
+        
+        #datePicker {
+            background: #F9FAFB;
+            border: 1px solid #D1D5DB;
+            color: #374151;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            min-width: 95px;
+        }
+        
+        #datePicker:hover {
+            background: #F3F4F6;
+            border-color: #2563EB;
+        }
+        
+        .nav-link {
+            padding: 8px 16px;
+            background: #FFFFFF;
+            color: #64748B;
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-decoration: none;
+            display: inline-block;
+            white-space: nowrap;
+        }
+        
+        .nav-link:hover {
+            background: #F8FAFC;
+            border-color: #2563EB;
+            color: #2563EB;
+        }
+        
+        .nav-link.active {
+            background: #2563EB;
+            color: #FFFFFF;
+            border-color: #2563EB;
+            font-weight: 600;
+        }
+        
+        .main-content {
+            padding: 20px 16px;
+            max-width: 1920px;
+            margin: 0 auto;
+            background: #F5F5F7;
+        }
+        
+        .card {
+            background: #FFFFFF;
+            border-radius: 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            border: 0.5px solid #E5E7EB;
+            margin-bottom: 20px;
+        }
+        
+        .stock-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        
+        .stock-table th:nth-child(1),
+        .stock-table td:nth-child(1) {
+            width: 8%;
+            color: #9CA3AF;
+            font-weight: 500;
+        }
+        
+        .stock-table th:nth-child(2),
+        .stock-table td:nth-child(2) {
+            width: 13%;
+        }
+        
+        .stock-table th:nth-child(3),
+        .stock-table td:nth-child(3) {
+            width: 18%;
+        }
+        
+        .stock-table th:nth-child(4),
+        .stock-table td:nth-child(4) {
+            width: 18%;
+        }
+        
+        .stock-table th:nth-child(5),
+        .stock-table td:nth-child(5) {
+            width: 13%;
+        }
+        
+        .stock-table th:nth-child(6),
+        .stock-table td:nth-child(6) {
+            width: 30%;
+        }
+        
+        .stock-table th {
+            background: #F3F4F6;
+            padding: 14px 16px;
+            text-align: center;
+            font-weight: 700;
+            color: #374151;
+            font-size: 14px;
+            letter-spacing: 0.3px;
+            border-bottom: 0.5px solid #E5E7EB;
+        }
+        
+        .stock-table td {
+            padding: 16px 16px;
+            text-align: center;
+            border-bottom: 0.5px solid #F3F4F6;
+            font-size: 16px;
+            background: #FFFFFF;
+            color: #111827;
+            font-weight: 600;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .stock-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .stock-table tbody tr:last-child td:first-child {
+            border-bottom-left-radius: 16px;
+        }
+        
+        .stock-table tbody tr:last-child td:last-child {
+            border-bottom-right-radius: 16px;
+        }
+        
+        .stock-table tbody tr {
+            transition: background 0.1s ease;
+        }
+        
+        .stock-table tbody tr:hover {
+            background: #F9FAFB !important;
+            cursor: pointer;
+        }
+        
+        .stock-table tbody tr:nth-child(even) {
+            background: #FFFFFF;
+        }
+        
+        .stock-table tbody tr:active {
+            background: #F3F4F6 !important;
+        }
+        
+        .stock-name {
+            font-weight: 700;
+            color: #0F172A;
+            font-size: 17px;
+            position: relative;
+            display: inline-block;
+            letter-spacing: -0.01em;
+        }
+        
+        .stock-code {
+            color: #64748B;
+            font-size: 13px;
+            font-weight: 400;
+            margin-top: 2px;
+        }
+        
+        .positive {
+            color: #DC2626;
+            background: #FEE2E2;
+            font-weight: 700;
+            font-size: 16px;
+            letter-spacing: -0.02em;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        
+        .negative {
+            color: #059669;
+            background: #D1FAE5;
+            font-weight: 700;
+            font-size: 16px;
+            letter-spacing: -0.02em;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        
+        .neutral {
+            color: #8E8E93;
+            font-size: 16px;
+        }
+        
+        .highlight-purple {
+            color: #7C3AED;
+            background: #EDE9FE;
+            font-weight: 700;
+            font-size: 16px;
+            letter-spacing: -0.02em;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        
+        .highlight-red {
+            color: #DC2626;
+            background: #FEE2E2;
+            font-weight: 700;
+            font-size: 16px;
+            letter-spacing: -0.02em;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        
+        .loading, .no-data {
+            text-align: center;
+            padding: 60px 20px;
+            color: #64748B;
+            font-size: 14px;
+        }
+        
+        .stock-tooltip {
+            position: fixed;
+            display: none;
+            background: #FFFFFF;
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            pointer-events: none;
+        }
+        
+        .stock-tooltip img {
+            display: block;
+            width: 545px;
+            height: 300px;
+            background: #F8FAFC;
+            border-radius: 6px;
+        }
+        
+        .stock-tooltip .tooltip-header {
+            font-size: 12px;
+            color: #1E40AF;
+            font-weight: 600;
+            margin-bottom: 6px;
+            text-align: center;
+        }
+        
+        .stock-cell {
+            cursor: pointer;
+        }
+        
+        .stock-cell:hover .stock-name {
+            color: #3B82F6;
+        }
+        
+        .group-container {
+            margin-bottom: 16px;
+        }
+        
+        .group-header {
+            background: #F3F4F6;
+            color: #374151;
+            padding: 12px 16px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-top-left-radius: 16px;
+            border-top-right-radius: 16px;
+            border-bottom: 1px solid #E5E7EB;
+        }
+        
+        .group-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: #6B7280;
+        }
+        
+        .stock-count {
+            font-size: 12px;
+            color: #9CA3AF;
+            font-weight: 500;
+        }
+        
+        .common-tips {
+            text-align: center;
+            padding: 16px;
+            color: #475569;
+            font-size: 12px;
+            background: #FFFFFF;
+            border-radius: 8px;
+            margin-top: 16px;
+            line-height: 1.6;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            border: 1px solid #E5E7EB;
+        }
+        
+        .common-tips strong {
+            color: #1E40AF;
+            font-weight: 700;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 12px;
+            }
+            
+            .stock-table th {
+                padding: 10px 6px;
+                font-size: 10px;
+            }
+            
+            .stock-table td {
+                padding: 10px 6px;
+                font-size: 12px;
+            }
+            
+            .stock-tooltip img {
+                width: 100%;
+                max-width: 400px;
+                height: auto;
+            }
+        }
+            /* mobile no-scroll baseline */
+        @media (max-width: 768px) {
+            body {
+                overflow-x: hidden;
+            }
+            .container,
+            .content,
+            .table-container,
+            .group-table-container,
+            .table-wrap {
+                max-width: 100%;
+                overflow-x: hidden !important;
+            }
+            table,
+            .stock-table {
+                width: 100%;
+                table-layout: fixed;
+            }
+            th,
+            td,
+            .stock-table th,
+            .stock-table td,
+            .stock-name,
+            .s-name,
+            .strategy-tag,
+            .nav-btn,
+            .group-title,
+            .group-name {
+                white-space: normal !important;
+                word-break: break-all;
+                overflow-wrap: anywhere;
+            }
+            #datePicker,
+            .date-display {
+                min-width: 0 !important;
+                width: 100%;
+                max-width: 100%;
+            }
+        }
+</style>
+</head>
+<body>
+    <div class="stock-tooltip" id="klineTooltip">
+        <div class="tooltip-header"></div>
+        <img id="klineImage" src="" alt="K线图">
+    </div>
+
+    <div class="container">
+        <nav class="navbar">
+            <div class="navbar-content">
+                <div class="brand">📊 通达信5拉升阴向上</div>
+                <div class="status-indicators">
+                    <div class="status-item">
+                        <span>🕐</span>
+                        <span id="updateTime">-</span>
+                    </div>
+                </div>
+                <div class="nav-links">
+                    <div class="date-selector">
+                        <button class="date-nav-btn" id="prevDateBtn" onclick="prevDate()">‹</button>
+                        <input type="text" id="datePicker" value="-" readonly>
+                        <button class="date-nav-btn" id="nextDateBtn" onclick="nextDate()">›</button>
+                    </div>
+                    <a href="/" class="nav-link">首页</a>
+                    <a href="/通达信5拉升十字星" class="nav-link">通达信5拉升十字星</a>
+                    <a href="/通达信5拉升阴向上" class="nav-link active">通达信5拉升阴向上</a>
+                </div>
+            </div>
+        </nav>
+        
+        <div class="main-content">
+            <div id="loading" class="loading">正在加载数据...</div>
+            <div id="noData" class="no-data" style="display: none;">暂无数据</div>
+            <div id="groupsContainer"></div>
+            
+            <div class="common-tips">
+                <strong>📌 通达信5拉升阴向上策略说明：</strong>最近10个交易日内所有阴线满足阴线向上条件。分组顺序：全阳（优先级最高） → 不碰并向上 → 十字并向上 → 其他
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let stocksData = [];
+        let currentDate = null;
+        let availableDates = [];
+        let currentDateIndex = 0;
+
+        async function fetchDates() {
+            try {
+                const response = await fetch('/api/tdx5lssxs/dates');
+                const result = await response.json();
+                if (result.success && result.dates && result.dates.length > 0) {
+                    availableDates = result.dates;
+                    currentDate = availableDates[0];
+                    currentDateIndex = 0;
+                    
+                    document.getElementById('datePicker').value = currentDate;
+                    await loadStocks(currentDate);
+                } else {
+                    document.getElementById('datePicker').value = '暂无数据';
+                    await loadStocks();
+                }
+            } catch (error) {
+                console.error('获取日期列表失败:', error);
+                await loadStocks();
+            }
+        }
+
+        function prevDate() {
+            if (currentDateIndex < availableDates.length - 1) {
+                currentDateIndex++;
+                currentDate = availableDates[currentDateIndex];
+                document.getElementById('datePicker').value = currentDate;
+                loadStocks(currentDate);
+            }
+        }
+
+        function nextDate() {
+            if (currentDateIndex > 0) {
+                currentDateIndex--;
+                currentDate = availableDates[currentDateIndex];
+                document.getElementById('datePicker').value = currentDate;
+                loadStocks(currentDate);
+            }
+        }
+
+        async function loadStocks(dateToLoad = null) {
+            try {
+                const url = dateToLoad ? `/api/tdx5lssxs/stocks?date=${dateToLoad}` : '/api/tdx5lssxs/stocks';
+                const response = await fetch(url);
+                const result = await response.json();
+                
+                if (result.success && result.data && result.data.length > 0) {
+                    stocksData = result.data;
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('noData').style.display = 'none';
+                    
+                    renderTable();
+                    
+                    if (currentDateIndex === 0) {
+                        await refreshRealtime();
+                    }
+                } else {
+                    stocksData = [];
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('noData').style.display = 'block';
+                    renderTable();
+                }
+            } catch (error) {
+                console.error('加载股票列表失败:', error);
+                document.getElementById('loading').textContent = '加载失败，请刷新页面重试';
+            }
+        }
+
+        async function refreshRealtime() {
+            if (currentDateIndex !== 0 || stocksData.length === 0) return;
+            
+            try {
+                const codes = stocksData.map(s => s.code);
+                const response = await fetch('/api/tdx5lssxs/realtime', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ codes: codes })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.data) {
+                    let hasChange = false;
+                    stocksData.forEach(stock => {
+                        if (result.data[stock.code]) {
+                            const newChange = result.data[stock.code].change;
+                            if (stock.today_change !== newChange) {
+                                stock.today_change = newChange;
+                                hasChange = true;
+                            }
+                        }
+                    });
+                    
+                    if (hasChange) {
+                        renderTable();
+                    }
+                }
+            } catch (error) {
+                console.error('刷新实时行情失败:', error);
+            }
+        }
+
+        function renderTable() {
+            const container = document.getElementById('groupsContainer');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            const groups = {};
+            stocksData.forEach(stock => {
+                const groupKey = stock.group || '未分组';
+                if (!groups[groupKey]) groups[groupKey] = [];
+                groups[groupKey].push(stock);
+            });
+            
+            const groupOrder = ['group3', 'group2', 'group1', 'group4'];
+            const groupNames = {
+                'group3': '全阳',
+                'group2': '不碰并向上',
+                'group1': '十字并向上',
+                'group4': '其他'
+            };
+            
+            let globalIndex = 0; // 全局序号，跨分组累加
+            
+            groupOrder.forEach(groupKey => {
+                if (!groups[groupKey] || groups[groupKey].length === 0) return;
+                
+                // 按涨跌幅从高到低排序
+                const groupData = groups[groupKey];
+                groupData.sort((a, b) => (b.today_change || 0) - (a.today_change || 0));
+                
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'group-container card';
+                
+                const header = document.createElement('div');
+                header.className = 'group-header';
+                header.innerHTML = `
+                    <span class="group-name">${groupNames[groupKey]}</span>
+                    <span class="stock-count">(${groupData.length}只)</span>
+                `;
+                groupDiv.appendChild(header);
+                
+                const table = document.createElement('table');
+                table.className = 'stock-table';
+                table.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th style="text-align: center;">序号</th>
+                            <th style="text-align: center;">代码</th>
+                            <th style="text-align: center;">名称</th>
+                            <th style="text-align: center;">涨跌幅</th>
+                            <th style="text-align: center;">不下杀</th>
+                            <th style="text-align: center;">市值(亿)</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                `;
+                
+                const tbody = table.querySelector('tbody');
+                
+                groupData.forEach(stock => {
+                    globalIndex++; // 序号递增
+                    const row = document.createElement('tr');
+                    
+                    row.addEventListener('mouseenter', (e) => showKline(e, stock.code, stock.name));
+                    row.addEventListener('mouseleave', hideKline);
+                    row.addEventListener('mousemove', moveTooltip);
+                    
+                    const change = stock.today_change || 0;
+                    let changeClass = 'neutral';
+                    if (change > 0) changeClass = 'positive';
+                    else if (change < 0) changeClass = 'negative';
+                    
+                    const noKillClass = (stock.no_kill_count || 0) === 10 ? 'highlight-purple' : 
+                                        (stock.no_kill_count || 0) >= 9 ? 'highlight-red' : '';
+                    
+                    row.innerHTML = `
+                        <td style="text-align: center;">${globalIndex}</td>
+                        <td style="text-align: center;">${stock.code}</td>
+                        <td style="text-align: center;" class="stock-cell"><span class="stock-name">${stock.name}</span></td>
+                        <td style="text-align: center;" class="${changeClass}">${change > 0 ? '+' : ''}${change.toFixed(2)}%</td>
+                        <td style="text-align: center;" class="${noKillClass}">${stock.no_kill_count || '-'}</td>
+                        <td style="text-align: center;"><span data-market-cap-code="${stock.code}" data-market-cap-decimals="2" data-market-cap-unit="">${(stock.market_cap || 0).toFixed(2)}</span></td>
+                    `;
+                    
+                    tbody.appendChild(row);
+                });
+                
+                groupDiv.appendChild(table);
+                container.appendChild(groupDiv);
+            });
+        }
+
+        const tooltip = document.getElementById('klineTooltip');
+        const klineImg = document.getElementById('klineImage');
+
+        function showKline(e, code, name) {
+            const prefix = code.startsWith('6') ? '1' : '0';
+            klineImg.src = `https://webquoteklinepic.eastmoney.com/GetPic.aspx?nid=${prefix}.${code}&imageType=KXL&token=44c9d251add88e27b65ed86506f6e5da&at=1`;
+            tooltip.querySelector('.tooltip-header').innerText = `${name} (${code})`;
+            moveTooltip(e);
+            tooltip.style.display = 'block';
+        }
+
+        function hideKline() {
+            tooltip.style.display = 'none';
+            klineImg.src = '';
+        }
+
+        function moveTooltip(e) {
+            let left = e.clientX + 15;
+            let top = e.clientY + 15;
+            
+            if (left + 565 > window.innerWidth) left = e.clientX - 565 - 15;
+            if (top + 330 > window.innerHeight) top = e.clientY - 330 - 15;
+            if (left < 0) left = 10;
+            if (top < 0) top = 10;
+            
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+        }
+
+        // 涨跌幅刷新定时器（每3秒）
+        let realtimeRefreshInterval = 3000;
+        let refreshRealtimeTimer = null;
+
+        // 启动涨跌幅刷新定时器
+        function startRealtimeRefreshTimer() {
+            if (refreshRealtimeTimer) clearInterval(refreshRealtimeTimer);
+            refreshRealtimeTimer = setInterval(refreshRealtime, realtimeRefreshInterval);
+            console.log(`✅ 涨跌幅刷新定时器已启动，间隔: ${realtimeRefreshInterval/1000}秒`);
+        }
+
+        // 初始化
+        fetchDates();
+        
+        // 启动定时器
+        refreshRealtimeTimer = setInterval(refreshRealtime, realtimeRefreshInterval);
+        
+        console.log('🚀 通达信5拉升阴向上页面初始化完成');
+        console.log(`📊 涨跌幅刷新间隔: ${realtimeRefreshInterval/1000}秒`);
+    </script>
+<script src="{{ url_for('static', filename='async-market-cap.js') }}"></script>
+<script>
+window.initAsyncMarketCapRefresh({
+    dataStores: [() => stocksData]
+});
+</script>
+</body>
+</html>
+

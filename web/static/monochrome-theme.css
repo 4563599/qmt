@@ -1,0 +1,577 @@
+/*
+ * Global THS-style data theme.
+ * Enabled by html.monochrome-theme. Gain/loss colors stay red/green because
+ * they carry market meaning; the rest of the UI follows the 10jqka data table
+ * palette: light gray page background, blue section bars, pale blue-gray tables.
+ */
+
+:root {
+    --mono-bg: #f5f5f5;
+    --mono-bg-soft: #f7fafb;
+    --mono-surface: #ffffff;
+    --mono-surface-2: #f7fafb;
+    --mono-surface-3: #ecf2f6;
+    --mono-border: #eaeff2;
+    --mono-border-strong: #bec0c1;
+    --mono-text: #333333;
+    --mono-text-soft: #626262;
+    --mono-text-muted: #787878;
+    --mono-link: #0091c9;
+    --mono-ink: #3b5998;
+    --mono-ink-soft: #4c75c9;
+    --mono-active: #db4a39;
+    --mono-shadow: rgba(59, 89, 152, 0.16);
+    --mono-shadow-soft: rgba(59, 89, 152, 0.08);
+    --mono-change: #d86b6b;
+    --mono-up: #d86b6b;
+    --mono-down: #66ad84;
+}
+
+.monochrome-theme {
+    color-scheme: light;
+}
+
+.monochrome-theme body {
+    background: var(--mono-bg) !important;
+    background-image: none !important;
+    color: var(--mono-text) !important;
+}
+
+.monochrome-theme body::before,
+.monochrome-theme body::after {
+    background: transparent !important;
+    background-image: none !important;
+}
+
+.monochrome-theme *:not(.positive):not(.negative):not(.change-up):not(.change-down):not(.s-gain):not(.focus-alert-gain):not(.fav-stock-change):not(.kline-chart *):not(canvas) {
+    border-color: var(--mono-border) !important;
+    text-shadow: none !important;
+}
+
+.monochrome-theme [style*="background" i]:not(.positive):not(.negative):not(.change-up):not(.change-down):not(.s-gain):not(.focus-alert-gain):not(.fav-stock-change):not(#ios-modal-overlay),
+.monochrome-theme [class*="nav-btn"],
+.monochrome-theme [class*="badge"],
+.monochrome-theme [class*="tag"],
+.monochrome-theme [class*="label"],
+.monochrome-theme [class*="pill"] {
+    background-image: none !important;
+}
+
+.monochrome-theme [style*="color" i]:not(.positive):not(.negative):not(.change-up):not(.change-down):not(.s-gain):not(.focus-alert-gain):not(.fav-stock-change) {
+    color: var(--mono-text) !important;
+}
+
+.monochrome-theme :where(
+    .container,
+    .main-container,
+    .content,
+    .page,
+    .page-wrap,
+    .page-title,
+    .header,
+    .panel,
+    .card,
+    .table-container,
+    .table-section,
+    .metric-column,
+    .metric-column-stack,
+    .columns-grid,
+    .day-column,
+    .stacked-column,
+    .group-container,
+    .group-table-container,
+    .task-panel,
+    .task-section,
+    .focus-alert-panel,
+    .focus-alert-panels,
+    .focus-alert-card,
+    .high-gain-section,
+    .high-gain-group,
+    .bare-main-group,
+    .ths-panel,
+    .date-selector,
+    .status-bar,
+    .toolbar,
+    .filter-panel,
+    .data-summary,
+    .stats-card,
+    .control-panel,
+    .tips-panel,
+    .modal,
+    .dialog,
+    .tooltip,
+    .stock-tooltip,
+    .kline-tooltip,
+    #klineTooltip,
+    #ios-modal-overlay > div,
+    .ios-modal,
+    .kline-test-panel,
+    .kline-main-card,
+    .kline-side-card
+) {
+    background: var(--mono-surface) !important;
+    background-image: none !important;
+    color: var(--mono-text) !important;
+    border-color: var(--mono-border) !important;
+    box-shadow: 0 2px 8px var(--mono-shadow-soft) !important;
+}
+
+.monochrome-theme :where(
+    .page-title,
+    .hero,
+    .summary,
+    .summary-card,
+    .info-card,
+    .loading,
+    .loading-msg,
+    .no-data,
+    .nav-buttons,
+    .tab-switcher,
+    .filter-tabs,
+    .mobile-list-tabs,
+    .mobile-group-tabs,
+    .stock-row-header,
+    .high-gain-row-header,
+    .task-row-header,
+    .task-panel-header,
+    .focus-alert-header,
+    .high-gain-header,
+    .group-header,
+    thead,
+    th
+) {
+    background: var(--mono-surface-2) !important;
+    background-image: none !important;
+    color: var(--mono-text) !important;
+    border-color: var(--mono-border) !important;
+}
+
+.monochrome-theme :where(
+    .col-header,
+    .metric-header,
+    .table-header,
+    .section-header,
+    .table-tit,
+    .group-label,
+    .group-sub-label,
+    .focus-group-title,
+    .task-section-header,
+    .task-section-title,
+    .high-gain-title,
+    .high-gain-group-label,
+    .tips-header
+) {
+    background: var(--mono-surface-3) !important;
+    background-image: none !important;
+    color: var(--mono-text-muted) !important;
+    border-color: var(--mono-border) !important;
+    box-shadow: none !important;
+}
+
+/* Some templates define colorful list headers with higher-specificity !important
+   gradients. Keep headers in the same light table style as 10jqka. */
+.monochrome-theme .col-header,
+.monochrome-theme .metric-header,
+.monochrome-theme .table-header,
+.monochrome-theme .section-header,
+.monochrome-theme .group-header,
+.monochrome-theme .group-label,
+.monochrome-theme .group-sub-label,
+.monochrome-theme .task-section-header,
+.monochrome-theme .task-section-title,
+.monochrome-theme .task-panel-header,
+.monochrome-theme .task-group-header,
+.monochrome-theme .high-gain-header,
+.monochrome-theme .high-gain-title,
+.monochrome-theme .high-gain-group-label,
+.monochrome-theme .focus-alert-header,
+.monochrome-theme .focus-group-title,
+.monochrome-theme .tips-header,
+.monochrome-theme .col-header[class],
+.monochrome-theme .group-label[class],
+.monochrome-theme .group-header[style*="background" i],
+.monochrome-theme .extra-group-title[style*="background" i],
+.monochrome-theme .task-section-header[style*="background" i],
+.monochrome-theme .high-gain-header[style*="background" i] {
+    background: var(--mono-surface-3) !important;
+    background-image: none !important;
+    color: var(--mono-text-muted) !important;
+    border-color: var(--mono-border) !important;
+    box-shadow: none !important;
+}
+
+.monochrome-theme .col-header *,
+.monochrome-theme .metric-header *,
+.monochrome-theme .table-header *,
+.monochrome-theme .section-header *,
+.monochrome-theme .group-header *,
+.monochrome-theme .group-label *,
+.monochrome-theme .task-section-header *,
+.monochrome-theme .task-panel-header *,
+.monochrome-theme .high-gain-header *,
+.monochrome-theme .focus-alert-header *,
+.monochrome-theme .tips-header * {
+    color: var(--mono-text-muted) !important;
+}
+
+.monochrome-theme :where(
+    .nav-btn,
+    .nav-link,
+    .date-nav-btn,
+    .tab-btn,
+    .mobile-list-tab,
+    .mobile-group-tab,
+    .col-filter-btn,
+    .filter-btn,
+    .display-mode-btn,
+    .mode-btn,
+    .action-btn,
+    .kline-theme-btn,
+    button,
+    input[type="button"],
+    input[type="submit"],
+    a[style*="background" i]
+) {
+    background: var(--mono-surface) !important;
+    background-image: none !important;
+    color: var(--mono-text) !important;
+    border: 1px solid var(--mono-border-strong) !important;
+    box-shadow: none !important;
+}
+
+.monochrome-theme :where(
+    .nav-btn:hover,
+    .nav-link:hover,
+    .date-nav-btn:hover,
+    .tab-btn:hover,
+    .mobile-list-tab:hover,
+    .mobile-group-tab:hover,
+    .col-filter-btn:hover,
+    .filter-btn:hover,
+    .display-mode-btn:hover,
+    .mode-btn:hover,
+    .action-btn:hover,
+    button:hover
+) {
+    background: var(--mono-surface-3) !important;
+    color: var(--mono-link) !important;
+    transform: none !important;
+}
+
+.monochrome-theme :where(
+    .active,
+    .selected,
+    .current,
+    .tab-btn[class*="active"],
+    .mobile-list-tab.active,
+    .mobile-group-tab.active,
+    .col-filter-btn.active,
+    .col-filter-btn.secondary-active,
+    .col-filter-btn.purple-active,
+    .filter-btn.active,
+    .display-mode-btn.active,
+    .mode-btn.active,
+    .nav-btn.active,
+    button.active
+) {
+    background: var(--mono-active) !important;
+    background-image: none !important;
+    color: #ffffff !important;
+    border-color: var(--mono-active) !important;
+    box-shadow: 0 5px 14px var(--mono-shadow) !important;
+}
+
+/* Tabs and filter chips often have page-specific color classes. Normalize them
+   to the 10jqka table-tab style while keeping the selected state obvious. */
+.monochrome-theme .tab-switcher,
+.monochrome-theme .filter-tabs,
+.monochrome-theme .mobile-list-tabs,
+.monochrome-theme .mobile-group-tabs,
+.monochrome-theme .list-tabs,
+.monochrome-theme .mode-tabs {
+    background: var(--mono-surface-2) !important;
+    background-image: none !important;
+    border-color: #e6ebed !important;
+    box-shadow: none !important;
+}
+
+.monochrome-theme .tab-btn,
+.monochrome-theme .mobile-list-tab,
+.monochrome-theme .mobile-group-tab,
+.monochrome-theme .filter-btn,
+.monochrome-theme .col-filter-btn,
+.monochrome-theme .display-mode-btn,
+.monochrome-theme .mode-btn,
+.monochrome-theme .action-btn,
+.monochrome-theme .tab-switcher button,
+.monochrome-theme .filter-tabs button,
+.monochrome-theme button[class*="tab"],
+.monochrome-theme button[class*="filter"],
+.monochrome-theme button[class*="mode"] {
+    background: var(--mono-surface) !important;
+    background-image: none !important;
+    color: #8a95a5 !important;
+    border: 1px solid #d8d8d8 !important;
+    box-shadow: none !important;
+}
+
+.monochrome-theme .tab-btn.active,
+.monochrome-theme .tab-btn.selected,
+.monochrome-theme .tab-btn.current,
+.monochrome-theme .mobile-list-tab.active,
+.monochrome-theme .mobile-group-tab.active,
+.monochrome-theme .filter-btn.active,
+.monochrome-theme .col-filter-btn.active,
+.monochrome-theme .col-filter-btn.secondary-active,
+.monochrome-theme .col-filter-btn.purple-active,
+.monochrome-theme .display-mode-btn.active,
+.monochrome-theme .mode-btn.active,
+.monochrome-theme .action-btn.active,
+.monochrome-theme .tab-switcher button.active,
+.monochrome-theme .filter-tabs button.active,
+.monochrome-theme button[class*="tab"].active,
+.monochrome-theme button[class*="filter"].active,
+.monochrome-theme button[class*="mode"].active {
+    background: var(--mono-active) !important;
+    background-image: none !important;
+    color: #ffffff !important;
+    border-color: var(--mono-active) !important;
+    box-shadow: none !important;
+}
+
+.monochrome-theme .col-filter-btn.secondary-active,
+.monochrome-theme .col-filter-btn.purple-active {
+    background: var(--mono-active) !important;
+    background-image: none !important;
+    color: #ffffff !important;
+    border-color: var(--mono-active) !important;
+    outline: 2px solid rgba(219, 74, 57, 0.32) !important;
+    box-shadow: 0 2px 8px rgba(219, 74, 57, 0.18) !important;
+}
+
+.monochrome-theme :where(
+    .badge,
+    .tag,
+    .label,
+    .pill,
+    .strategy-badge,
+    .strategy-tag,
+    .feature-badge,
+    .limit-up-badge,
+    .barefoot-badge,
+    .lsyin-badge,
+    .break20-badge,
+    .focus-alert-badge,
+    .new-badge,
+    .task-panel-count,
+    .focus-alert-count,
+    .stock-count,
+    [class*="badge"],
+    [class*="tag"],
+    [class*="pill"]
+) {
+    background: var(--mono-surface-3) !important;
+    background-image: none !important;
+    color: var(--mono-text-muted) !important;
+    border-color: var(--mono-border) !important;
+    box-shadow: none !important;
+}
+
+.monochrome-theme .badge,
+.monochrome-theme .tag,
+.monochrome-theme .label,
+.monochrome-theme .pill,
+.monochrome-theme .strategy-badge,
+.monochrome-theme .strategy-tag,
+.monochrome-theme .feature-badge,
+.monochrome-theme .limit-up-badge,
+.monochrome-theme .barefoot-badge,
+.monochrome-theme .lsyin-badge,
+.monochrome-theme .break20-badge,
+.monochrome-theme .focus-alert-badge,
+.monochrome-theme .new-badge,
+.monochrome-theme .stock-inline-badge,
+.monochrome-theme .task-panel-count,
+.monochrome-theme .focus-alert-count,
+.monochrome-theme .stock-count,
+.monochrome-theme [class*="badge"],
+.monochrome-theme [class*="tag"],
+.monochrome-theme [class*="pill"] {
+    background: var(--mono-surface-3) !important;
+    background-image: none !important;
+    color: var(--mono-text-muted) !important;
+    border-color: var(--mono-border) !important;
+    box-shadow: none !important;
+}
+
+.monochrome-theme :where(
+    .col-header-sub,
+    .task-section-sub,
+    .high-gain-desc,
+    .desc,
+    .sub,
+    .subtitle,
+    .muted,
+    .tips-body,
+    .s-code,
+    .stock-code,
+    small
+) {
+    color: var(--mono-text-muted) !important;
+}
+
+.monochrome-theme :where(a:not(.nav-btn):not(.tab-btn):not(.mobile-list-tab):not(.mobile-group-tab):not(.filter-btn):not(.col-filter-btn)) {
+    color: var(--mono-link) !important;
+}
+
+.monochrome-theme :where(
+    .stock-row,
+    .high-gain-row,
+    .task-row,
+    .stock-card,
+    .list-item,
+    .focus-alert-card,
+    tr,
+    td
+) {
+    background: var(--mono-surface) !important;
+    color: var(--mono-text) !important;
+    border-color: var(--mono-border) !important;
+}
+
+.monochrome-theme :where(table, .m-table, .stock-table) {
+    border-collapse: collapse !important;
+    background: var(--mono-surface) !important;
+    border-color: var(--mono-border) !important;
+}
+
+.monochrome-theme :where(th) {
+    color: var(--mono-text-muted) !important;
+    font-weight: 500 !important;
+}
+
+.monochrome-theme :where(td) {
+    line-height: 28px;
+    border-left-color: var(--mono-border) !important;
+    border-right-color: var(--mono-border) !important;
+}
+
+.monochrome-theme :where(
+    .stock-row:nth-child(even),
+    .high-gain-row:nth-child(even),
+    .task-row:nth-child(even),
+    .stock-card:nth-child(even),
+    .list-item:nth-child(even),
+    tr:nth-child(even)
+) {
+    background: var(--mono-bg-soft) !important;
+}
+
+.monochrome-theme :where(
+    .stock-row:hover,
+    .high-gain-row:hover,
+    .task-row:hover,
+    .stock-card:hover,
+    .list-item:hover,
+    tr:hover
+) {
+    background: var(--mono-surface-2) !important;
+}
+
+.monochrome-theme :where(input, select, textarea, #datePicker) {
+    background: var(--mono-surface) !important;
+    background-image: none !important;
+    color: var(--mono-text) !important;
+    border-color: var(--mono-border-strong) !important;
+    box-shadow: inset 0 1px 2px var(--mono-shadow-soft) !important;
+}
+
+.monochrome-theme :where(.flatpickr-calendar, .flatpickr-months, .flatpickr-weekdays, .flatpickr-days) {
+    background: var(--mono-surface) !important;
+    color: var(--mono-text) !important;
+    border-color: var(--mono-border) !important;
+}
+
+.monochrome-theme :where(.flatpickr-day.selected, .flatpickr-day.startRange, .flatpickr-day.endRange) {
+    background: var(--mono-active) !important;
+    color: #ffffff !important;
+    border-color: var(--mono-active) !important;
+}
+
+.monochrome-theme :where(svg, img):not(#klineImage):not(.kline-image):not(.stock-tooltip img):not(.kline-tooltip img) {
+    filter: grayscale(1) contrast(1.04);
+}
+
+.monochrome-theme :where(#klineImage, .kline-image, .stock-tooltip img, .kline-tooltip img, canvas) {
+    filter: none !important;
+}
+
+.monochrome-theme :where(
+    .positive,
+    .change-up,
+    .up,
+    .c-rise,
+    .s-gain.positive,
+    .focus-alert-gain.positive,
+    .fav-stock-change.change-up
+) {
+    color: var(--mono-up) !important;
+}
+
+.monochrome-theme :where(
+    .negative,
+    .change-down,
+    .down,
+    .c-fall,
+    .s-gain.negative,
+    .focus-alert-gain.negative,
+    .fav-stock-change.change-down
+) {
+    color: var(--mono-down) !important;
+}
+
+.monochrome-theme :where(.neutral, .s-gain.neutral, .focus-alert-gain.neutral) {
+    color: var(--mono-text-muted) !important;
+}
+
+.monochrome-theme .monochrome-toggle {
+    background: var(--mono-ink) !important;
+    color: #ffffff !important;
+    border-color: var(--mono-ink) !important;
+}
+
+.monochrome-toggle {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    z-index: 2147483000;
+    min-width: 82px;
+    min-height: 34px;
+    padding: 7px 12px;
+    border: 1px solid #3b5998;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #3b5998;
+    font-size: 12px;
+    line-height: 1.2;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 7px 20px rgba(59, 89, 152, 0.18);
+    opacity: 0.95;
+}
+
+.monochrome-toggle:hover {
+    opacity: 1;
+}
+
+@media (max-width: 768px) {
+    .monochrome-toggle {
+        top: auto;
+        right: 10px;
+        bottom: 12px;
+        min-width: 70px;
+        min-height: 30px;
+        padding: 6px 9px;
+        font-size: 11px;
+    }
+}

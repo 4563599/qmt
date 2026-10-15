@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>涨停前连续强</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: #ffffff; min-height: 100vh; padding: 20px; margin: 0;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .nav-buttons { margin-bottom: 10px; display: flex; justify-content: flex-start; align-items: center; gap: 15px; flex-wrap: wrap; }
+        .nav-left { display: flex; gap: 10px; align-items: center; }
+        .nav-right { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; justify-content: flex-start; }
+        .nav-btn {
+            display: inline-block; padding: 5px 9px; color: white; text-decoration: none;
+            border-radius: 8px; transition: all 0.3s; font-size: 13px; font-weight: 500;
+            letter-spacing: 0.1px; white-space: nowrap; flex-shrink: 0;
+        }
+        .nav-btn-home { background: #667eea; }
+        .nav-btn-home:hover { background: #5568d3; transform: translateY(-2px); }
+        .nav-btn-5lsys3 { background: #ec4899; }
+        .nav-btn-5lsys3:hover { background: #db2777; transform: translateY(-2px); }
+        .nav-btn-doji { background: #f59e0b; }
+        .nav-btn-doji:hover { background: #d97706; transform: translateY(-2px); }
+        .nav-btn-up { background: #0ea5e9; }
+        .nav-btn-up:hover { background: #0284c7; transform: translateY(-2px); }
+        .nav-btn-yx205 { background: #06b6d4; }
+        .nav-btn-yx205:hover { background: #0891b2; transform: translateY(-2px); }
+        .nav-btn-lszty { background: #e11d48; }
+        .nav-btn-lszty:hover { background: #be123c; transform: translateY(-2px); }
+        .nav-btn-sbzt { background: #f43f5e; }
+        .nav-btn-sbzt:hover { background: #e11d48; transform: translateY(-2px); }
+        .nav-btn-ztorgj  { background: #d946ef; }
+        .nav-btn-ztorgj:hover  { background: #c026d3; transform: translateY(-2px); }
+        
+        .nav-btn-ztqq { background: #7c3aed; }
+        .nav-btn-ztqq:hover { background: #6d28d9; transform: translateY(-2px); }
+        .nav-btn-5ls { background: #8b5cf6; }
+        .nav-btn-5ls:hover { background: #7c3aed; transform: translateY(-2px); }
+        .nav-btn-5lsy2 { background: #ef4444; }
+        .nav-btn-5lsy2:hover { background: #dc2626; transform: translateY(-2px); }
+        .nav-btn-yqhq { background: #ec4899; display: none; }
+        .nav-btn-yqhq:hover { background: #db2777; transform: translateY(-2px); }
+        .nav-btn-5las3gj { background: #f97316; }
+        .nav-btn-5las3gj:hover { background: #ea6c0a; transform: translateY(-2px); }
+        .nav-btn-jpgz { background: #f59e0b; }
+        .nav-btn-jpgz:hover { background: #d97706; transform: translateY(-2px); }
+        .nav-btn-yhy { background: #e11d48; }
+        .nav-btn-yhy:hover { background: #be123c; transform: translateY(-2px); }
+
+        .date-selector { display: flex; align-items: center; gap: 6px; background: white; padding: 4px 8px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .date-nav-btn { background: #667eea; color: white; border: none; padding: 5px 8px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.3s; font-weight: 500; min-width: 28px; display: flex; align-items: center; justify-content: center; }
+        .date-nav-btn:hover { background: #5568d3; transform: scale(1.05); }
+        .date-nav-btn:disabled { background: #ccc; cursor: not-allowed; transform: scale(1); }
+        #datePicker { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; text-align: center; width: auto; min-width: 95px; max-width: 105px; }
+
+        .flatpickr-calendar { box-shadow: 0 20px 60px rgba(0,0,0,0.3) !important; border-radius: 12px !important; border: none !important; }
+        .flatpickr-day.selected { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important; border-color: #667eea !important; }
+        .flatpickr-months .flatpickr-month { background: #667eea !important; color: white !important; }
+        .flatpickr-current-month .flatpickr-monthDropdown-months { background: #667eea !important; color: white !important; }
+        .flatpickr-weekdays { background: #f2f2f7 !important; }
+        span.flatpickr-weekday { color: #8e8e93 !important; font-weight: 600 !important; }
+
+        .tips-panel { position: fixed; left: 20px; top: 50%; transform: translateY(-50%); background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); color: white; padding: 20px; border-radius: 12px; box-shadow: 0 8px 24px rgba(124,58,237,0.3); width: 240px; z-index: 1000; }
+        .tips-panel .tips-title { font-size: 16px; font-weight: 700; margin-bottom: 15px; text-align: center; border-bottom: 2px solid rgba(255,255,255,0.3); padding-bottom: 10px; }
+        .tips-panel .tips-list { list-style: none; padding: 0; margin: 0; }
+        .tips-panel .tips-list li { padding: 8px 0; font-size: 13px; line-height: 1.6; display: flex; align-items: flex-start; }
+        .tips-panel .tips-list li::before { content: "●"; margin-right: 8px; color: #ffd700; flex-shrink: 0; }
+        @media (max-width: 768px) { .tips-panel { display: none; } }
+
+        .loading { text-align: center; padding: 30px; color: #666; font-size: 14px; }
+        .no-data { text-align: center; padding: 30px; color: #999; font-size: 13px; }
+        .positive { color: #e74c3c; font-weight: bold; }
+        .negative { color: #27ae60; font-weight: bold; }
+        .neutral { color: #95a5a6; }
+
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        thead { background: #ede9fe; color: #333; }
+        th { padding: 10px 12px; text-align: center; font-weight: 600; white-space: nowrap; font-size: 15px; }
+        tbody tr { border-bottom: 1px solid #eee; transition: all 0.3s; }
+        tbody tr:hover { background: #f8f9fa; }
+        td { padding: 10px 12px; color: #1d1d1f; font-size: 15px; font-weight: 500; text-align: center; }
+
+        .group-container { margin-bottom: 15px; }
+        .group-header { background: #f5f5f5; color: #1d1d1f; padding: 12px 15px; border-radius: 0; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; border: 1px solid #e0e0e0; border-bottom: none; }
+        .group-header .group-name { font-size: 17px; font-weight: 600; }
+        .group-header .stock-count { font-size: 15px; font-weight: 500; }
+        .group-table-container { background: white; padding: 0; border: 1px solid #e0e0e0; border-top: none; overflow-x: auto; }
+
+        .data-divider { margin: 20px 0; text-align: center; position: relative; height: 2px; background: linear-gradient(to right, transparent, #e0e0e0, transparent); display: flex; align-items: center; justify-content: center; }
+        .data-divider span { background: white; padding: 6px 16px; color: #333; font-size: 14px; font-weight: 700; display: inline-block; border: 1px solid #7c3aed; border-radius: 20px; }
+
+        .stock-tooltip { position: fixed; display: none; background: #fff; border: 1px solid #e1e1e1; border-radius: 8px; padding: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 10000; pointer-events: none; }
+        .stock-tooltip img { display: block; width: 680px; height: 380px; background: #f5f5f7; }
+        .stock-tooltip .tooltip-header { font-size: 12px; color: #666; margin-bottom: 5px; text-align: center; }
+        .stock-cell { cursor: pointer; }
+        .stock-cell:hover { color: #667eea; }
+        .stock-name { position: relative; display: inline-block; font-size: 15px; font-weight: 600; }
+        .stock-code { font-weight: 600; }
+        .stock-number { font-weight: 600; color: #86868b; text-align: center; }
+
+        .tag-detail { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 11px; font-weight: 600; margin: 1px 2px; }
+        .tag-gt { background: #fee2e2; color: #dc2626; }
+        .tag-gj { background: #dcfce7; color: #16a34a; }
+        .tag-gtgj { background: #fef3c7; color: #d97706; }
+
+        .page-title { background: white; border-radius: 10px; padding: 12px 16px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .page-title h1 { font-size: 22px; font-weight: 700; color: #1d1d1f; margin: 0; }
+        .page-title .badge { color: white; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+        .page-title .desc { color: #6b7280; font-size: 13px; }
+
+        .explanation-box { background: #f8f9fa; border: 1px solid #7c3aed; border-radius: 8px; padding: 15px 20px; margin: 30px 0 20px 0; line-height: 1.6; }
+        .explanation-box .title { color: #7c3aed; font-size: 14px; font-weight: 600; margin-bottom: 10px; text-align: center; }
+        .explanation-box .item { margin-bottom: 8px; font-size: 13px; color: #333; display: flex; align-items: flex-start; }
+        .explanation-box .item-label { font-weight: 600; color: #7c3aed; min-width: 110px; margin-right: 8px; }
+        .explanation-box .item-content { flex: 1; color: #555; }
+
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .nav-left, .nav-right { width: 100%; justify-content: center; }
+            .nav-right { flex-wrap: wrap; gap: 8px; }
+            .nav-btn { flex: 1 1 calc(50% - 4px); min-width: 0; padding: 8px 6px; font-size: 12px; white-space: normal; word-break: keep-all; line-height: 1.3; text-align: center; }
+            .date-selector { width: 100%; justify-content: center; padding: 6px 10px; }
+            .date-nav-btn { min-width: 36px; padding: 8px 10px; font-size: 14px; }
+            .stock-tooltip { max-width: 95vw; }
+            .stock-tooltip img { width: 100%; max-width: 600px; height: auto; }
+            .group-header { font-size: 14px; }
+            .group-header .group-name { font-size: 16px; }
+            table th, table td { padding: 8px 4px; font-size: 12px; }
+        }
+            /* mobile no-scroll baseline */
+        @media (max-width: 768px) {
+            body {
+                overflow-x: hidden;
+            }
+            .container,
+            .content,
+            .table-container,
+            .group-table-container,
+            .table-wrap {
+                max-width: 100%;
+                overflow-x: hidden !important;
+            }
+            table,
+            .stock-table {
+                width: 100%;
+                table-layout: fixed;
+            }
+            th,
+            td,
+            .stock-table th,
+            .stock-table td,
+            .stock-name,
+            .s-name,
+            .strategy-tag,
+            .nav-btn,
+            .group-title,
+            .group-name {
+                white-space: normal !important;
+                word-break: break-all;
+                overflow-wrap: anywhere;
+            }
+            #datePicker,
+            .date-display {
+                min-width: 0 !important;
+                width: 100%;
+                max-width: 100%;
+            }
+        }
+</style>
+</head>
+<body>
+    <div class="stock-tooltip" id="klineTooltip">
+        <div class="tooltip-header"></div>
+        <img id="klineImage" src="" alt="K线图">
+    </div>
+
+    <div class="tips-panel">
+        <div class="tips-title">涨停前连续强</div>
+        <ul class="tips-list">
+            <li>涨停日当天涨停</li>
+            <li>往前连续N天几乎光头K或光脚K</li>
+            <li>N ≥ 2 才入选</li>
+            <li>按连续强天数排序</li>
+        </ul>
+    </div>
+
+    <div class="container">
+        <div class="nav-buttons">
+            <div class="nav-left">
+                <div class="date-selector">
+                    <button class="date-nav-btn" id="prevDateBtn" onclick="prevDate()">◀</button>
+                    <input type="text" id="datePicker" placeholder="选择日期" readonly>
+                    <button class="date-nav-btn" id="nextDateBtn" onclick="nextDate()">▶</button>
+                </div>
+            </div>
+            <div class="nav-right">
+                <a href="/" class="nav-btn nav-btn-home">首页</a>
+                <a href="/涨停前横盘" class="nav-btn" style="background:#2563eb;">涨停前横盘</a>
+                <a href="/阴后强" class="nav-btn nav-btn-yhy">阴后强</a>
+                <a href="/5拉升" class="nav-btn" style="background:#2563eb;">5拉升</a>
+                <a href="/20阴少跌少横盘" class="nav-btn nav-btn-yx205">20阴少跌少横盘</a>
+                <a href="/阴线跌破5日次数" class="nav-btn" style="background:#ca8a04;">阴线跌破5日次数</a>
+                <a href="/10天大5日线" class="nav-btn" style="background:#0f766e;">10天大5日线</a>
+                <a href="/涨停或光脚" class="nav-btn nav-btn-ztorgj">涨停或光脚</a>
+                <a href="/连续5不碰" class="nav-btn" style="background:#f43f5e;">连续5不碰</a>
+                <a href="/连续涨停" class="nav-btn nav-btn-lszty">连续涨停</a>
+                <a href="/连续4天拉升" class="nav-btn nav-btn-intraday4up" style="background:#f97316;">连续4天拉升</a>
+
+                <a href="/5拉升阴前后强" class="nav-btn nav-btn-yqhq">5拉升阴前后强</a>
+            </div>
+            <a href="/极品关注" class="nav-btn" style="background:#f59e0b;">极品关注</a>
+            <a href="/同花顺板块" class="nav-btn" style="background:#2563eb;">同花顺板块</a>
+        </div>
+        <div class="page-title">
+            <h1>涨停前连续强</h1>
+            <span class="badge" style="background: linear-gradient(135deg, #7c3aed, #6d28d9);">光头光脚K</span>
+            <span class="desc">涨停前连续N天几乎光头K或光脚K · 按天数排序</span>
+        </div>
+        <div id="loading" class="loading">正在加载数据...</div>
+        <div id="noData" class="no-data" style="display: none;">暂无数据</div>
+        <div id="groupsContainer"></div>
+
+        <div class="explanation-box">
+            <div class="title">筛选条件说明</div>
+            <div class="item">
+                <span class="item-label">入选条件：</span>
+                <span class="item-content">参考日涨停，涨停前连续 N ≥ 2 天满足几乎光头K或几乎光脚K</span>
+            </div>
+            <div class="item">
+                <span class="item-label">几乎光头K：</span>
+                <span class="item-content">没有上引线 或 上引线占比 < 0.1% 或 最高价与max(开,收)差 ≤ 0.01元</span>
+            </div>
+            <div class="item">
+                <span class="item-label">几乎光脚K：</span>
+                <span class="item-content">没有下引线 或 下引线占比 < 0.1% 或 最低价与min(开,收)差 ≤ 0.01元</span>
+            </div>
+            <div class="item">
+                <span class="item-label">涨停开板：</span>
+                <span class="item-content">涨停开板后自动从Redis剔除</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let stocksData = [];
+        let lastTimestamp = null;
+        let currentDate = null;
+        let availableDates = [];
+        let currentDateIndex = 0;
+
+        let latestTradeDate = new Date().toISOString().split('T')[0];
+        async function fetchLatestTradeDate() {
+            const todayKey = 'latestTradeDate_' + new Date().toISOString().split('T')[0];
+            const cached = localStorage.getItem(todayKey);
+            if (cached) { latestTradeDate = cached; return; }
+            try {
+                const resp = await fetch('/api/latest_trade_date');
+                const result = await resp.json();
+                if (result.success && result.date) {
+                    latestTradeDate = result.date;
+                    localStorage.setItem(todayKey, result.date);
+                }
+            } catch(e) {}
+        }
+
+        async function loadDates() {
+            await fetchLatestTradeDate();
+            try {
+                const response = await fetch('/api/ztqq/dates');
+                const result = await response.json();
+                const today = latestTradeDate;
+                currentDate = today;
+                if (result.success && result.dates && result.dates.length > 0) {
+                    availableDates = result.dates;
+                    currentDateIndex = availableDates.indexOf(today);
+                    if (currentDateIndex === -1) currentDateIndex = -1;
+                } else {
+                    availableDates = [];
+                    currentDateIndex = -1;
+                }
+                initFlatpickr();
+                loadStocks();
+            } catch (error) {
+                console.error('加载日期列表失败:', error);
+                currentDate = latestTradeDate;
+                availableDates = [];
+                currentDateIndex = -1;
+                initFlatpickr();
+                loadStocks();
+            }
+        }
+
+        let flatpickrInstance = null;
+        function initFlatpickr() {
+            flatpickrInstance = flatpickr("#datePicker", {
+                enable: availableDates,
+                dateFormat: "Y-m-d",
+                defaultDate: currentDate,
+                locale: {
+                    weekdays: { shorthand: ['日','一','二','三','四','五','六'], longhand: ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'] },
+                    months: { shorthand: ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'], longhand: ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'] }
+                },
+                onChange: function(selectedDates, dateStr) {
+                    if (dateStr && dateStr !== currentDate) {
+                        currentDate = dateStr;
+                        currentDateIndex = availableDates.indexOf(dateStr);
+                        loadStocks();
+                    }
+                }
+            });
+        }
+
+        function prevDate() {
+            if (currentDateIndex < availableDates.length - 1) {
+                currentDateIndex++;
+                currentDate = availableDates[currentDateIndex];
+                if (flatpickrInstance) flatpickrInstance.setDate(currentDate, false);
+                loadStocks();
+            }
+        }
+        function nextDate() {
+            if (currentDateIndex > 0) {
+                currentDateIndex--;
+                currentDate = availableDates[currentDateIndex];
+                if (flatpickrInstance) flatpickrInstance.setDate(currentDate, false);
+                loadStocks();
+            }
+        }
+
+        async function loadStocks() {
+            try {
+                const url = currentDate ? `/api/ztqq/stocks?date=${currentDate}` : '/api/ztqq/stocks';
+                const response = await fetch(url);
+                const result = await response.json();
+                if (result.success) {
+                    stocksData = result.data || [];
+                    if (stocksData.length > 0) {
+                        document.getElementById('loading').style.display = 'none';
+                        document.getElementById('noData').style.display = 'none';
+                        renderTable();
+                    } else {
+                        document.getElementById('loading').style.display = 'none';
+                        document.getElementById('noData').style.display = 'block';
+                        document.getElementById('groupsContainer').innerHTML = '';
+                    }
+                } else {
+                    stocksData = [];
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('noData').style.display = 'block';
+                    document.getElementById('groupsContainer').innerHTML = '';
+                }
+            } catch (error) {
+                console.error('加载股票列表失败:', error);
+                document.getElementById('loading').textContent = '加载失败，请刷新页面重试';
+            }
+        }
+
+        function renderTable() {
+            const container = document.getElementById('groupsContainer');
+            container.innerHTML = '';
+
+            const sorted = stocksData.slice().sort((a, b) => (b.n_strong_days || 0) - (a.n_strong_days || 0));
+
+            const groups = {};
+            sorted.forEach(s => {
+                const n = s.n_strong_days || 0;
+                if (!groups[n]) groups[n] = [];
+                groups[n].push(s);
+            });
+
+            const nKeys = Object.keys(groups).map(Number).sort((a, b) => b - a);
+
+            nKeys.forEach(n => {
+                const stocks = groups[n];
+                const divider = document.createElement('div');
+                divider.className = 'data-divider';
+                divider.style.marginTop = '15px';
+                divider.innerHTML = `<span>连续${n}天强K（${stocks.length}只）</span>`;
+                container.appendChild(divider);
+                renderGroup(container, stocks, n);
+            });
+        }
+
+        function renderDetailTags(details) {
+            if (!details || details.length === 0) return '-';
+            return details.map(d => {
+                if (d === '光头光脚') return '<span class="tag-detail tag-gtgj">光头光脚</span>';
+                if (d === '光头') return '<span class="tag-detail tag-gt">光头</span>';
+                if (d === '光脚') return '<span class="tag-detail tag-gj">光脚</span>';
+                return '<span class="tag-detail">' + d + '</span>';
+            }).join('');
+        }
+
+        function renderGroup(container, data, nDays) {
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'group-container';
+
+            const header = document.createElement('div');
+            header.className = 'group-header';
+            header.innerHTML = `<span class="group-name">连续${nDays}天强K</span><span class="stock-count">(${data.length}只)</span>`;
+            groupDiv.appendChild(header);
+
+            const tableContainer = document.createElement('div');
+            tableContainer.className = 'group-table-container';
+            const table = document.createElement('table');
+            table.innerHTML = `<colgroup>
+                <col style="width:5%"><col style="width:10%"><col style="width:10%"><col style="width:8%">
+                <col style="width:10%"><col style="width:10%"><col style="width:12%"><col style="width:35%">
+            </colgroup><thead><tr>
+                <th>编号</th><th>股票代码</th><th>股票名称</th><th>板块</th>
+                <th>参考日涨幅</th><th>涨停幅度</th><th>连续强天数</th><th>K线详情</th>
+            </tr></thead><tbody></tbody>`;
+
+            const tbody = table.querySelector('tbody');
+            data.forEach((stock, index) => {
+                const row = document.createElement('tr');
+                row.addEventListener('mouseenter', (e) => showKline(e, stock.code, stock.name));
+                row.addEventListener('mouseleave', hideKline);
+                row.addEventListener('mousemove', moveTooltip);
+
+                const gain = stock.ref_gain || 0;
+                const gainClass = gain > 0 ? 'positive' : gain < 0 ? 'negative' : 'neutral';
+
+                row.innerHTML = `
+                    <td class="stock-number">${index + 1}</td>
+                    <td class="stock-code">${stock.code}</td>
+                    <td class="stock-cell"><span class="stock-name">${stock.name}</span></td>
+                    <td>${stock.board_type || '-'}</td>
+                    <td class="${gainClass}">${gain > 0 ? '+' : ''}${gain.toFixed(2)}%</td>
+                    <td>${stock.limit_ratio || 10}%</td>
+                    <td style="font-weight:700;color:#7c3aed;font-size:18px;">${stock.n_strong_days}天</td>
+                    <td style="white-space:normal;line-height:1.8;">${renderDetailTags(stock.strong_details)}</td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            tableContainer.appendChild(table);
+            groupDiv.appendChild(tableContainer);
+            container.appendChild(groupDiv);
+        }
+
+        function formatDate(d) {
+            if (!d || d.length !== 8) return d || '-';
+            return d.substring(4, 6) + '-' + d.substring(6, 8);
+        }
+
+        loadDates();
+
+        let checkUpdateTimer = setInterval(async () => {
+            const today = latestTradeDate;
+            if (currentDate !== today) return;
+            try {
+                const resp = await fetch('/api/ztqq/check_update');
+                const result = await resp.json();
+                if (result.success && result.updated) {
+                    const ts = result.timestamp;
+                    if (lastTimestamp === null) { lastTimestamp = ts; }
+                    else if (ts !== lastTimestamp) { lastTimestamp = ts; await loadStocks(); }
+                }
+            } catch(e) {}
+        }, 5000);
+
+        const tooltip = document.getElementById('klineTooltip');
+        const klineImg = document.getElementById('klineImage');
+        function getEastMoneyPrefix(code) { return code.startsWith('6') ? '1' : '0'; }
+        function showKline(e, code, name) {
+            klineImg.src = `https://webquoteklinepic.eastmoney.com/GetPic.aspx?nid=${getEastMoneyPrefix(code)}.${code}&imageType=KXL&token=44c9d251add88e27b65ed86506f6e5da&at=1`;
+            tooltip.querySelector('.tooltip-header').innerText = `${name} (${code}) - 日K线`;
+            moveTooltip(e);
+            tooltip.style.display = 'block';
+        }
+        function hideKline() { tooltip.style.display = 'none'; klineImg.src = ''; }
+        function moveTooltip(e) {
+            const tooltipWidth = window.innerWidth <= 768 ? Math.min(400, window.innerWidth * 0.95) : 565;
+            const tooltipHeight = window.innerWidth <= 768 ? 250 : 330;
+            let left = e.clientX + 15, top = e.clientY + 15;
+            if (left + tooltipWidth > window.innerWidth) left = e.clientX - tooltipWidth - 15;
+            if (top + tooltipHeight > window.innerHeight) top = e.clientY - tooltipHeight - 15;
+            if (left < 0) left = 10;
+            if (top < 0) top = 10;
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+        }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+<div id="ios-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:99999;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:14px;width:270px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.25);">
+        <div id="ios-modal-msg" style="padding:20px 16px 14px;text-align:center;font-size:16px;font-weight:600;color:#000;line-height:1.5;display:flex;align-items:center;justify-content:center;min-height:70px;"></div>
+        <div style="height:0.5px;background:#c6c6c8;"></div>
+        <div style="display:flex;height:44px;">
+            <button id="ios-modal-no" style="flex:1;background:none;border:0;outline:none;font-size:17px;color:#ff3b30;cursor:pointer;">否</button>
+            <div id="ios-modal-divider" style="width:0.5px;background:#c6c6c8;flex-shrink:0;"></div>
+            <button id="ios-modal-yes" style="flex:1;background:none;border:0;outline:none;font-size:17px;color:#007aff;cursor:pointer;font-weight:600;">是</button>
+        </div>
+    </div>
+</div>
+<script>
+function showIosConfirm(msg) {
+    return new Promise(resolve => {
+        const ov = document.getElementById('ios-modal-overlay');
+        document.getElementById('ios-modal-msg').textContent = msg;
+        const noBtn = document.getElementById('ios-modal-no');
+        const yesBtn = document.getElementById('ios-modal-yes');
+        noBtn.style.display = ''; noBtn.textContent = '否'; yesBtn.textContent = '是';
+        document.getElementById('ios-modal-divider').style.display = '';
+        ov.style.display = 'flex';
+        const done = r => { ov.style.display = 'none'; resolve(r); };
+        noBtn.onclick = () => done(false); yesBtn.onclick = () => done(true);
+    });
+}
+function showIosAlert(msg) {
+    return new Promise(resolve => {
+        const ov = document.getElementById('ios-modal-overlay');
+        document.getElementById('ios-modal-msg').textContent = msg;
+        document.getElementById('ios-modal-no').style.display = 'none';
+        document.getElementById('ios-modal-divider').style.display = 'none';
+        const yesBtn = document.getElementById('ios-modal-yes');
+        yesBtn.textContent = '确定';
+        ov.style.display = 'flex';
+        yesBtn.onclick = () => { ov.style.display = 'none'; document.getElementById('ios-modal-no').style.display = ''; document.getElementById('ios-modal-divider').style.display = ''; resolve(); };
+    });
+}
+</script>
+</body>
+</html>
