@@ -7347,6 +7347,11 @@ def get_pz1_focus():
                 )
                 for field in fields
             }
+            for field in ('yi_yin_yi_yang_10d', 'yi_yin_yi_yang_20d'):
+                groups[field] = sorted(
+                    (item for item in records if _ztorgj_truthy_flag(item.get(field))),
+                    key=lambda item: (-item['ref_gain'], item['code']),
+                )
             groups['high_gain_prev3_short_shadow'] = sorted(
                 (
                     item for item in records

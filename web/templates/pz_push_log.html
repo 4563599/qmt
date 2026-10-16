@@ -213,6 +213,15 @@
         }
         .focus-page1-special[hidden],
         .sheet-wrap[hidden] { display: none; }
+        .focus-page3-independent {
+            margin-bottom: 18px;
+        }
+        .focus-page3-independent[hidden] { display: none; }
+        .focus-page3-independent .stock-group-head {
+            width: 100%;
+            margin: 0 0 7px;
+            text-align: left;
+        }
         .focus-page1-sidebar {
             position: sticky;
             top: 0;
@@ -315,7 +324,9 @@
         }
         .focus-page1-columns span:last-child { text-align: right; }
         #focusPage1Special .focus-page1-columns,
-        #focusPage1Special .focus-page1-stock-main {
+        #focusPage1Special .focus-page1-stock-main,
+        .focus-page3-independent .focus-page1-columns,
+        .focus-page3-independent .focus-page1-stock-main {
             grid-template-columns: minmax(140px, 1fr) 112px 80px 90px;
             gap: 8px;
         }
@@ -736,7 +747,9 @@
                 gap: 3px;
             }
             #focusPage1Special .focus-page1-columns,
-            #focusPage1Special .focus-page1-stock-main {
+            #focusPage1Special .focus-page1-stock-main,
+            .focus-page3-independent .focus-page1-columns,
+            .focus-page3-independent .focus-page1-stock-main {
                 grid-template-columns: minmax(42px, 1fr) 48px 34px 44px;
                 gap: 2px;
             }
@@ -774,7 +787,8 @@
             .focus-page1-columns { padding: 5px 2px; font-size: calc(8px * var(--focus-text-scale, 1)); }
             .focus-page1-stock-row { padding: 8px 2px; }
             .focus-page1-stock-identity { font-size: calc(11px * var(--focus-text-scale, 1)); column-gap: 8px; }
-            #focusPage1Special .focus-page1-stock-identity {
+            #focusPage1Special .focus-page1-stock-identity,
+            .focus-page3-independent .focus-page1-stock-identity {
                 display: flex;
                 flex-wrap: wrap;
                 column-gap: 4px;
@@ -857,7 +871,9 @@
         @media (max-width: 340px) {
             #focusPage1Special { grid-template-columns: 104px minmax(0, 1fr); }
             #focusPage1Special .focus-page1-columns,
-            #focusPage1Special .focus-page1-stock-main { grid-template-columns: minmax(42px, 1fr) 48px 34px 44px; gap: 2px; }
+            #focusPage1Special .focus-page1-stock-main,
+            .focus-page3-independent .focus-page1-columns,
+            .focus-page3-independent .focus-page1-stock-main { grid-template-columns: minmax(42px, 1fr) 48px 34px 44px; gap: 2px; }
         }
     </style>
 </head>
@@ -880,7 +896,7 @@
         <div class="page-tabs" role="tablist" aria-label="关注分页">
             <button type="button" role="tab" data-focus-page="1" id="focusPage1" aria-selected="true" aria-controls="focusPage1Special">第一页</button>
             <button type="button" role="tab" data-focus-page="2" id="focusPage2" aria-selected="false" aria-controls="focusSheetWrap" tabindex="-1">第二页</button>
-            <button type="button" role="tab" data-focus-page="3" id="focusPage3" aria-selected="false" aria-controls="focusSheetWrap" tabindex="-1">第三页</button>
+            <button type="button" role="tab" data-focus-page="3" id="focusPage3" aria-selected="false" aria-controls="focusSheetWrap" tabindex="-1">1阴1阳</button>
             <button type="button" role="tab" data-focus-page="4" id="focusPage4" aria-selected="false" aria-controls="focusSheetWrap" tabindex="-1">第四页</button>
             <button type="button" role="tab" data-focus-page="5" id="focusPage5" aria-selected="false" aria-controls="focusSheetWrap" tabindex="-1">第五页</button>
             <button type="button" role="tab" data-focus-page="6" id="focusPage6" aria-selected="false" aria-controls="focusPage6Special" tabindex="-1">同花顺</button>
@@ -1024,6 +1040,20 @@
             {% endif %}
             {% if focus_mode %}
             <section class="focus-page2-extra" id="focusPage2Extra" aria-label="5拉新形态" hidden></section>
+            <section class="focus-page1-special focus-page3-independent" id="focusPage3Independent" aria-labelledby="focusPage3IndependentHeading" hidden>
+                <nav class="focus-page1-sidebar" aria-label="1阴1阳条件">
+                    <div class="focus-page1-sidebar-title">1阴1阳</div>
+                    <div id="focusPage3IndependentGroups"></div>
+                </nav>
+                <section class="focus-page1-main">
+                    <div class="focus-page1-heading">
+                        <strong id="focusPage3IndependentHeading">10日1阴1阳</strong>
+                        <span class="header-count" id="focusPage3IndependentCount">0只</span>
+                    </div>
+                    <div class="focus-page1-columns"><span>股票</span><span class="focus-page1-below-heading" id="focusPage3IndependentValueHeading">20天阴线破5次数</span><span>代码</span><span>涨跌幅</span></div>
+                    <div id="focusPage3IndependentRows"></div>
+                </section>
+            </section>
             {% endif %}
             <div class="sheet-wrap" id="focusSheetWrap"{% if focus_mode %} role="tabpanel" aria-labelledby="focusPage1"{% endif %}>
                 <table aria-label="{{ 'PZ1重点关注' if focus_mode else 'PZ钉钉推送日志' }}">
@@ -1063,6 +1093,12 @@
             { key: 'yi_yin_yi_yang', title: '5拉一阴一阳' },
             { key: 'qiangchi', title: '5拉强吃' },
             { key: 'pz1_five_pull_yin_pull_next_or_eaten', title: '5拉阴后拉' }
+        ];
+        const FOCUS_PAGE3_INDEPENDENT_COLUMNS = [
+            { key: 'yi_yin_yi_yang_10d', title: '10日1阴1阳' },
+            { key: 'yi_yin_yi_yang_20d', title: '20日1阴1阳' },
+            { key: 'yi_yin_yi_yang_10d_by_yin_count', title: '10日1阴1阳阴线次数', groupKey: 'yi_yin_yi_yang_10d', countField: 'yin_count_10d', countLabel: '10日阴线' },
+            { key: 'yi_yin_yi_yang_20d_by_yin_count', title: '20日1阴1阳阴线次数', groupKey: 'yi_yin_yi_yang_20d', countField: 'yin_count_20', countLabel: '20日阴线' }
         ];
         const FOCUS_SHAPE_TAGS = [
             { field: 'is_quanyang_10d', label: '没有阴线' },
@@ -1142,6 +1178,7 @@
             limitUpBareFootHighGainOnly: false, quanyangOnly: false, newHighOnly: false,
             focusPayload: null, focusPage: readStoredFocusPage(),
             page1GroupMode: 'yin', page1YinGroup: '', page1BelowGroup: '',
+            page3IndependentField: 'yi_yin_yi_yang_10d',
             page6Board: '', page6Condition: 'limit_up', page6ConditionBoard: '', page6ConditionGroup: '',
             focusExcelSheet: FOCUS_EXCEL_DEFAULT_SHEET,
             focusExcelPayload: null, focusExcelChanges: new Map(),
@@ -1174,6 +1211,12 @@
         const focusPage1Description = document.getElementById('focusPage1Description');
         const focusPage1ValueHeading = document.getElementById('focusPage1ValueHeading');
         const focusPage1Rows = document.getElementById('focusPage1Rows');
+        const focusPage3Independent = document.getElementById('focusPage3Independent');
+        const focusPage3IndependentGroups = document.getElementById('focusPage3IndependentGroups');
+        const focusPage3IndependentHeading = document.getElementById('focusPage3IndependentHeading');
+        const focusPage3IndependentValueHeading = document.getElementById('focusPage3IndependentValueHeading');
+        const focusPage3IndependentCount = document.getElementById('focusPage3IndependentCount');
+        const focusPage3IndependentRows = document.getElementById('focusPage3IndependentRows');
         const focusPage6Special = document.getElementById('focusPage6Special');
         const focusRedisPage = document.getElementById('focusRedisPage');
         const focusPage6Groups = document.getElementById('focusPage6Groups');
@@ -1328,6 +1371,7 @@
                 ) + gap;
             } else if (
                 focusPage1Rows?.contains(state.openKlineAnchor)
+                || focusPage3IndependentRows?.contains(state.openKlineAnchor)
                 || focusPage6Rows?.contains(state.openKlineAnchor)
                 || focusPage6ConditionRows?.contains(state.openKlineAnchor)
             ) {
@@ -1473,6 +1517,7 @@
                 : focusPage6Rows?.contains(anchor) ? 'page6'
                 : focusPage6ConditionRows?.contains(anchor) ? 'page6-conditions'
                 : focusPage2Extra?.contains(anchor) ? 'page2-extra'
+                : focusPage3IndependentRows?.contains(anchor) ? 'page3-independent'
                 : 'table';
             anchor.classList.add('is-kline-open');
             klineImage.src = url;
@@ -1549,6 +1594,7 @@
             if (focusRedisPage) focusRedisPage.hidden = !redisPage;
             if (focusSheetWrap) focusSheetWrap.hidden = firstPage || sixthPage || redisPage;
             if (focusPage2Extra) focusPage2Extra.hidden = !(FOCUS_MODE && state.focusPage === 2);
+            if (focusPage3Independent) focusPage3Independent.hidden = !(FOCUS_MODE && state.focusPage === 3);
             if (focusPageNotes) focusPageNotes.hidden = sixthPage;
             if (focusPage1Note) focusPage1Note.hidden = !firstPage;
             if (focusPage2Note) focusPage2Note.hidden = !(FOCUS_MODE && state.focusPage === 2);
@@ -1701,17 +1747,78 @@
                 : '';
             focusPage1Rows.innerHTML = selectedWithCounts.length
                 ? selectedWithCounts.map(({ stock, belowCount }) => {
-                    const gain = focusStockGain(stock);
-                    const quanyangTag = isPz1Quanyang(stock)
-                        ? '<span class="focus-quanyang-tag">全阳</span>' : '';
                     const belowClass = !metric && belowCount !== null && belowCount <= 1 ? ' is-priority' : '';
                     const valueText = metric
                         ? `${page1MetricValue(stock, metric.field).toFixed(3)}%`
                         : belowCount === null ? '--' : belowCount;
-                    return `<article class="focus-page1-stock-row" data-stock-code="${escapeHtml(stock.code)}" role="button" tabindex="0" aria-label="查看${escapeHtml(stock.name || stock.code)}K线图"><div class="focus-page1-stock-main stock-main"><span class="focus-page1-stock-identity"><span class="focus-page1-stock-name">${escapeHtml(stock.name || stock.code)}</span>${quanyangTag}</span><span class="focus-page1-below-count${belowClass}">${valueText}</span><span class="focus-page1-stock-code">${escapeHtml(stock.code)}</span><span class="focus-page1-stock-gain">${gain.toFixed(2)}%</span></div></article>`;
+                    return focusListStockRow(stock, valueText, belowClass);
                 }).join('') + prioritySection
                 : `<div class="focus-page1-empty">${metric ? '当前日期暂无该指标数据' : '暂无重点关注股票'}</div>`;
             return selectedStocks;
+        }
+
+        function focusListStockRow(stock, valueText, belowClass = '', groupLabel = '') {
+            const gain = focusStockGain(stock);
+            const quanyangTag = isPz1Quanyang(stock)
+                ? '<span class="focus-quanyang-tag">全阳</span>' : '';
+            const groupHead = groupLabel ? `<div class="stock-group-head">${escapeHtml(groupLabel)}</div>` : '';
+            return `<article class="focus-page1-stock-row" data-stock-code="${escapeHtml(stock.code)}" role="button" tabindex="0" aria-label="查看${escapeHtml(stock.name || stock.code)}K线图">${groupHead}<div class="focus-page1-stock-main stock-main"><span class="focus-page1-stock-identity"><span class="focus-page1-stock-name">${escapeHtml(stock.name || stock.code)}</span>${quanyangTag}</span><span class="focus-page1-below-count${belowClass}">${valueText}</span><span class="focus-page1-stock-code">${escapeHtml(stock.code)}</span><span class="focus-page1-stock-gain">${gain.toFixed(2)}%</span></div></article>`;
+        }
+
+        function renderFocusPage3Independent(groups, filterStock) {
+            if (!focusPage3IndependentRows || !focusPage3IndependentCount
+                || !focusPage3IndependentGroups || !focusPage3IndependentHeading) return [];
+            const columns = FOCUS_PAGE3_INDEPENDENT_COLUMNS;
+            const selected = columns.find(column => column.key === state.page3IndependentField) || columns[0];
+            state.page3IndependentField = selected.key;
+            const stocksByField = Object.fromEntries(columns.map(column => [
+                column.key, (Array.isArray(groups[column.groupKey || column.key])
+                    ? groups[column.groupKey || column.key] : []).filter(filterStock)
+            ]));
+            focusPage3IndependentGroups.innerHTML = columns.map(column => {
+                const active = column.key === selected.key;
+                return `<button type="button" class="focus-page1-group-button${active ? ' is-active' : ''}" data-independent-field="${column.key}" aria-pressed="${String(active)}"><span>${column.title}</span><span class="focus-page1-group-count">${stocksByField[column.key].length}只</span></button>`;
+            }).join('');
+            focusPage3IndependentHeading.textContent = selected.title;
+            if (focusPage3IndependentValueHeading) {
+                focusPage3IndependentValueHeading.textContent = selected.countField
+                    ? `${selected.countLabel}次数` : '20天阴线破5次数';
+            }
+            const stocks = stocksByField[selected.key];
+            const yinCount = stock => {
+                const value = stock[selected.countField];
+                if (value === null || value === undefined || value === '') return null;
+                const count = Number(value);
+                return Number.isInteger(count) && count >= 0 ? count : null;
+            };
+            const sorted = [...stocks].sort((left, right) =>
+                (selected.countField
+                    ? (yinCount(left) ?? Infinity) - (yinCount(right) ?? Infinity) : 0)
+                || focusStockGain(right) - focusStockGain(left)
+                || String(left.code).localeCompare(String(right.code))
+            );
+            const groupCounts = new Map();
+            if (selected.countField) sorted.forEach(stock => {
+                const count = yinCount(stock);
+                groupCounts.set(count, (groupCounts.get(count) || 0) + 1);
+            });
+            let previousCount;
+            focusPage3IndependentCount.textContent = `${sorted.length}只`;
+            focusPage3IndependentRows.innerHTML = sorted.length
+                ? sorted.map(stock => {
+                    if (selected.countField) {
+                        const count = yinCount(stock);
+                        const groupLabel = count !== previousCount
+                            ? `${selected.countLabel}${count === null ? '：未统计' : `=${count}`}（${groupCounts.get(count)}只）` : '';
+                        previousCount = count;
+                        return focusListStockRow(stock, count === null ? '--' : count, '', groupLabel);
+                    }
+                    const belowCount = closeBelowMa5Count20d(stock);
+                    const belowClass = belowCount !== null && belowCount <= 1 ? ' is-priority' : '';
+                    return focusListStockRow(stock, belowCount === null ? '--' : belowCount, belowClass);
+                }).join('')
+                : '<div class="focus-page1-empty">暂无符合当前条件的股票</div>';
+            return sorted;
         }
 
         const BOARD_REASON_LABELS = {
@@ -2257,6 +2364,8 @@
             const rawPushLog = Array.isArray(groups.push_log) ? groups.push_log : [];
             const page2PushLogStocks = state.focusPage === 2 ? rawPushLog.filter(filterStock) : [];
             const extraStocks = renderFocusPage2Extra(groups, filterStock, page2PushLogStocks);
+            const independentStocks = state.focusPage === 3
+                ? renderFocusPage3Independent(groups, filterStock) : [];
             const stocksByColumn = config.map(column => groupStocks(column.key));
             const columns = config.map((column, index) => {
                 if (column.customGrouping === 'qy1') {
@@ -2271,7 +2380,7 @@
 
             renderFocusHeaders(stocksByColumn);
             const visibleCount = new Set(
-                stocksByColumn.flat().concat(extraStocks).map(stock => stock.code)
+                stocksByColumn.flat().concat(extraStocks, independentStocks).map(stock => stock.code)
             ).size;
             const filterLabel = [
                 limitUpOnly ? '涨停' : state.notLimitUpOnly ? '未涨停' : '',
@@ -2302,6 +2411,8 @@
             if (openCode) {
                 const reopened = openRegion === 'page2-extra'
                     ? focusPage2Extra?.querySelector(`[data-focus-extra-group="${openExtraGroup}"] [data-stock-code="${openCode}"]`)
+                    : openRegion === 'page3-independent'
+                    ? focusPage3IndependentRows?.querySelector(`[data-stock-code="${openCode}"]`)
                     : rowsElement.querySelector(`td:nth-child(${openColumn + 1}) [data-stock-code="${openCode}"]`);
                 if (reopened) showKline(openCode, reopened);
                 else closeKline();
@@ -2445,6 +2556,11 @@
                 if (focusPage1Rows && state.focusPage === 1) {
                     focusPage1Rows.innerHTML = '<div class="focus-page1-empty">加载中...</div>';
                 }
+                if (focusPage3IndependentRows && state.focusPage === 3) {
+                    focusPage3IndependentCount.textContent = '0只';
+                    focusPage3IndependentGroups.innerHTML = '';
+                    focusPage3IndependentRows.innerHTML = '<div class="focus-page1-empty">加载中...</div>';
+                }
                 if (focusPage6Rows && state.focusPage === 6) {
                     focusPage6Rows.innerHTML = '<div class="focus-page1-empty">加载中...</div>';
                     renderThsConditionMarkup(focusPage6Conditions, '');
@@ -2484,6 +2600,9 @@
                 statusText.className = 'error';
                 if (FOCUS_MODE && !state.focusPayload) {
                     rowsElement.innerHTML = `<tr><td colspan="${columnCount()}" class="empty-cell">加载失败，正在等待重试</td></tr>`;
+                    if (state.focusPage === 3 && focusPage3IndependentRows) {
+                        focusPage3IndependentRows.innerHTML = '<div class="focus-page1-empty">加载失败，正在等待重试</div>';
+                    }
                     if (state.focusPage === 6 && focusPage6ConditionRows) {
                         renderThsConditionMarkup(focusPage6ConditionRows, '<div class="focus-page1-empty">加载失败，正在等待重试</div>');
                     }
@@ -2698,6 +2817,19 @@
         bindThsConditionSelector(focusPage6ConditionBoards, 'data-ths-board', 'page6ConditionBoard');
         bindThsConditionSelector(focusPage6ConditionBoards, 'data-ths-yin-count', 'page6ConditionGroup');
 
+        if (focusPage3IndependentGroups) {
+            focusPage3IndependentGroups.addEventListener('click', event => {
+                const button = event.target.closest('[data-independent-field]');
+                if (!button || !state.focusPayload) return;
+                const field = button.dataset.independentField;
+                if (!FOCUS_PAGE3_INDEPENDENT_COLUMNS.some(column => column.key === field)) return;
+                state.page3IndependentField = field;
+                closeKline();
+                renderFocus(state.focusPayload);
+                focusPage3IndependentGroups.querySelector(`[data-independent-field="${field}"]`)?.focus({ preventScroll: true });
+            });
+        }
+
         function copyStockName(name) {
             if (!name) return;
             const copyWithSelection = () => {
@@ -2763,6 +2895,7 @@
 
         bindStockInteractions(rowsElement);
         bindStockInteractions(focusPage1Rows);
+        bindStockInteractions(focusPage3IndependentRows);
         bindStockInteractions(focusPage6Rows);
         bindStockInteractions(focusPage6ConditionRows);
         bindStockInteractions(focusPage2Extra);
