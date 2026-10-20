@@ -18,6 +18,7 @@ import traceback
 import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
+from functools import lru_cache
 
 try:
     import redis
@@ -53,6 +54,7 @@ REDIS_KEY_PREFIX = "pz"
 PZ1_REDIS_KEY_PREFIX = "pz1"
 QY1_REDIS_KEY_PREFIX = "qy1"
 QY2_REDIS_KEY_PREFIX = "qy2"
+LIMIT_UP_LADDER_PREFIX = "limitup:ladder"
 KLINE_HISTORY_PREFIX = "pz:kline:history"
 KLINE_REALTIME_PREFIX = "pz:kline:realtime"
 QY1_KLINE_HISTORY_PREFIX = "qy1:kline:history"
@@ -107,6 +109,12 @@ g_redis_client = None
 g_initialized = False
 g_stock_pool = []
 g_stock_names = {}
+g_ladder_pool = []
+g_ladder_details = {}
+g_ladder_details_date = ""
+g_ladder_history = {}
+g_ladder_history_date = ""
+g_ladder_history_retry_at = {}
 g_history_data = {}
 g_reference_date = ""
 g_history_reload_date = ""
@@ -135,6 +143,8 @@ g_qy2_candidate_cache_date = ""
 g_qy2_candidate_stocks = set()
 g_reference_series_cache_date = ""
 g_reference_series_cache = {}
+g_window_metrics_cache_date = ""
+g_window_metrics_cache = {}
 
 
 # ==================== pure helpers ====================
@@ -197,16 +207,21 @@ def previous_history_closes(history, ref_date):
     )
 
 
-def normalize_trade_date(value):
-    digits = "".join(ch for ch in str(value or "") if ch.isdigit())
-    if len(digits) < 8:
-        return ""
-    text = digits[:8]
+@lru_cache(maxsize=512)
+def validated_trade_date(text):
     try:
         datetime.strptime(text, "%Y%m%d")
         return text
     except Exception:
         return ""
+
+
+def normalize_trade_date(value):
+    digits = "".join(ch for ch in str(value or "") if ch.isdigit())
+    if len(digits) < 8:
+        return ""
+    text = digits[:8]
+    return validated_trade_date(text)
 
 
 def tick_trade_date(tick):
@@ -240,7 +255,7 @@ def get_limit_up_ratio(stock_code):
     code = simple_code(stock_code)
     if code.startswith("688") or code.startswith("300") or code.startswith("301"):
         return 20.0
-    if code.startswith("8") or code.startswith("4"):
+    if code.startswith(("8", "4", "92")):
         return 30.0
     return 10.0
 
@@ -427,6 +442,74 @@ def calculate_yi_yin_yi_yang_flags(
         if next_close < recent_opens[index]:
             qiangchi = 0
     return {"yi_yin_yi_yang": 1, "qiangchi": qiangchi}
+
+
+def calculate_reference_candle_flags(
+    stock_code, opens, closes, reference_previous_close=0.0
+):
+    """Count the current board streak and check windows without a five-pull gate."""
+    result = {
+        "is_first_limit_up": 0,
+        "is_second_limit_up": 0,
+        "consecutive_limit_up_days": 0,
+        "yi_yin_yi_yang_10d": 0,
+        "yi_yin_yi_yang_20d": 0,
+    }
+    size = len(closes)
+    if not size:
+        return result
+    previous_close = safe_float(reference_previous_close)
+    if previous_close <= 0 and size >= 2:
+        previous_close = safe_float(closes[-2])
+
+    streak = 0
+    boundary_known = False
+    for index in range(size - 1, -1, -1):
+        day_close = safe_float(closes[index])
+        day_previous = (
+            previous_close if index == size - 1
+            else safe_float(closes[index - 1]) if index >= 1 else 0.0
+        )
+        if min(day_close, day_previous) <= 0:
+            break
+        if not is_limit_up_by_price(day_close, day_previous, stock_code):
+            boundary_known = True
+            break
+        streak += 1
+    result["consecutive_limit_up_days"] = streak
+    # Missing older data must not falsely label an exact first/second board.
+    result["is_first_limit_up"] = int(boundary_known and streak == 1)
+    result["is_second_limit_up"] = int(boundary_known and streak == 2)
+
+    if size < 10 or len(opens) != size:
+        return result
+    current_open = safe_float(opens[-1])
+    current_close = safe_float(closes[-1])
+    if (
+        min(current_open, current_close, previous_close) <= 0
+        or current_close < current_open
+        or is_limit_down_by_price(current_close, previous_close, stock_code)
+    ):
+        return result
+
+    next_open, next_close = current_open, current_close
+    for offset in range(1, min(size, 20) + 1):
+        index = size - offset
+        day_open = safe_float(opens[index])
+        day_close = safe_float(closes[index])
+        if min(day_open, day_close) <= 0:
+            break
+        if day_close < day_open:
+            next_previous = previous_close if offset == 2 else day_close
+            if (
+                next_close < next_open
+                or is_limit_down_by_price(next_close, next_previous, stock_code)
+            ):
+                break
+        if offset in (10, 20):
+            result["yi_yin_yi_yang_%dd" % offset] = 1
+        next_open, next_close = day_open, day_close
+    return result
 
 
 def summarize_condition_hits(results):
@@ -713,6 +796,223 @@ def calculate_window_metrics(opens, highs, lows, closes):
         "lower_shadow_pct_sum_4d": round(lower_shadow_pct_sum_4d, 6) if continuous_4_no_touch else 0.0,
         "is_quanyang_10d": int(is_quanyang_10d),
     }
+
+
+def prepare_scan_window_metrics(series):
+    """Cache only completed bars; the reference candle is never cached here."""
+    opens, highs, lows, closes = (
+        [safe_float(value) for value in series[field][-24:-1]]
+        for field in ("opens", "highs", "lows", "closes")
+    )
+    high_gains = [0.0] * 13 + [
+        calc_gain(highs[index], closes[index - 1]) for index in range(13, 23)
+    ]
+    ma5s = [0.0] * 14 + [
+        sum(closes[index - 4:index + 1]) / 5.0 for index in range(14, 23)
+    ]
+    yin_indexes = [index for index in range(14, 23) if closes[index] < opens[index]]
+    low_above = [
+        lows[index] > ma5s[index] and ma5s[index] > 0 for index in range(14, 23)
+    ]
+    yin_up = []
+    for index in yin_indexes:
+        body = opens[index] - closes[index]
+        upper = highs[index] - opens[index]
+        lower = closes[index] - lows[index]
+        yin_up.append((upper > body and upper > lower) or high_gains[index] >= 6.5)
+    pull_next = eaten_next = pull_prev_or_next = True
+    qy2_yin_ok = qy2_eaten_next = True
+    for index in yin_indexes:
+        if index == 22:
+            continue
+        next_high = high_gains[index + 1] >= 6.5
+        eaten = closes[index + 1] > opens[index]
+        pull_next = pull_next and (next_high or eaten)
+        eaten_next = eaten_next and eaten
+        pull_prev_or_next = pull_prev_or_next and (
+            high_gains[index - 1] >= 6.5 or next_high
+        )
+        qy2_eaten_next = qy2_eaten_next and eaten
+        low_gte_ma5 = ma5s[index] > 0 and lows[index] + 1e-9 >= ma5s[index]
+        next_yang_eaten = eaten and closes[index + 1] > opens[index + 1]
+        qy2_yin_ok = qy2_yin_ok and (low_gte_ma5 or next_yang_eaten)
+    close_below_count = 0
+    close_below_sum = 0.0
+    for index in range(14, 23):
+        if ma5s[index] > 0 and closes[index] < ma5s[index]:
+            close_below_count += 1
+            close_below_sum += (ma5s[index] - closes[index]) / ma5s[index] * 100.0
+    continuous = all(
+        lows[index] > ma5s[index] and closes[index] > 0 for index in range(20, 23)
+    )
+    shadow_sum = 0.0
+    if continuous:
+        for index in range(20, 23):
+            lower = max(0.0, min(opens[index], closes[index]) - lows[index])
+            shadow_sum += lower / closes[index] * 100.0
+    return {
+        "closes": closes,
+        "last_open": opens[-1],
+        "last_is_yin": closes[-1] < opens[-1],
+        "last_high_gain": high_gains[-1],
+        "previous_high_gain": high_gains[-2],
+        "last_low_gte_ma5": ma5s[-1] > 0 and lows[-1] + 1e-9 >= ma5s[-1],
+        "qy2_yin_ok": qy2_yin_ok,
+        "qy2_eaten_next": qy2_eaten_next,
+        "close_below_count": close_below_count,
+        "close_below_sum": close_below_sum,
+        "all_yin_no_touch": all(
+            lows[index] > ma5s[index] and ma5s[index] > 0 for index in yin_indexes
+        ),
+        "all_yin_up": all(yin_up),
+        "all_yin_cross_star": all(
+            is_cross_star(opens[index], closes[index], closes[index - 1])
+            for index in yin_indexes
+        ),
+        "yin_count_20": sum(closes[index] < opens[index] for index in range(4, 23)),
+        "yin_count_10d": len(yin_indexes),
+        "high_gain_10d_count": sum(value >= 6.5 for value in high_gains[14:]),
+        "low_above_ma5_count_10d": sum(low_above),
+        "all_close_above_ma10_10d": all(
+            closes[index] > sum(closes[index - 9:index + 1]) / 10.0
+            for index in range(14, 23)
+        ),
+        "yin_pull_next": pull_next,
+        "all_yin_eaten_next": eaten_next,
+        "yin_pull_prev_or_next": pull_prev_or_next,
+        "continuous_4_no_touch": continuous,
+        "shadow_sum": shadow_sum,
+        "prev3_metrics": calculate_prev3_shadow_metrics(
+            opens, highs, lows, closes, reference_index=23
+        ),
+        "prior_high_20d": max(highs[-19:]),
+    }
+
+
+def update_scan_window_metrics(prepared, series):
+    open_price, high_price, low_price, close_price = (
+        safe_float(series[field][-1]) for field in ("opens", "highs", "lows", "closes")
+    )
+    closes = prepared["closes"]
+    high_gain = calc_gain(high_price, closes[-1])
+    ma5 = sum(closes[-4:] + [close_price]) / 5.0
+    ma10 = sum(closes[-9:] + [close_price]) / 10.0
+    yin = close_price < open_price
+    yin_count = prepared["yin_count_10d"] + int(yin)
+    low_above = ma5 > 0 and low_price > ma5
+    upper = high_price - open_price
+    lower = close_price - low_price
+    yin_up = (upper > open_price - close_price and upper > lower) or high_gain >= 6.5
+    pull_next = prepared["yin_pull_next"]
+    eaten_next = prepared["all_yin_eaten_next"]
+    pull_prev_or_next = prepared["yin_pull_prev_or_next"]
+    if prepared["last_is_yin"]:
+        eaten = close_price > prepared["last_open"]
+        pull_next = pull_next and (high_gain >= 6.5 or eaten)
+        eaten_next = eaten_next and eaten
+        previous_high = prepared["previous_high_gain"] >= 6.5
+        pull_prev_or_next = pull_prev_or_next and (previous_high or high_gain >= 6.5)
+    if yin:
+        pull_next = eaten_next = False
+        pull_prev_or_next = pull_prev_or_next and prepared["last_high_gain"] >= 6.5
+    continuous = (
+        prepared["continuous_4_no_touch"] and low_price > ma5 and close_price > 0
+    )
+    shadow_sum = prepared["shadow_sum"]
+    if continuous:
+        lower_shadow = max(0.0, min(open_price, close_price) - low_price)
+        shadow_sum += lower_shadow / close_price * 100.0
+    return {
+        "yin_count_20": prepared["yin_count_20"] + int(yin),
+        "yin_count_10d": yin_count,
+        "high_gain_10d_count": prepared["high_gain_10d_count"] + int(high_gain >= 6.5),
+        "low_above_ma5_count_10d": prepared["low_above_ma5_count_10d"] + int(low_above),
+        "all_close_above_ma10_10d": int(
+            prepared["all_close_above_ma10_10d"] and ma10 > 0 and close_price > ma10
+        ),
+        "all_yin_no_touch": int(
+            yin_count > 0 and prepared["all_yin_no_touch"] and (not yin or low_above)
+        ),
+        "all_yin_up": int(
+            yin_count > 0 and prepared["all_yin_up"] and (not yin or yin_up)
+        ),
+        "all_yin_cross_star": int(
+            yin_count > 0 and prepared["all_yin_cross_star"]
+            and (not yin or is_cross_star(open_price, close_price, closes[-1]))
+        ),
+        "yin_pull_next": int(pull_next) if yin_count else 1,
+        "yin_pull_prev_or_next": int(yin_count > 0 and pull_prev_or_next),
+        "all_yin_eaten_next": int(yin_count > 0 and eaten_next),
+        "continuous_4_no_touch": int(continuous),
+        "lower_shadow_pct_sum_4d": round(shadow_sum, 6) if continuous else 0.0,
+        "is_quanyang_10d": int(yin_count == 0),
+    }
+
+
+def calculate_scan_window_metrics(stock, history, series, ref_date, shared=None):
+    global g_window_metrics_cache_date, g_window_metrics_cache
+    if g_window_metrics_cache_date != ref_date:
+        g_window_metrics_cache_date = ref_date
+        g_window_metrics_cache = {}
+    lengths = [
+        len(series.get(field) or []) for field in ("opens", "highs", "lows", "closes")
+    ]
+    if min(lengths) < 24 or len(set(lengths)) != 1:
+        return calculate_window_metrics(
+            series["opens"], series["highs"], series["lows"], series["closes"]
+        )
+    source = g_reference_series_cache.get(stock)
+    cached = g_window_metrics_cache.get(stock)
+    if (
+        cached is None or cached[0] is not history
+        or cached[1] != lengths[0] or cached[2] is not source
+    ):
+        cached = (history, lengths[0], source, prepare_scan_window_metrics(series))
+        g_window_metrics_cache[stock] = cached
+    prepared = cached[3]
+    if shared is not None:
+        shared["scan_window"] = prepared
+        shared["prev3_metrics"] = prepared["prev3_metrics"]
+        shared["prior_high_20d"] = prepared["prior_high_20d"]
+    return update_scan_window_metrics(prepared, series)
+
+
+def calculate_scan_qy2_metrics(prepared, opens, lows, closes):
+    if prepared is None:
+        return calculate_qy2_metrics(opens, lows, closes)
+    open_price = safe_float(opens[-1])
+    close_price = safe_float(closes[-1])
+    low_price = safe_float(lows[-1])
+    ma5 = sum(prepared["closes"][-4:] + [close_price]) / 5.0
+    yin_ok = prepared["qy2_yin_ok"]
+    eaten_next = prepared["qy2_eaten_next"]
+    if prepared["last_is_yin"]:
+        eaten = close_price > prepared["last_open"]
+        eaten_next = eaten_next and eaten
+        yin_ok = yin_ok and (
+            prepared["last_low_gte_ma5"] or (eaten and close_price > open_price)
+        )
+    if close_price < open_price:
+        eaten_next = False
+        yin_ok = yin_ok and ma5 > 0 and low_price + 1e-9 >= ma5
+    below = ma5 > 0 and close_price < ma5
+    below_sum = prepared["close_below_sum"]
+    if below:
+        below_sum += (ma5 - close_price) / ma5 * 100.0
+    return {
+        "all_yin_low_gte_ma5_or_eaten_10d": int(yin_ok),
+        "all_yin_eaten_next_10d": int(eaten_next),
+        "close_below_ma5_count_10d": prepared["close_below_count"] + int(below),
+        "close_below_ma5_abs_pct_sum_10d": round(below_sum, 6),
+    }
+
+
+def shared_series_value(shared, name, calculate):
+    if shared is None:
+        return calculate()
+    if name not in shared:
+        shared[name] = calculate()
+    return shared[name]
 
 
 def calculate_qy1_metrics(opens, highs, lows, closes):
@@ -1113,6 +1413,7 @@ def preload_history_data(ContextInfo, end_date=""):
     global g_pz1_candidate_cache_date, g_pz1_candidate_stocks
     global g_qy2_candidate_cache_date, g_qy2_candidate_stocks
     global g_reference_series_cache_date, g_reference_series_cache
+    global g_window_metrics_cache_date, g_window_metrics_cache
     requested_end = normalize_trade_date(end_date)
     if requested_end:
         query_end = (datetime.strptime(requested_end, "%Y%m%d") + timedelta(days=7)).strftime("%Y%m%d")
@@ -1175,6 +1476,8 @@ def preload_history_data(ContextInfo, end_date=""):
         g_qy2_candidate_stocks = set()
         g_reference_series_cache_date = ""
         g_reference_series_cache = {}
+        g_window_metrics_cache_date = ""
+        g_window_metrics_cache = {}
     latest_dates = [
         history.get("dates", [])[-1]
         for history in loaded.values()
@@ -2057,9 +2360,241 @@ def dingtalk_worker():
 
 # ==================== scan ====================
 
+def ladder_at_limit(price, limit_price):
+    price, limit_price = safe_float(price), safe_float(limit_price)
+    return min(price, limit_price) > 0 and abs(price - limit_price) < 0.0001
+
+
+def ladder_history_rows(frame, ref_date):
+    if frame is None:
+        return []
+    rows = []
+    previous = 0.0
+    for index in range(len(frame)):
+        raw_date = frame.index[index]
+        date = raw_date.strftime("%Y%m%d") if hasattr(raw_date, "strftime") else normalize_trade_date(raw_date)
+        close = safe_float(frame["close"].iloc[index])
+        if not date or date >= ref_date or close <= 0:
+            continue
+        pre_close = safe_float(frame["preClose"].iloc[index]) if "preClose" in frame else 0.0
+        row = {"date": date, "close": close, "pre_close": pre_close or previous}
+        if "open" in frame:
+            row["open"] = safe_float(frame["open"].iloc[index])
+        rows.append(row)
+        previous = close
+    return rows
+
+
+def ladder_board_streak(stock, name, rows, current_close, current_limit, open_date=""):
+    if not ladder_at_limit(current_close, current_limit):
+        return 0, False
+    ratio = get_limit_up_ratio(stock) / 100.0
+    if simple_code(stock).startswith("689"):
+        ratio = 0.20
+    no_limit_dates = set()
+    listing_date = normalize_trade_date(open_date)
+    for index, row in enumerate(rows):
+        if listing_date and row["date"] == listing_date:
+            count = 1 if str(stock).endswith(".BJ") else 5
+            no_limit_dates = {item["date"] for item in rows[index:index + count]}
+            break
+    streak = 1
+    complete = False
+    for row in reversed(rows):
+        if row["date"] in no_limit_dates:
+            complete = True
+            break
+        previous = safe_float(row.get("pre_close"))
+        if previous <= 0:
+            break
+        day_ratio = ratio
+        # SH/SZ main-board ST limits changed from 5% to 10% on 2026-07-06.
+        if ratio == 0.10 and "ST" in str(name).upper() and row["date"] < "20260706":
+            day_ratio = 0.05
+        upper = float((Decimal(str(previous)) * (Decimal("1") + Decimal(str(day_ratio)))).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        ))
+        if not ladder_at_limit(row.get("close"), upper):
+            complete = True
+            break
+        streak += 1
+    return streak, complete
+
+
+def init_ladder_market(ContextInfo, base_pool):
+    global g_ladder_pool, g_ladder_details, g_ladder_details_date
+    global g_ladder_history_date, g_ladder_history, g_ladder_history_retry_at
+    pool = set(base_pool)
+    # QMT versions use different names for the Beijing market sector.
+    for sector in ("\u5317\u4ea4\u6240", "\u5317\u8bc1A\u80a1", "\u5317\u4eacA\u80a1"):
+        try:
+            pool.update(ContextInfo.get_stock_list_in_sector(sector) or [])
+        except Exception:
+            pass
+    if not any(str(stock).endswith(".BJ") for stock in pool):
+        try:
+            market_ticks = ContextInfo.get_full_tick(["BJ"])
+            if isinstance(market_ticks, dict):
+                pool.update(stock for stock in market_ticks if str(stock).endswith(".BJ"))
+        except Exception as error:
+            log("[LADDER] Beijing market discovery unavailable: %s" % error, "WARN")
+    pool = sorted(stock for stock in pool if (
+        str(stock).endswith((".SH", ".SZ", ".BJ"))
+        and simple_code(stock).startswith(("0", "3", "6", "8", "4", "92"))
+    ))
+    details = {}
+    get_detail = getattr(ContextInfo, "get_instrument_detail", None)
+    if not callable(get_detail):
+        get_detail = getattr(ContextInfo, "get_instrumentdetail", None)
+    for stock in pool:
+        try:
+            detail = get_detail(stock) if callable(get_detail) else None
+            if isinstance(detail, dict) and detail:
+                details[stock] = detail
+        except Exception:
+            pass
+    g_ladder_pool = pool
+    g_ladder_details = details
+    g_ladder_details_date = datetime.now().strftime("%Y%m%d")
+    g_ladder_history_date, g_ladder_history, g_ladder_history_retry_at = "", {}, {}
+    log("[LADDER] market=%d details=%d BJ=%d; existing strategy universe unchanged" % (
+        len(pool), len(details), sum(stock.endswith(".BJ") for stock in pool)
+    ))
+
+
+def build_limit_up_ladder(ContextInfo, all_ticks, ref_date, snapshot_at):
+    global g_ladder_history_date, g_ladder_history, g_ladder_history_retry_at
+    metadata = {
+        "status": "success", "scope": "all_a_shares", "reference_date": ref_date,
+        "updated_at": snapshot_at, "market_count": len(g_ladder_pool),
+        "market_counts": {market: sum(stock.endswith("." + market) for stock in g_ladder_pool)
+                          for market in ("SH", "SZ", "BJ")},
+        "missing_quote_count": 0, "missing_detail_count": 0,
+        "history_missing_count": 0, "streak_pending_count": 0,
+        "window_metrics_missing_count": 0,
+        "history_rule": "raw_preclose_board_ratio",
+    }
+    if ref_date != g_ladder_details_date:
+        metadata.update(status="unavailable", error="No current-day instrument limits for this date")
+        return [], metadata
+    if g_ladder_history_date != ref_date:
+        g_ladder_history_date, g_ladder_history, g_ladder_history_retry_at = ref_date, {}, {}
+    candidates = []
+    for stock in g_ladder_pool:
+        tick = all_ticks.get(stock) or {}
+        if tick_trade_date(tick) != ref_date or safe_float(tick.get("lastPrice")) <= 0:
+            metadata["missing_quote_count"] += 1
+            continue
+        detail = g_ladder_details.get(stock) or {}
+        if not detail:
+            metadata["missing_detail_count"] += 1
+            continue
+        if ladder_at_limit(tick.get("lastPrice"), detail.get("UpStopPrice")):
+            candidates.append((stock, tick, detail))
+    now_ts = time.time()
+    needed = [stock for stock, _, _ in candidates if stock not in g_ladder_history
+              and now_ts >= g_ladder_history_retry_at.get(stock, 0)]
+    for offset in range(0, len(needed), HISTORY_BATCH_SIZE):
+        batch = needed[offset:offset + HISTORY_BATCH_SIZE]
+        try:
+            data = ContextInfo.get_market_data_ex(
+                ["open", "close", "preClose"], batch, period="1d", end_time=ref_date + "235959",
+                count=HISTORY_REQUEST_DAYS, dividend_type="none", fill_data=False,
+            )
+            for stock in batch:
+                frame = extract_stock_data(data, stock)
+                rows = ladder_history_rows(frame, ref_date)
+                if rows:
+                    g_ladder_history[stock] = rows
+                else:
+                    g_ladder_history_retry_at[stock] = now_ts + 60
+        except Exception as error:
+            for stock in batch:
+                g_ladder_history_retry_at[stock] = now_ts + 60
+            log("[LADDER] raw history failed: %s" % error, "WARN", ref_date)
+    results = []
+    for stock, tick, detail in candidates:
+        name = str(detail.get("InstrumentName") or g_stock_names.get(stock) or simple_code(stock))
+        previous = safe_float(detail.get("PreClose")) or safe_float(tick.get("lastClose"))
+        close = safe_float(tick.get("lastPrice"))
+        high_gain = calc_gain(max(safe_float(tick.get("high")), close), previous)
+        rows = g_ladder_history.get(stock, [])
+        streak, complete = ladder_board_streak(
+            stock, name, rows, close, detail.get("UpStopPrice"), detail.get("OpenDate")
+        )
+        if not rows:
+            metadata["history_missing_count"] += 1
+        if not complete:
+            metadata["streak_pending_count"] += 1
+        recent = rows[-19:] + [{"open": safe_float(tick.get("open")), "close": close}]
+        opens = [safe_float(row.get("open")) for row in recent]
+        closes = [safe_float(row.get("close")) for row in recent]
+        yin_count_20 = (sum(day_close < day_open for day_open, day_close in zip(opens, closes))
+                        if len(recent) == 20 and min(opens + closes) > 0 else None)
+        independent_10d = None
+        if len(recent) >= 10 and min(opens[-10:] + closes[-10:]) > 0:
+            independent_10d = calculate_reference_candle_flags(
+                stock, opens, closes, previous
+            )["yi_yin_yi_yang_10d"]
+        if yin_count_20 is None or independent_10d is None:
+            metadata["window_metrics_missing_count"] += 1
+        results.append({
+            "code": simple_code(stock), "stock_code": stock, "name": name,
+            "ref_date": ref_date, "ref_gain": round(calc_gain(close, previous), 6),
+            "today_change": round(calc_gain(close, previous), 6),
+            "ref_high_gain": round(high_gain, 6), "max_gain": round(high_gain, 6),
+            "ref_high_gain_ok": int(high_gain >= 6.5),
+            "ref_high_gain_gte_6_5": int(high_gain >= 6.5),
+            "is_bare_foot": int(is_nearly_bare_foot(
+                tick.get("open"), close, tick.get("high"), tick.get("low")
+            )),
+            "is_limit_up": 1, "ref_is_limit_up": 1,
+            "limit_up_price": safe_float(detail.get("UpStopPrice")),
+            "consecutive_limit_up_days": streak if complete else None,
+            "streak_min_days": streak,
+            "streak_complete": complete,
+            "is_first_limit_up": int(complete and streak == 1),
+            "is_second_limit_up": int(complete and streak == 2),
+            "yin_count_20": yin_count_20,
+            "yi_yin_yi_yang_10d": independent_10d,
+            "updated_at": snapshot_at,
+        })
+    metadata["selected_count"] = len(results)
+    metadata["missing_markets"] = [market for market, count in metadata["market_counts"].items() if not count]
+    if (metadata["missing_markets"] or metadata["missing_quote_count"]
+            or metadata["missing_detail_count"] or metadata["streak_pending_count"]):
+        metadata["status"] = "partial"
+    return results, metadata
+
+
+def publish_limit_up_ladder(ContextInfo, all_ticks, ref_date, snapshot_at):
+    started = time.time()
+    if not g_ladder_pool or not all_ticks:
+        return 0.0
+    try:
+        results, metadata = build_limit_up_ladder(ContextInfo, all_ticks, ref_date, snapshot_at)
+        if metadata["status"] == "unavailable" or not g_ladder_pool:
+            return 0.0
+        if metadata.get("market_count", 0) > 0 and (
+            metadata.get("missing_quote_count", 0) >= metadata["market_count"]
+        ):
+            log("[LADDER] no valid current-day quotes; retain last snapshot", "WARN", ref_date)
+            return time.time() - started
+        mapping = {item["code"]: item for item in results}
+        metadata["seconds"] = round(time.time() - started, 4)
+        mapping["_scan_info"] = metadata
+        publish_full_hash(redis_key(LIMIT_UP_LADDER_PREFIX, ref_date), mapping)
+        return time.time() - started
+    except Exception as error:
+        log("[LADDER] publish failed; existing strategy snapshots unaffected: %s" % error,
+            "WARN", ref_date)
+        return time.time() - started
+
+
 def get_realtime_ticks(ContextInfo):
     try:
-        ticks = ContextInfo.get_full_tick(g_stock_pool)
+        pool = sorted(set(g_stock_pool).union(g_ladder_pool)) if g_ladder_pool else g_stock_pool
+        ticks = ContextInfo.get_full_tick(pool)
         return ticks if isinstance(ticks, dict) else {}
     except Exception as error:
         log("[TICK] get_full_tick failed: %s" % error, "ERROR", g_reference_date)
@@ -2075,7 +2610,7 @@ def latest_tick_trade_date(all_ticks):
     return latest
 
 
-def build_pz1_result(stock, name, series, ref_date, snapshot_at, metrics=None):
+def build_pz1_result(stock, name, series, ref_date, snapshot_at, metrics=None, shared=None):
     opens = list(series.get("opens") or [])
     highs = list(series.get("highs") or [])
     lows = list(series.get("lows") or [])
@@ -2094,10 +2629,14 @@ def build_pz1_result(stock, name, series, ref_date, snapshot_at, metrics=None):
     ref_gain = calc_gain(current_price, previous_close)
     max_gain = calc_gain(highs[-1], previous_close)
     is_ref_price_20d_high = int(
-        current_price + 1e-8 >= max(safe_float(value) for value in highs[-20:-1])
+        current_price + 1e-8 >= shared_series_value(
+            shared, "prior_high_20d", lambda: max(safe_float(value) for value in highs[-20:-1])
+        )
     )
-    prev3_metrics = calculate_prev3_shadow_metrics(
-        opens, highs, lows, closes, reference_index=size - 1
+    prev3_metrics = shared_series_value(
+        shared, "prev3_metrics", lambda: calculate_prev3_shadow_metrics(
+            opens, highs, lows, closes, reference_index=size - 1
+        )
     )
     high_gain_prev3_short_shadow_met = int(
         max_gain + 1e-9 >= HIGH_GAIN_THRESHOLD_PCT
@@ -2112,7 +2651,7 @@ def build_pz1_result(stock, name, series, ref_date, snapshot_at, metrics=None):
     )
     yin7_yang_no_touch_or_eaten_10d = int(
         yin_count_20_lte_7_and_ref_yang
-        and calculate_qy1_metrics(opens, highs, lows, closes)[
+        and shared_series_value(shared, "qy1_metrics", lambda: calculate_qy1_metrics(opens, highs, lows, closes))[
             "all_yin_no_touch_or_eaten_10d"
         ] == 1
     )
@@ -2248,6 +2787,11 @@ def build_pz1_result(stock, name, series, ref_date, snapshot_at, metrics=None):
         "snapshot_at": snapshot_at,
         "updated_at": now_text(),
     }
+    result.update(shared_series_value(
+        shared, "reference_candle_flags", lambda: calculate_reference_candle_flags(
+            stock, opens, closes, previous_close
+        )
+    ))
     result.update(five_pull_group_flags)
     result["five_pull_yin_pull_next_or_eaten"] = int(
         five_pull_group_flags.get("five_pull_yin_pull_next", 0) or 0
@@ -2312,7 +2856,7 @@ def calculate_low_above_ma5_count_20d(closes, lows):
 
 
 def build_qy_common_result(stock, name, series, ref_date, snapshot_at,
-                           metrics, qy1_metrics):
+                           metrics, qy1_metrics, shared=None):
     opens = list(series.get("opens") or [])
     highs = list(series.get("highs") or [])
     lows = list(series.get("lows") or [])
@@ -2330,7 +2874,7 @@ def build_qy_common_result(stock, name, series, ref_date, snapshot_at,
     is_bare_foot = int(
         is_nearly_bare_foot(opens[-1], current_price, highs[-1], lows[-1])
     )
-    return {
+    result = {
         "code": code,
         "name": name or code,
         "stock_code_with_market": stock,
@@ -2355,8 +2899,8 @@ def build_qy_common_result(stock, name, series, ref_date, snapshot_at,
         "all_yin_cross_star": int(metrics["all_yin_cross_star"]),
         "high_gain_10d_count": int(metrics["high_gain_10d_count"]),
         "low_above_ma5_count_10d": int(metrics["low_above_ma5_count_10d"]),
-        "low_above_ma5_count_20d": calculate_low_above_ma5_count_20d(
-            closes, lows
+        "low_above_ma5_count_20d": shared_series_value(
+            shared, "low_above_ma5_count_20d", lambda: calculate_low_above_ma5_count_20d(closes, lows)
         ),
         "continuous_4_no_touch": int(metrics["continuous_4_no_touch"]),
         "lower_shadow_pct_sum_4d": metrics["lower_shadow_pct_sum_4d"],
@@ -2375,9 +2919,15 @@ def build_qy_common_result(stock, name, series, ref_date, snapshot_at,
         "snapshot_at": snapshot_at,
         "updated_at": now_text(),
     }
+    result.update(shared_series_value(
+        shared, "reference_candle_flags", lambda: calculate_reference_candle_flags(
+            stock, opens, closes, previous_close
+        )
+    ))
+    return result
 
 
-def build_qy1_result(stock, name, series, ref_date, snapshot_at, metrics=None):
+def build_qy1_result(stock, name, series, ref_date, snapshot_at, metrics=None, shared=None):
     opens = list(series.get("opens") or [])
     highs = list(series.get("highs") or [])
     lows = list(series.get("lows") or [])
@@ -2390,13 +2940,13 @@ def build_qy1_result(stock, name, series, ref_date, snapshot_at, metrics=None):
         previous_close = safe_float(closes[-2])
     if calc_gain(current_price, previous_close) < MIN_REALTIME_GAIN_PCT:
         return None
-    qy1_metrics = calculate_qy1_metrics(opens, highs, lows, closes)
+    qy1_metrics = shared_series_value(shared, "qy1_metrics", lambda: calculate_qy1_metrics(opens, highs, lows, closes))
     if int(qy1_metrics["all_yin_no_touch_or_eaten_10d"]) != 1:
         return None
     if metrics is None:
-        metrics = calculate_window_metrics(opens, highs, lows, closes)
+        metrics = shared_series_value(shared, "window_metrics", lambda: calculate_window_metrics(opens, highs, lows, closes))
     result = build_qy_common_result(
-        stock, name, series, ref_date, snapshot_at, metrics, qy1_metrics
+        stock, name, series, ref_date, snapshot_at, metrics, qy1_metrics, shared=shared
     )
     result["close_below_ma5_count_10d"] = int(
         qy1_metrics.get("close_below_ma5_count_10d", 0)
@@ -2408,21 +2958,24 @@ def build_qy1_result(stock, name, series, ref_date, snapshot_at, metrics=None):
     return result
 
 
-def build_qy2_result(stock, name, series, ref_date, snapshot_at, metrics=None):
+def build_qy2_result(stock, name, series, ref_date, snapshot_at, metrics=None, shared=None):
     opens = list(series.get("opens") or [])
     highs = list(series.get("highs") or [])
     lows = list(series.get("lows") or [])
     closes = list(series.get("closes") or [])
     if min(len(opens), len(highs), len(lows), len(closes)) < 20:
         return None
-    qy2_metrics = calculate_qy2_metrics(opens, lows, closes)
+    qy2_metrics = calculate_scan_qy2_metrics(
+        shared.get("scan_window") if shared is not None else None,
+        opens, lows, closes
+    )
     if qy2_metrics["all_yin_low_gte_ma5_or_eaten_10d"] != 1:
         return None
     if metrics is None:
-        metrics = calculate_window_metrics(opens, highs, lows, closes)
-    qy1_metrics = calculate_qy1_metrics(opens, highs, lows, closes)
+        metrics = shared_series_value(shared, "window_metrics", lambda: calculate_window_metrics(opens, highs, lows, closes))
+    qy1_metrics = shared_series_value(shared, "qy1_metrics", lambda: calculate_qy1_metrics(opens, highs, lows, closes))
     result = build_qy_common_result(
-        stock, name, series, ref_date, snapshot_at, metrics, qy1_metrics
+        stock, name, series, ref_date, snapshot_at, metrics, qy1_metrics, shared=shared
     )
     result.update({
         "qy2_all_yin_low_gte_ma5_or_eaten_10d": 1,
@@ -2446,7 +2999,7 @@ def build_qy2_result(stock, name, series, ref_date, snapshot_at, metrics=None):
 
 
 def evaluate_candidate(stock, name, series, tick, ref_date, snapshot_at, metrics=None,
-                       published_codes=None, payload_cache=None):
+                       published_codes=None, payload_cache=None, shared=None):
     if len(series.get("closes") or []) < 20:
         return None, None, None
     if metrics is None:
@@ -2499,8 +3052,8 @@ def evaluate_candidate(stock, name, series, tick, ref_date, snapshot_at, metrics
         "yin_count_10d": metrics["yin_count_10d"],
         "high_gain_10d_count": metrics["high_gain_10d_count"],
         "low_above_ma5_count_10d": metrics["low_above_ma5_count_10d"],
-        "low_above_ma5_count_20d": calculate_low_above_ma5_count_20d(
-            series["closes"], series["lows"]
+        "low_above_ma5_count_20d": shared_series_value(
+            shared, "low_above_ma5_count_20d", lambda: calculate_low_above_ma5_count_20d(series["closes"], series["lows"])
         ),
         "all_close_above_ma10_10d": metrics["all_close_above_ma10_10d"],
         "ref_gain_gte_5": 1,
@@ -2532,6 +3085,11 @@ def evaluate_candidate(stock, name, series, tick, ref_date, snapshot_at, metrics
         "snapshot_at": snapshot_at,
         "updated_at": now_text(),
     }
+    result.update(shared_series_value(
+        shared, "reference_candle_flags", lambda: calculate_reference_candle_flags(
+            stock, series["opens"], series["closes"], previous_close
+        )
+    ))
     result.update(five_pull_group_flags)
     result["five_pull_yin_pull_next_or_eaten"] = int(
         five_pull_group_flags.get("five_pull_yin_pull_next", 0) or 0
@@ -2596,7 +3154,9 @@ def scan_stocks(ContextInfo=None, force=False):
         all_ticks = get_realtime_ticks(ContextInfo) if not historical_mode else {}
         tick_seconds = time.time() - tick_started
         if live_reference:
-            actual_tick_date = latest_tick_trade_date(all_ticks)
+            actual_tick_date = latest_tick_trade_date({
+                stock: all_ticks.get(stock, {}) for stock in g_stock_pool
+            })
             if actual_tick_date and actual_tick_date != ref_date:
                 log(
                     "[DATE] system reference=%s, QMT tick date=%s; use tick date"
@@ -2703,13 +3263,13 @@ def scan_stocks(ContextInfo=None, force=False):
                     history_fallback_sample.append(stock)
 
             metrics = None
+            shared = {}
             if pz1_candidate_met:
-                metrics = calculate_window_metrics(
-                    series["opens"], series["highs"],
-                    series["lows"], series["closes"]
+                metrics = calculate_scan_window_metrics(
+                    stock, history, series, ref_date, shared=shared
                 )
                 pz1_result = build_pz1_result(
-                    stock, name, series, ref_date, snapshot_at, metrics=metrics
+                    stock, name, series, ref_date, snapshot_at, metrics=metrics, shared=shared
                 )
                 if pz1_result:
                     pz1_selected.append(pz1_result)
@@ -2717,7 +3277,7 @@ def scan_stocks(ContextInfo=None, force=False):
 
             if qy2_candidate_met:
                 qy2_result = build_qy2_result(
-                    stock, name, series, ref_date, snapshot_at, metrics=metrics
+                    stock, name, series, ref_date, snapshot_at, metrics=metrics, shared=shared
                 )
                 if qy2_result:
                     qy2_selected.append(qy2_result)
@@ -2734,12 +3294,11 @@ def scan_stocks(ContextInfo=None, force=False):
             gain_candidate_count += 1
 
             if metrics is None:
-                metrics = calculate_window_metrics(
-                    series["opens"], series["highs"],
-                    series["lows"], series["closes"]
-                )
+                metrics = shared.get("window_metrics")
+                if metrics is None:
+                    metrics = calculate_scan_window_metrics(stock, history, series, ref_date, shared=shared)
             qy1_result = build_qy1_result(
-                stock, name, series, ref_date, snapshot_at, metrics=metrics
+                stock, name, series, ref_date, snapshot_at, metrics=metrics, shared=shared
             )
             if qy1_result:
                 qy1_selected.append(qy1_result)
@@ -2754,7 +3313,7 @@ def scan_stocks(ContextInfo=None, force=False):
             result, history_payload, realtime_payload = evaluate_candidate(
                 stock, name, series, tick, ref_date, snapshot_at, metrics=metrics,
                 published_codes=g_history_published_codes,
-                payload_cache=kline_payload_cache
+                payload_cache=kline_payload_cache, shared=shared
             )
             if not result:
                 continue
@@ -3005,6 +3564,7 @@ def scan_stocks(ContextInfo=None, force=False):
             ),
             date_text=ref_date,
         )
+        ladder_seconds = publish_limit_up_ladder(ContextInfo, all_ticks, ref_date, snapshot_at)
         total_seconds = time.time() - started
         finished_at = now_text()
         final_info = dict(scan_info)
@@ -3017,6 +3577,7 @@ def scan_stocks(ContextInfo=None, force=False):
             "pz1_redis_seconds": round(pz1_redis_seconds, 4),
             "qy1_redis_seconds": round(qy1_redis_seconds, 4),
             "qy2_redis_seconds": round(qy2_redis_seconds, 4),
+            "ladder_seconds": round(ladder_seconds, 4),
             "kline_history_seconds": round(kline_history_seconds, 4),
             "kline_realtime_seconds": round(kline_realtime_seconds, 4),
             "qy1_history_written": qy1_history_written,
@@ -3189,6 +3750,7 @@ def reload_history_data(ContextInfo=None):
         return
     try:
         preload_history_data(ContextInfo, normalize_trade_date(REFERENCE_DATE))
+        init_ladder_market(ContextInfo, g_ladder_pool or g_stock_pool)
     finally:
         g_scan_lock.release()
 
@@ -3244,6 +3806,7 @@ def init(ContextInfo):
             g_stock_names[stock] = name
     g_stock_pool = [stock for stock in g_stock_pool if stock in g_stock_names]
     log("[MARKET] usable=%d" % len(g_stock_pool))
+    init_ladder_market(ContextInfo, pool)
 
     preload_history_data(ContextInfo, normalize_trade_date(REFERENCE_DATE))
     g_reference_date = resolve_reference_date()
