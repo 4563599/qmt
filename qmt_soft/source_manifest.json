@@ -1,0 +1,7 @@
+{
+  "description": "Public export hashes; credential assignments excluded from business parity check.",
+  "sha256": {
+    "盘中.py": "512f6728b0eaa7da204d57aa81082d332744ca0c1d2cdf50f4a35f0760db3c63",
+    "ths筛选.py": "5cd6af226618e34809e53d657a1c7a06c6af0527cda56eec72527c48050b54f3"
+  }
+}

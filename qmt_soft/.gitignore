@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+logs/
+runtime/
+backups/
+*.log
+.env
+.env.*
+!.env.example
+*.local.*
+验证结果.json

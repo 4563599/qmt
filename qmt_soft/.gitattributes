@@ -1,0 +1,8 @@
+# Keep Python source bytes stable (GBK and approved SHA256 test fixtures).
+*.py -text
+*.cmd text eol=crlf
+*.vbs text eol=crlf
+*.ps1 text eol=crlf
+*.md text eol=lf
+*.json text eol=lf
+*.txt text eol=lf

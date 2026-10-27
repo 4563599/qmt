@@ -1,0 +1,7 @@
+# External Python 3.11 only; do not install into QMT's bundled Python.
+numpy>=1.24,<3
+pandas>=2,<3
+redis>=4.5,<7
+requests>=2.31,<3
+psutil>=5.9,<8
+tushare>=1.4,<2

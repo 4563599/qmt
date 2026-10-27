@@ -68,12 +68,8 @@ DINGTALK_CONDITION3_DEDUP_PREFIX = "dingtalk:pz:pushed:condition3"
 DINGTALK_RECORD_PREFIX = "dingtalk:pz:records"
 
 DINGTALK_ENABLED = True
-DINGTALK_WEBHOOK = (
-    os.environ.get("DINGTALK_WEBHOOK", "")
-)
-DINGTALK_CONDITION3_WEBHOOK = (
-    os.environ.get("DINGTALK_CONDITION3_WEBHOOK", "")
-)
+DINGTALK_WEBHOOK = os.environ.get("DINGTALK_WEBHOOK", "")
+DINGTALK_CONDITION3_WEBHOOK = os.environ.get("DINGTALK_CONDITION3_WEBHOOK", "")
 DINGTALK_ROUTE_YIN20 = "yin20"
 DINGTALK_ROUTE_CONDITION3 = "condition3"
 DINGTALK_FIVE_PULL_CONDITIONS = (
@@ -226,21 +222,36 @@ def normalize_trade_date(value):
 
 def tick_trade_date(tick):
     tick = tick if isinstance(tick, dict) else {}
-    raw_value = tick.get("time") or tick.get("timetag") or tick.get("datetime")
-    if raw_value is None or raw_value == "":
-        return ""
-    direct = normalize_trade_date(raw_value)
-    if direct:
-        return direct
-    numeric = safe_float(raw_value)
-    if numeric <= 0:
-        return ""
-    if numeric > 100000000000:
-        numeric = numeric / 1000.0
-    try:
-        return datetime.fromtimestamp(numeric).strftime("%Y%m%d")
-    except Exception:
-        return ""
+    for field in ("time", "timetag", "datetime"):
+        raw_value = tick.get(field)
+        if raw_value is None or raw_value == "":
+            continue
+        text = str(raw_value).strip()
+        compact_date = text.isdigit() and len(text) in (8, 14, 17)
+        separated_date = len(text) >= 10 and text[4] in "-/" and text[7] in "-/"
+        qmt_date = len(text) > 8 and text[:8].isdigit() and text[8] in " T"
+        # Epoch milliseconds can start with a valid-looking date in year 1793.
+        if (compact_date or separated_date or qmt_date) and text[:4].isdigit():
+            if 1990 <= int(text[:4]) <= 2199:
+                direct = normalize_trade_date(text)
+                if direct:
+                    return direct
+        numeric = safe_float(raw_value)
+        if numeric <= 0:
+            continue
+        if numeric > 100000000000000000:
+            numeric /= 1000000000.0
+        elif numeric > 100000000000000:
+            numeric /= 1000000.0
+        elif numeric > 100000000000:
+            numeric /= 1000.0
+        try:
+            value = datetime.utcfromtimestamp(numeric) + timedelta(hours=8)
+            if 1990 <= value.year <= 2199:
+                return value.strftime("%Y%m%d")
+        except Exception:
+            pass
+    return ""
 
 
 def calc_gain(value, previous):
@@ -509,6 +520,54 @@ def calculate_reference_candle_flags(
         if offset in (10, 20):
             result["yi_yin_yi_yang_%dd" % offset] = 1
         next_open, next_close = day_open, day_close
+    return result
+
+
+def calculate_limit_up_gap_flags(stock_code, series):
+    """Nearest earlier limit-up in 30 sessions; the intervening yin count is <=1."""
+    result = {
+        "limit_up_gap_yin_lte1_30d": 0,
+        "prev_limit_up_date_30d": "",
+        "limit_up_gap_yin_count_30d": None,
+    }
+    opens = series.get("opens") or []
+    closes = series.get("closes") or []
+    dates = series.get("dates") or []
+    size = len(closes)
+    if size < 2 or len(opens) != size:
+        return result
+    previous = safe_float(series.get("pre_close")) or safe_float(closes[-2])
+    if min(safe_float(opens[-1]), safe_float(closes[-1]), previous) <= 0:
+        return result
+    multiplier = Decimal("1") + Decimal(str(get_limit_up_ratio(stock_code))) / Decimal("100")
+
+    def at_limit(close_price, previous_close):
+        upper = float((Decimal(str(previous_close)) * multiplier).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        ))
+        return upper > 0 and abs(safe_float(close_price) - upper) < 0.0001
+
+    if not at_limit(closes[-1], previous):
+        return result
+    # Include the reference day in the 30-day window; exclude both endpoints
+    # from the yin count. A prior close is required to judge the earlier board.
+    first = max(1, size - 30)
+    for index in range(size - 2, first - 1, -1):
+        day_open = safe_float(opens[index])
+        day_close = safe_float(closes[index])
+        day_previous = safe_float(closes[index - 1])
+        if min(day_open, day_close, day_previous) <= 0:
+            return result
+        if not at_limit(day_close, day_previous):
+            continue
+        count = sum(safe_float(closes[day]) < safe_float(opens[day])
+                    for day in range(index + 1, size - 1))
+        result.update({
+            "limit_up_gap_yin_lte1_30d": int(count <= 1),
+            "prev_limit_up_date_30d": normalize_trade_date(dates[index]) if index < len(dates) else "",
+            "limit_up_gap_yin_count_30d": count,
+        })
+        return result
     return result
 
 
@@ -1179,8 +1238,8 @@ def ensure_qy2_candidate_cache(ref_date):
     return g_qy2_candidate_stocks
 
 
-def is_pz1_history_candidate(history, ref_date):
-    """Return whether prior bars can still produce a PZ1 match today."""
+def is_pz1_history_candidate(history, ref_date, stock_code=""):
+    """Keep prior windows that can satisfy any of the eight PZ1 entry routes."""
     history = history if isinstance(history, dict) else {}
     ref_date = normalize_trade_date(ref_date)
     if not ref_date:
@@ -1205,6 +1264,17 @@ def is_pz1_history_candidate(history, ref_date):
         prior_rows.append((open_price, high_price, low_price, close_price))
     if len(prior_rows) < 19:
         return False
+    prior_9 = prior_rows[-9:]
+    if sum(row[3] < row[0] for row in prior_rows[-19:]) <= PZ1_MAX_YIN_COUNT_20:
+        return True
+    if all(row[3] >= row[0] for row in prior_9):
+        return True
+    prior_10 = prior_rows[-10:]
+    if sum(
+        calc_gain(prior_10[index][1], prior_10[index - 1][3]) >= HIGH_GAIN_THRESHOLD_PCT
+        for index in range(1, len(prior_10))
+    ) >= MIN_HIGH_GAIN_COUNT_10D - 1:
+        return True
     shadow_metrics = calculate_prev3_shadow_metrics(
         [row[0] for row in prior_rows],
         [row[1] for row in prior_rows],
@@ -1214,27 +1284,34 @@ def is_pz1_history_candidate(history, ref_date):
     )
     if shadow_metrics["prev3_short_shadow_met"] == 1:
         return True
-    prior_19 = prior_rows[-19:]
-    prior_9 = prior_rows[-9:]
-    yin_count_19 = sum(
-        1 for open_price, _high_price, _low_price, close_price in prior_19
-        if close_price < open_price
-    )
-    yin_count_9 = sum(
-        1 for open_price, _high_price, _low_price, close_price in prior_9
-        if close_price < open_price
-    )
-    if yin_count_19 <= PZ1_MAX_YIN_COUNT_20 or yin_count_9 == 0:
-        return True
-
-    prior_10 = prior_rows[-10:]
-    high_gain_count = sum(
-        1
-        for index in range(1, len(prior_10))
-        if calc_gain(prior_10[index][1], prior_10[index - 1][3]) >= 6.5
-    )
-    # The reference day can add one hit; five-pull no longer needs a yin pattern.
-    return high_gain_count >= MIN_HIGH_GAIN_COUNT_10D - 1
+    if stock_code:
+        # Keep a possible limit-up-gap match before the reference quote exists.
+        # Use the same exact-cent rounding as the final marker, not its gain gate.
+        possible_prior = prior_rows[-30:]
+        previous_close = possible_prior[-1][3]
+        multiplier = Decimal("1") + Decimal(str(get_limit_up_ratio(stock_code))) / Decimal("100")
+        possible_close = float((Decimal(str(previous_close)) * multiplier).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        ))
+        possible_gap = calculate_limit_up_gap_flags(stock_code, {
+            "opens": [row[0] for row in possible_prior] + [previous_close],
+            "closes": [row[3] for row in possible_prior] + [possible_close],
+            "pre_close": previous_close,
+        })
+        if possible_gap["limit_up_gap_yin_lte1_30d"] == 1:
+            return True
+    # Both longer-window and five-pull one-yin patterns imply the last-10 pattern.
+    # Yesterday's yin is left pending until this round's reference candle exists.
+    for index in range(len(prior_9) - 1):
+        day_open, _high, _low, day_close = prior_9[index]
+        if day_close >= day_open:
+            continue
+        next_open, _next_high, _next_low, next_close = prior_9[index + 1]
+        if next_close < next_open:
+            return False
+        if stock_code and is_limit_down_by_price(next_close, day_close, stock_code):
+            return False
+    return True
 
 
 def ensure_pz1_candidate_cache(ref_date):
@@ -1246,7 +1323,7 @@ def ensure_pz1_candidate_cache(ref_date):
     candidates = {
         stock
         for stock, history in g_history_data.items()
-        if is_pz1_history_candidate(history, ref_date)
+        if is_pz1_history_candidate(history, ref_date, stock)
     }
     g_pz1_candidate_cache_date = ref_date
     g_pz1_candidate_stocks = candidates
@@ -2628,6 +2705,14 @@ def build_pz1_result(stock, name, series, ref_date, snapshot_at, metrics=None, s
         previous_close = safe_float(closes[-2])
     ref_gain = calc_gain(current_price, previous_close)
     max_gain = calc_gain(highs[-1], previous_close)
+    reference_flags = shared_series_value(
+        shared, "reference_candle_flags", lambda: calculate_reference_candle_flags(
+            stock, opens, closes, previous_close
+        )
+    )
+    yi_yin_yi_yang_flags = calculate_yi_yin_yi_yang_flags(
+        stock, opens, closes, metrics["high_gain_10d_count"], previous_close
+    )
     is_ref_price_20d_high = int(
         current_price + 1e-8 >= shared_series_value(
             shared, "prior_high_20d", lambda: max(safe_float(value) for value in highs[-20:-1])
@@ -2662,20 +2747,23 @@ def build_pz1_result(stock, name, series, ref_date, snapshot_at, metrics=None, s
     yin_pull_next_or_eaten_met = int(
         five_pull_group_flags.get("five_pull_yin_pull_next", 0) or 0
     )
-    if not (
-        yin_count_20_lte_7_and_ref_yang
-        or quanyang_10d_met
-        or five_pull_met
-        or yin_pull_next_or_eaten_met
-        or high_gain_prev3_short_shadow_met
-    ):
+    limit_up_gap_flags = shared_series_value(
+        shared, "limit_up_gap_flags", lambda: calculate_limit_up_gap_flags(stock, series)
+    )
+    entry_flags = (
+        ("yin_count_20_lte_7_and_ref_yang", yin_count_20_lte_7_and_ref_yang),
+        ("quanyang_10d", quanyang_10d_met),
+        ("high_gain_10d_gte_5", five_pull_met),
+        ("high_gain_prev3_short_shadow", high_gain_prev3_short_shadow_met),
+        ("yi_yin_yi_yang_10d", reference_flags["yi_yin_yi_yang_10d"]),
+        ("yi_yin_yi_yang_20d", reference_flags["yi_yin_yi_yang_20d"]),
+        ("yi_yin_yi_yang", yi_yin_yi_yang_flags["yi_yin_yi_yang"]),
+        ("limit_up_gap_yin_lte1_30d", limit_up_gap_flags["limit_up_gap_yin_lte1_30d"]),
+    )
+    if not any(value for _field, value in entry_flags):
         return None
-
     yin_below_ma5_stats = calculate_yin_close_below_ma5_stats_20d(
         opens, closes
-    )
-    yi_yin_yi_yang_flags = calculate_yi_yin_yi_yang_flags(
-        stock, opens, closes, metrics["high_gain_10d_count"], previous_close
     )
     code = simple_code(stock)
     limit_ratio = get_limit_up_ratio(stock)
@@ -2770,28 +2858,13 @@ def build_pz1_result(stock, name, series, ref_date, snapshot_at, metrics=None, s
         "pz1_high_gain_prev3_short_shadow_met": (
             high_gain_prev3_short_shadow_met
         ),
-        "match_reasons": (
-            (["yin_count_20_lte_7_and_ref_yang"] if yin_count_20_lte_7_and_ref_yang else [])
-            + (["quanyang_10d"] if quanyang_10d_met else [])
-            + (["high_gain_10d_gte_5"] if five_pull_met else [])
-            + (
-                ["five_pull_yin_pull_next_or_eaten"]
-                if yin_pull_next_or_eaten_met else []
-            )
-            + (
-                ["high_gain_prev3_short_shadow"]
-                if high_gain_prev3_short_shadow_met else []
-            )
-        ),
+        "match_reasons": [field for field, value in entry_flags if value],
         "selected_at": snapshot_at,
         "snapshot_at": snapshot_at,
         "updated_at": now_text(),
     }
-    result.update(shared_series_value(
-        shared, "reference_candle_flags", lambda: calculate_reference_candle_flags(
-            stock, opens, closes, previous_close
-        )
-    ))
+    result.update(reference_flags)
+    result.update(limit_up_gap_flags)
     result.update(five_pull_group_flags)
     result["five_pull_yin_pull_next_or_eaten"] = int(
         five_pull_group_flags.get("five_pull_yin_pull_next", 0) or 0
@@ -2923,6 +2996,9 @@ def build_qy_common_result(stock, name, series, ref_date, snapshot_at,
         shared, "reference_candle_flags", lambda: calculate_reference_candle_flags(
             stock, opens, closes, previous_close
         )
+    ))
+    result.update(shared_series_value(
+        shared, "limit_up_gap_flags", lambda: calculate_limit_up_gap_flags(stock, series)
     ))
     return result
 
@@ -3089,6 +3165,9 @@ def evaluate_candidate(stock, name, series, tick, ref_date, snapshot_at, metrics
         shared, "reference_candle_flags", lambda: calculate_reference_candle_flags(
             stock, series["opens"], series["closes"], previous_close
         )
+    ))
+    result.update(shared_series_value(
+        shared, "limit_up_gap_flags", lambda: calculate_limit_up_gap_flags(stock, series)
     ))
     result.update(five_pull_group_flags)
     result["five_pull_yin_pull_next_or_eaten"] = int(

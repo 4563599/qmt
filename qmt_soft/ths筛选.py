@@ -14,6 +14,7 @@ REFERENCE_DATE填写YYYYMMDD时进入历史模式，只发布一次，不启动定时器。
 from __future__ import print_function
 
 import csv
+import hashlib
 import json
 import math
 import os
@@ -86,6 +87,42 @@ g_close_bar_cache = {}
 g_close_bar_last_fetch_at = 0.0
 g_history_rows_cache_date = ""
 g_history_rows_cache = {}
+g_ths_digest_cache = None
+g_redis_lua_disabled_client = None
+
+_THS_SNAPSHOT_LUA = """
+local latest = redis.call('GET', KEYS[1])
+if not latest or latest ~= KEYS[2] then
+    return {latest or false, false, false}
+end
+local raw = redis.call('GET', KEYS[2])
+if not raw then return {latest, false, false} end
+local digest = redis.sha1hex(raw)
+if digest == ARGV[1] then return {latest, digest, false} end
+return {latest, digest, raw}
+"""
+
+_KLINE_DELTA_LUA = """
+local values = {'_ths_snapshot_info', ARGV[2]}
+for offset = 3, #ARGV, 5 do
+    local old = redis.call('HGET', KEYS[1], ARGV[offset])
+    if not old then return 0 end
+    local marker = '"rows":['
+    local first = string.find(old, marker, 1, true)
+    if not first then return 0 end
+    first = first + #marker
+    local size = tonumber(ARGV[offset + 2])
+    local history = string.sub(old, first, first + size - 1)
+    if #history ~= size or redis.sha1hex(history) ~= ARGV[offset + 3] then
+        return 0
+    end
+    values[#values + 1] = ARGV[offset]
+    values[#values + 1] = ARGV[offset + 1] .. history .. ARGV[offset + 4]
+end
+redis.call('HSET', KEYS[1], unpack(values))
+redis.call('EXPIRE', KEYS[1], tonumber(ARGV[1]))
+return 1
+"""
 
 
 # ==================== 通用工具 ====================
@@ -224,22 +261,21 @@ def _redis_keys(redis_client, pattern):
     return list(redis_client.keys(pattern))
 
 
-def _redis_get_payload_unchecked(redis_client, key):
-    """
-    QMT内置redis-py会把包含股票代码和普通数字的响应误判为敏感数据。
-    这里只对THS大JSON使用底层连接读取，绕过客户端响应文本扫描；Redis命令仍是只读GET。
-    """
+def _redis_command_unchecked(redis_client, command, *arguments):
+    # QMT's high-level response scanner misclassifies stock JSON as sensitive text.
     pool = getattr(redis_client, "connection_pool", None)
     if pool is None:
-        return redis_client.get(key)
+        if command == "GET":
+            return redis_client.get(*arguments)
+        return redis_client.execute_command(command, *arguments)
 
     connection = None
     try:
         try:
-            connection = pool.get_connection("GET")
+            connection = pool.get_connection(command)
         except TypeError:
             connection = pool.get_connection()
-        connection.send_command("GET", key)
+        connection.send_command(command, *arguments)
         return connection.read_response()
     except Exception:
         if connection is not None:
@@ -254,6 +290,79 @@ def _redis_get_payload_unchecked(redis_client, key):
                 pool.release(connection)
             except Exception:
                 pass
+
+
+def _redis_get_payload_unchecked(redis_client, key):
+    return _redis_command_unchecked(redis_client, "GET", key)
+
+
+@lru_cache(maxsize=8)
+def _lua_digest(script):
+    return hashlib.sha1(script.encode("utf-8")).hexdigest()
+
+
+def _redis_eval_cached(redis_client, script, keys, arguments):
+    global g_redis_lua_disabled_client
+    if g_redis_lua_disabled_client is redis_client:
+        return None
+    values = [len(keys)] + list(keys) + list(arguments)
+    try:
+        try:
+            return _redis_command_unchecked(
+                redis_client, "EVALSHA", _lua_digest(script), *values
+            )
+        except Exception as error:
+            if type(error).__name__ != "NoScriptError" and "NOSCRIPT" not in str(error).upper():
+                raise
+            return _redis_command_unchecked(redis_client, "EVAL", script, *values)
+    except Exception as error:
+        message = str(error).upper()
+        if (isinstance(error, (AttributeError, NotImplementedError))
+                or "NOPERM" in message or "UNKNOWN COMMAND" in message):
+            g_redis_lua_disabled_client = redis_client
+            log("Redis增量优化不可用，回退到原来的全量读写", "WARN", REFERENCE_DATE)
+        return None
+
+
+def _resolve_ths_source_cached(redis_client, force_reload=False):
+    global g_ths_digest_cache
+    if REFERENCE_DATE:
+        g_ths_digest_cache = None
+        return resolve_ths_source(redis_client, REFERENCE_DATE)
+    cached = g_ths_digest_cache
+    if cached is not None and cached[0] is not redis_client:
+        cached = None
+    key = cached[1] if cached is not None else THS_LATEST_KEY
+    digest = cached[2] if cached is not None and not force_reload else ""
+    result = _redis_eval_cached(
+        redis_client, _THS_SNAPSHOT_LUA, [THS_LATEST_KEY, key], [digest]
+    )
+    if isinstance(result, (list, tuple)) and len(result) == 3:
+        latest = result[0]
+        if isinstance(latest, bytes):
+            latest = latest.decode("utf-8", errors="ignore")
+        latest = str(latest or "").strip()
+        if re.match(r"^ths:\d{8}$", latest):
+            server_digest = result[1]
+            if isinstance(server_digest, bytes):
+                server_digest = server_digest.decode("ascii")
+            if cached is not None and cached[1] == latest and server_digest == digest and digest:
+                return latest, cached[3]
+            raw = result[2]
+            if raw is None:
+                raw = _redis_get_payload_unchecked(redis_client, latest)
+            payload = _decode_ths_payload(raw)
+            if _valid_ths_payload(payload):
+                if not isinstance(raw, (bytes, str)):
+                    g_ths_digest_cache = None
+                    return latest, payload
+                encoded = raw if isinstance(raw, bytes) else raw.encode("utf-8")
+                g_ths_digest_cache = (
+                    redis_client, latest, hashlib.sha1(encoded).hexdigest(), payload
+                )
+                return latest, payload
+    g_ths_digest_cache = None
+    return resolve_ths_source(redis_client, REFERENCE_DATE)
 
 
 def resolve_ths_source(redis_client, reference_date=""):
@@ -833,7 +942,7 @@ def calculate_panzhong_flags(stock, rows, high_gain_10d_count):
     )
     if code.startswith(("688", "300", "301")):
         limit_ratio = 20.0
-    elif code.startswith(("8", "4")):
+    elif code.startswith(("8", "4", "92")):
         limit_ratio = 30.0
     else:
         limit_ratio = 10.0
@@ -1294,6 +1403,23 @@ def write_status(redis_client, date_text, mapping):
         log("状态写入失败: %s" % error, "WARN", date_text)
 
 
+def _kline_delta_parts(payload, encoded):
+    if not isinstance(payload, dict):
+        return None
+    rows = payload.get("rows")
+    if not isinstance(rows, list) or not rows or list(payload)[-1] != "rows":
+        return None
+    header = dict(payload)
+    header.pop("rows")
+    head = json.dumps(header, ensure_ascii=False, separators=(",", ":"))[:-1]
+    head += ("," if header else "") + '"rows":['
+    tail = json.dumps(rows[-1], ensure_ascii=False, separators=(",", ":")) + "]}"
+    if not encoded.startswith(head) or not encoded.endswith(tail):
+        return None
+    history = encoded[len(head):-len(tail)].encode("utf-8")
+    return head, len(history), hashlib.sha1(history).hexdigest(), tail
+
+
 def publish_payloads(redis_client, ref_date, payloads, ths_source_key, ths_stats,
                      started_at=None, target_count=None):
     if redis_client is None:
@@ -1306,10 +1432,13 @@ def publish_payloads(redis_client, ref_date, payloads, ths_source_key, ths_stats
     payloads = dict(payloads or {})
     target_count = int(target_count if target_count is not None else len(payloads))
     mapping = {}
+    deltas = {}
     total_bytes = 0
     for code, payload in payloads.items():
         encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-        mapping[_simple_code(code)] = encoded
+        simple_code = _simple_code(code)
+        mapping[simple_code] = encoded
+        deltas[simple_code] = _kline_delta_parts(payload, encoded)
         total_bytes += len(encoded.encode("utf-8"))
 
     info = {
@@ -1330,11 +1459,19 @@ def publish_payloads(redis_client, ref_date, payloads, ths_source_key, ths_stats
     info_encoded = json.dumps(info, ensure_ascii=False, separators=(",", ":"))
     total_bytes += len(info_encoded.encode("utf-8"))
 
-    pipe = redis_client.pipeline(transaction=False)
     mapping["_ths_snapshot_info"] = info_encoded
-    pipe.hset(key, mapping=mapping)
-    pipe.expire(key, REDIS_QMT_KLINE_TTL_SEC)
-    pipe.execute()
+    published = False
+    if len(deltas) <= 512 and all(value is not None for value in deltas.values()):
+        arguments = [REDIS_QMT_KLINE_TTL_SEC, info_encoded]
+        for code, parts in deltas.items():
+            arguments.extend((code,) + parts)
+        # Verify every historical prefix before writing any field; mismatches use full HSET.
+        published = _redis_eval_cached(redis_client, _KLINE_DELTA_LUA, [key], arguments) == 1
+    if not published:
+        pipe = redis_client.pipeline(transaction=False)
+        pipe.hset(key, mapping=mapping)
+        pipe.expire(key, REDIS_QMT_KLINE_TTL_SEC)
+        pipe.execute()
     return {
         "redis_key": key,
         "success_count": len(mapping) - 1,
@@ -1485,7 +1622,7 @@ def refresh_ths_universe(ContextInfo, force_reload=False):
     global g_ths_stock_metadata
     global g_history_rows_cache
     ths_started = time.time()
-    source_key, payload = resolve_ths_source(g_redis_client, REFERENCE_DATE)
+    source_key, payload = _resolve_ths_source_cached(g_redis_client, force_reload)
     all_metadata = collect_ths_stock_metadata(payload)
     _load_qmt_names(ContextInfo, payload)
     stocks, names, stats = select_ths_universe(payload, g_market_code_map, g_stock_names)
@@ -1870,7 +2007,7 @@ def init(ContextInfo):
 
     log("=" * 70)
     log("THS股票清洗与K线一秒连续同步程序初始化")
-    log("[CONFIG] optimization=ths_latest_fastpath_history_cache_pipeline_v1")
+    log("[CONFIG] optimization=ths_content_digest_exact_kline_delta_v2")
     log("=" * 70)
     if not init_redis():
         return
